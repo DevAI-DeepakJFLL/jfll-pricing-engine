@@ -1,0 +1,116 @@
+# ==============================================================================
+# Air Export Pricing Recommendation Engine - Git Ignore Rules
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. CONFIDENTIAL BUSINESS DATA & SPREADSHEETS (STRICT SECURITY EXCLUSION)
+# ------------------------------------------------------------------------------
+# Raw business reports, customer shipment datasets, won/lost quote records
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# General tabular data files containing proprietary commercial figures
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+*.tsv
+*.parquet
+*.feather
+
+# Keep directory structure
+!data/**/.gitkeep
+
+# ------------------------------------------------------------------------------
+# 2. RUNTIME DATABASES, AUDIT TRAILS & LOCAL STATE
+# ------------------------------------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+data/recommendations_history.db
+
+# ------------------------------------------------------------------------------
+# 3. SERIALIZED MACHINE LEARNING MODEL ARTIFACTS
+# ------------------------------------------------------------------------------
+# Serialized models contain proprietary customer lookup tables & cohort stats
+*.joblib
+*.pkl
+*.pickle
+*.h5
+*.pt
+*.pth
+*.onnx
+models/*
+!models/.gitkeep
+
+# ------------------------------------------------------------------------------
+# 4. ENVIRONMENT VARIABLES, SECRETS & CREDENTIALS
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+credentials.json
+client_secret*.json
+
+# ------------------------------------------------------------------------------
+# 5. PYTHON BYTECODE & VIRTUAL ENVIRONMENTS
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+.venv/
+venv/
+env/
+ENV/
+.env/
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ------------------------------------------------------------------------------
+# 6. OPERATING SYSTEM & IDE ARTIFACTS
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ------------------------------------------------------------------------------
+# 7. LOGS, TESTING & LOCAL SCRATCH ARTIFACTS
+# ------------------------------------------------------------------------------
+*.log
+/tmp/
+tmp/
+scratch/
+.pytest_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Agent tooling
+.agents/
+
