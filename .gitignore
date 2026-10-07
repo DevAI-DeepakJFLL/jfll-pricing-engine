@@ -114,3 +114,10 @@ htmlcov/
 # Agent tooling
 .agents/
 
+
+# Local internal documentation & audits
+docs/
+CODEBASE_REVIEW_REPORT.md
+GEMINI.md
+REMEDIATION_FIXES_SUMMARY.md
+margin_engine_test_cases.md
