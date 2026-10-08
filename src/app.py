@@ -1218,12 +1218,12 @@ HTML_TEMPLATE = """
                     <div class="metric-card">
                         <div class="metric-title">
                             <span class="tip-target">
-                                Recommended Margin %
+                                Recommended Margin Range
                                 <span class="info-dot">i</span>
-                                <span class="tip-bubble">Optimal markup percentage calculated for this shipment corridor and profile.</span>
+                                <span class="tip-bubble">Recommended commercial margin range calculated with statistical confidence for this trade lane.</span>
                             </span>
                         </div>
-                        <div class="metric-number" id="res_margin_pct" style="color: var(--primary-dark);">0.0%</div>
+                        <div class="metric-number" id="res_margin_pct" style="color: var(--primary-dark);">0.0% – 0.0%</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">
@@ -1732,10 +1732,11 @@ HTML_TEMPLATE = """
             currentStrategies = stratDict;
             currentSensitivityRows = body.sensitivity || [];
             currentChargeableWeight = weights.chargeable_wt || 100;
+            currentCorridor = body.negotiation_corridor || (opt && opt.negotiation_corridor) || null;
 
-            renderStrategicCards(currentStrategies, 'balanced', currentChargeableWeight);
+            renderStrategicCards(currentStrategies, 'balanced', currentChargeableWeight, currentCorridor);
             renderSensitivityTable(currentSensitivityRows, opt.Margin_Percentage);
-            updateHeroMetrics(opt);
+            updateHeroMetrics(opt, currentCorridor);
 
             if (body.warnings && body.warnings.length > 0 && noticeAlert) {
                 noticeAlert.style.display = 'block';
@@ -1758,13 +1759,23 @@ HTML_TEMPLATE = """
     let selectedStrategyKey = 'balanced';
     let currentSensitivityRows = [];
     let currentChargeableWeight = 100;
+    let currentCorridor = null;
 
-    function updateHeroMetrics(strat) {
+    function updateHeroMetrics(strat, corridor) {
         if (!strat) return;
+        const corr = corridor || currentCorridor;
         const grossMarginPct = strat.Gross_Margin_Percentage !== undefined ? strat.Gross_Margin_Percentage : ((strat.Margin_Amount_INR / Math.max(1, strat.Quoted_Sell_Price_INR)) * 100);
         document.getElementById('res_selling_price').innerText = `₹${formatINR(strat.Quoted_Sell_Price_INR)}`;
-        document.getElementById('res_hero_sub').innerText = `Markup on Buy: ${strat.Margin_Percentage.toFixed(1)}% | Gross Margin on Sell: ${grossMarginPct.toFixed(1)}% (₹${formatINR(strat.Margin_Amount_INR)} Gross Profit if Won)`;
-        document.getElementById('res_margin_pct').innerText = `${strat.Margin_Percentage.toFixed(1)}% (GM: ${grossMarginPct.toFixed(1)}%)`;
+        
+        let marginRangeText = `${strat.Margin_Percentage.toFixed(1)}%`;
+        if (corr && corr.min_margin_pct !== undefined && corr.max_margin_pct !== undefined) {
+            marginRangeText = `${corr.min_margin_pct.toFixed(1)}% – ${corr.max_margin_pct.toFixed(1)}%`;
+            document.getElementById('res_hero_sub').innerText = `Recommended Margin: ${marginRangeText} (Target: ${strat.Margin_Percentage.toFixed(1)}% | ₹${formatINR(strat.Margin_Amount_INR)} Gross Profit if Won)`;
+        } else {
+            document.getElementById('res_hero_sub').innerText = `Markup on Buy: ${strat.Margin_Percentage.toFixed(1)}% | Gross Margin on Sell: ${grossMarginPct.toFixed(1)}% (₹${formatINR(strat.Margin_Amount_INR)} Gross Profit if Won)`;
+        }
+
+        document.getElementById('res_margin_pct').innerText = marginRangeText;
         if (strat.History_Percentile !== undefined && strat.History_Percentile !== null) {
             document.getElementById('res_win_prob').innerText = `P${strat.History_Percentile.toFixed(0)}`;
         } else if (strat.Win_Probability !== undefined && strat.Win_Probability !== null) {
@@ -1790,10 +1801,11 @@ HTML_TEMPLATE = """
         }
     }
 
-    function renderStrategicCards(strategies, activeKey, chWt) {
+    function renderStrategicCards(strategies, activeKey, chWt, corridor) {
         currentStrategies = strategies || {};
         selectedStrategyKey = activeKey || 'balanced';
         currentChargeableWeight = chWt || 100;
+        if (corridor) currentCorridor = corridor;
 
         const container = document.getElementById('strategic_tiers');
         if (!container) return;
@@ -1823,12 +1835,23 @@ HTML_TEMPLATE = """
                     ? `<span>•</span><span>Win Prob: <strong class="strat-meta-val">${(strat.Win_Probability * 100).toFixed(1)}%</strong></span>`
                     : '');
 
+            // Present margin as a clear range indicator on the balanced card, or clear tier range indicator
+            let rangeBadgeHtml = '';
+            if (key === 'balanced' && currentCorridor && currentCorridor.min_margin_pct !== undefined && currentCorridor.max_margin_pct !== undefined) {
+                rangeBadgeHtml = `<span class="badge" style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px;">Recommended Range: ${currentCorridor.min_margin_pct.toFixed(1)}% – ${currentCorridor.max_margin_pct.toFixed(1)}%</span>`;
+            } else if (key === 'floor' && currentCorridor && currentCorridor.min_margin_pct !== undefined) {
+                rangeBadgeHtml = `<span class="badge" style="background: #f1f5f9; color: #475569; font-weight: 700; font-size: 11px;">Floor Bound: ${currentCorridor.min_margin_pct.toFixed(1)}%</span>`;
+            } else if (key === 'premium' && currentCorridor && currentCorridor.max_margin_pct !== undefined) {
+                rangeBadgeHtml = `<span class="badge" style="background: #f5f3ff; color: #7c3aed; font-weight: 700; font-size: 11px;">Ceiling Bound: ${currentCorridor.max_margin_pct.toFixed(1)}%</span>`;
+            }
+
             card.innerHTML = `
                 <div class="strat-card-left">
                     <div class="strat-card-title-row">
                         <span class="strat-radio-indicator"></span>
                         <span class="strat-name">${strat.Strategy_Name}</span>
                         <span class="badge badge-${key}">${strat.Badge_Label}</span>
+                        ${rangeBadgeHtml}
                         ${clampedBadge}
                     </div>
                     <div class="strat-meta-chips">
@@ -1846,7 +1869,6 @@ HTML_TEMPLATE = """
                     <div class="strat-price-unit">Sell: ₹${formatINR(perKgPrice)} / kg</div>
                 </div>
             `;
-
 
             card.onclick = function() { selectStrategyCard(key); };
             card.onkeydown = function(e) {
@@ -1880,7 +1902,7 @@ HTML_TEMPLATE = """
         });
 
         // Update Hero Metric and Top Summary Cards
-        updateHeroMetrics(strat);
+        updateHeroMetrics(strat, currentCorridor);
 
         // Highlight matching row in Market Sensitivity Frontier
         renderSensitivityTable(currentSensitivityRows, strat.Margin_Percentage);
@@ -2764,6 +2786,7 @@ def api_quote():
             "status": "success",
             "optimal": optimal_quote,
             "strategic_recommendations": legacy["strategic_recommendations"],
+            "negotiation_corridor": legacy.get("negotiation_corridor"),
             "sensitivity": sens,
             "confidence": confidence,
             "warnings": warnings,

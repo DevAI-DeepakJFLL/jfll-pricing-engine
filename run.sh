@@ -39,6 +39,10 @@ case "$1" in
         echo "[*] Starting Web UI on http://127.0.0.1:5050..."
         $PYTHON src/app.py
         ;;
+    drift)
+        echo "[*] Running offline market drift & concept shift watchdog..."
+        $PYTHON scripts/monitor_market_drift.py
+        ;;
     pipeline)
         echo "[*] Running end-to-end pipeline: Preprocess -> Train -> Verify -> Test -> Serve..."
         $PYTHON src/preprocess.py
@@ -48,7 +52,7 @@ case "$1" in
         $PYTHON src/app.py
         ;;
     *)
-        echo "Usage: ./run.sh {verify|preprocess|train|test|serve|pipeline}"
+        echo "Usage: ./run.sh {verify|preprocess|train|test|serve|drift|pipeline}"
         echo "Defaulting to starting the web app..."
         $PYTHON src/app.py
         ;;

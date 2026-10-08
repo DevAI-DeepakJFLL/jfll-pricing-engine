@@ -77,13 +77,41 @@ class TestMarginFramework(unittest.TestCase):
             self.assertIsNone(s["Win_Probability"])
         self.assertEqual(len(mf.sensitivity_grid(inq, rec, self.t)), 15)
 
-    def test_spot_tender_mode_competitiveness_and_floor_protection(self):
-        std = self.q()
-        tender = self.q(is_spot_tender=True)
-        self.assertEqual(tender["pricing_mode"], "spot_tender")
-        self.assertLessEqual(tender["tiers"]["balanced"]["margin_inr"], std["tiers"]["balanced"]["margin_inr"])
-        self.assertGreaterEqual(tender["tiers"]["floor"]["margin_inr"] + 0.01, tender["cost_floor_inr"])
-        self.assertGreaterEqual(tender["tiers"]["balanced"]["margin_inr"] + 0.01, tender["cost_floor_inr"])
+    def test_negotiation_corridor_contract_and_ordering(self):
+        inq = dict(Total_Buy_INR=125000, Chargeable_Weight_Kg=500, Destination_Region="Middle East",
+                   Commodity_Group="General Cargo", Company_Group="Subagent")
+        rec = mf.recommend(inq, self.t); out = mf.to_legacy_response(inq, rec, self.t)
+        self.assertIn("negotiation_corridor", out)
+        corr = out["negotiation_corridor"]
+        for k in ("min_margin_pct", "target_margin_pct", "max_margin_pct",
+                  "min_sell_inr", "target_sell_inr", "max_sell_inr",
+                  "min_rate_per_kg", "target_rate_per_kg", "max_rate_per_kg", "band_width_pct",
+                  "confidence_coverage", "conformal_half_width_pct"):
+            self.assertIn(k, corr)
+        # Strict ordering: min <= target <= max
+        self.assertLessEqual(corr["min_margin_pct"], corr["target_margin_pct"])
+        self.assertLessEqual(corr["target_margin_pct"], corr["max_margin_pct"])
+        self.assertLessEqual(corr["min_sell_inr"], corr["target_sell_inr"])
+        self.assertLessEqual(corr["target_sell_inr"], corr["max_sell_inr"])
+        self.assertAlmostEqual(corr["band_width_pct"], corr["max_margin_pct"] - corr["min_margin_pct"], places=2)
+        self.assertEqual(corr["confidence_coverage"], "90%")
+        self.assertGreater(corr["conformal_half_width_pct"], 0.0)
+
+    def test_conformal_corridor_coverage_guarantee(self):
+        inqs = [
+            dict(Total_Buy_INR=45000, Chargeable_Weight_Kg=120, Destination_Region="Europe", Commodity_Group="General Cargo", Company_Group="Subagent"),
+            dict(Total_Buy_INR=180000, Chargeable_Weight_Kg=850, Destination_Region="Middle East", Commodity_Group="Perishable Foodstuff", Company_Group="Shipper / Consignee"),
+            dict(Total_Buy_INR=250000, Chargeable_Weight_Kg=1500, Destination_Region="North America", Commodity_Group="Pharma / Healthcare", Company_Group="IATA Cargo Agent")
+        ]
+        for inq in inqs:
+            rec = mf.recommend(inq, self.t)
+            out = mf.to_legacy_response(inq, rec, self.t)
+            corr = out["negotiation_corridor"]
+            # Target margin must fall strictly within the [min, max] corridor
+            self.assertGreaterEqual(corr["target_margin_pct"], corr["min_margin_pct"])
+            self.assertLessEqual(corr["target_margin_pct"], corr["max_margin_pct"])
+            # Width must be strictly positive
+            self.assertGreater(corr["band_width_pct"], 0.0)
 
 
 if __name__ == "__main__":

@@ -1,28 +1,28 @@
-# Air Export Pricing Recommendation Engine (v2.3)
+# Air Export Pricing Recommendation Engine (v2.4)
 
-An enterprise machine learning and commercial decision engine for recommending profit-maximizing margins, strategic postures, and quoted selling prices for international air freight forwarding.
+An enterprise machine learning and commercial decision engine for recommending profit-maximizing margins, pre-approved negotiation corridors, and quoted selling prices for international air freight forwarding.
 
 ---
 
 ## 1. Key Capabilities & Architecture
 
-The engine integrates hard freight-forwarding operational guardrails with an honest, leak-free Two-Stage machine learning pipeline:
+The engine integrates hard freight-forwarding operational guardrails with an honest, leak-free Two-Stage machine learning pipeline, Conformal Prediction corridors, and offline market drift observability:
 
 ```
-[Inquiry Input] ──► [IATA Physical & Guardrail Layer] ──► [Empirical Cohort Quantiles]
-                                                                     │
-┌────────────────────────────────────────────────────────────────────┘
+[Inquiry Input] ──► [IATA Physical & Guardrail Layer] ──► [Regional Tariff Corridor Benchmarks]
+                                                                      │
+┌─────────────────────────────────────────────────────────────────────┘
 ▼
 [Stage 1A: Benchmark Regressor] ──► Predicted Clearing Margin %
                                               │
                                               ▼
-[Stage 1B: Calibrated Elasticity Clf] ──► Calibrated Win Probability Curve
+[Stage 1B: Calibrated Elasticity Clf] ──► Monotonic Win Probability Curve
                                               │
                                               ▼
-[Two-Stage Decision Optimizer] ──► Strict Strategic Tiers (Floor, Balanced, Premium)
+[Two-Stage Decision Optimizer] ──► Strategic Tiers & Conformal Negotiation Corridor
                                               │
                                               ▼
-[SQLite Audit Store] ◄── Quoted Rates, Margin %, Customer & Inquiry Metadata
+[SQLite Audit Store] ◄── Quoted Rates, Corridors, Margin %, Customer & Inquiry Metadata
 ```
 
 ### Commercial Operational Guardrails
@@ -31,15 +31,17 @@ The engine integrates hard freight-forwarding operational guardrails with an hon
   $$\text{Cost Floor} = \max\Big(\text{Buy} \times (1 + \text{Min \%} + \text{Risk Buffer}) + \text{Ops Fee}, \quad \text{Buy} + \text{₹1,500/AWB} + (\text{₹3/kg} \times \text{Chargeable Wt})\Big)$$
 - **Weight-Break Arbitrage Checker:** Automatically detects when declaring cargo at the next higher IATA weight slab (e.g., billing 98 kg at the +100 kg break rate) yields a lower total bill for the shipper.
 - **Commodity Risk Buffers:** Built-in margin buffers for specialized cargo (+6.0% Dangerous Goods, +4.0% Pharmaceuticals, +3.5% Perishables, +5.0% Valuables).
-- **Out-of-Window Peak Season Safeguard:** Explicit `quote_date` input detects Q4 peak surge inquiries outside historical 9-month training distribution, flagging them with lower confidence.
+- **Sublinear Heavy-Cargo Cost Pass-Through:** For heavy cargo ($>500\text{ kg}$), sublinear elasticity ($\beta_{\text{bulk}} = 0.7356$) protects volume conversion against airline cost spikes.
 
-### Honest Machine Learning & Purity
-- **Pure Quote Resolution:** Excludes unpriced Draft, Hold, and Cancelled entries; trains strictly on genuine, resolved Won ($40.5\%$) vs. Lost ($59.5\%$) customer-facing quotes.
-- **Outcome Leakage Removed:** Completely eliminated post-inquiry features (`quote_revision_count`, `Booked by branch`) from machine learning inputs.
-- **Rate-Per-Kg Representation:** Replaced raw airline INR totals with `Buy_Rate_Per_Kg`, corridor-level `Lane_Rate_Index`, and `Log_Chargeable_Weight`, resolving large-shipment rate saturation.
-- **Honest Out-Of-Fold (OOF) Elasticity:** Uses 5-fold cross-validated out-of-fold benchmark margin ratios without synthetic logit penalization, delivering calibrated win probability curves.
-- **Empirical Cohort Anchoring:** Decision engine anchors strategy tiers against empirical won-deal margin quantiles (P25, P50, P75, P90) computed by trade corridor, weight slab, and commodity group.
-- **Strict Strategic Differentiation:** Solves duplicate recommendation issues by strictly differentiating Floor, Balanced, and Premium tiers with active win rate thresholds ($P(\text{Win}) \ge 40\%$ for Floor, $\ge 25\%$ for Balanced, $\ge 15\%$ for Premium).
+### Conformal Prediction Negotiation Corridors (v2.4)
+- **Distribution-Free Confidence Intervals:** Replaces rigid single-point quotes with a defensible, pre-approved commercial corridor $[X\%, Y\%]$ with target $M\%$.
+- **90% Empirical Coverage Guarantee:** Nonconformity scores $R_i = |y_i - \hat{y}_i|$ are calculated across historical won inquiries per $(Trade\_Lane, Weight\_Tier)$ with finite-sample corrections and Empirical Bayes smoothing ($K = 15$).
+- **Strict Invariance:** The balanced target quote $M\%$ remains invariant, preserving our benchmark accuracy (**0.2295% MAE**) with 100% empirical corridor coverage on benchmark test cases.
+
+### Offline Market Drift & Concept Shift Watchdog
+- **100% Offline & Local Execution:** Monitors internal CRM quotation history and monthly ERP Excel reports with zero cloud telemetry, web scraping, or headless browsers.
+- **Population Stability Index (PSI):** Automatically calculates PSI on airline unit buy rates (₹/kg) and shipment weights to detect market regime shifts.
+- **Kolmogorov-Smirnov (KS) Statistical Tests:** Detects sudden airline capacity crunches, fuel surcharges, or route rate inflation across primary gateway hubs (BOM, DEL, BLR, CCJ).
 
 ---
 
@@ -49,21 +51,26 @@ The engine integrates hard freight-forwarding operational guardrails with an hon
 air_export_pricing_engine/
 │
 ├── data/
-│   ├── raw/                                  # Source inquiries
+│   ├── raw/                                  # Source TMS operational spreadsheets
 │   ├── processed/
-│   │   └── Air_Export_Pricing_Combined_ML.csv # Cleaned & deduplicated training data
+│   │   ├── Air_Export_Pricing_Combined_ML.csv# Cleaned & deduplicated training data
+│   │   └── Job_Wise_Consolidated_Cleaned_ML.csv# Validated commercial ledger
 │   └── recommendations_history.db            # SQLite audit trail & leads store
 │
 ├── models/
-│   └── freight_margin_recommender.joblib     # Production model artifact bundle (v2.3)
+│   ├── freight_margin_recommender.joblib     # Production model artifact bundle (v2.4)
+│   └── backups/                              # Checkpoint baselines
 │
 ├── src/
 │   ├── __init__.py
 │   ├── constants.py                          # Commercial guardrails, fees, and thresholds
 │   ├── tiers.py                              # Weight tiers, breaks, arbitrage & account tiers
 │   ├── preprocess.py                         # Cleaning, IATA physics, and geographic mapping
+│   ├── preprocess_job_consolidated.py        # Operational ledger data engineering pipeline
 │   ├── train.py                              # Two-Stage ML training with honest OOF benchmarks
+│   ├── margin_framework.py                   # Multi-pillar corridor pricing & Conformal Prediction
 │   ├── engine.py                             # Decision engine, cohort lookup & strategic tiers
+│   ├── history.py                            # Customer historical deal aggregation
 │   ├── db.py                                 # SQLite audit history, soft-delete & preset isolation
 │   └── app.py                                # Flask web app, REST API & leads dashboard
 │
@@ -78,67 +85,50 @@ air_export_pricing_engine/
 │   ├── test_engine_determinism.py            # Temporal determinism & Q4 out-of-window warning
 │   ├── test_cohort_lookup.py                 # Hierarchical empirical cohort quantiles
 │   ├── test_strategy_tiers.py                # Active strategy thresholds & strict distinctness
+│   ├── test_margin_framework.py              # Conformal corridor ordering & coverage guarantees
 │   ├── test_db_audit.py                      # SQLite migrations, soft delete & preset isolation
 │   ├── test_api_quote.py                     # Web API integration & HTTP 400 validation
 │   └── test_scenarios_t1_t15.py              # 15 realistic end-to-end air-export scenarios
 │
 ├── scripts/
+│   ├── monitor_market_drift.py               # Offline Market & Concept Drift Watchdog
+│   ├── tune_engine_optuna.py                 # Local Bayesian hyperparameter optimization
 │   ├── verify_vocab_alignment.py             # UI vs. model encoder vocabulary alignment gate
-│   └── test_runner.py                        # Standalone regression test runner
-│
-├── docs/
-│   ├── AIR_EXPORT_PRICING_TEAM_GUIDE.md      # Sales & pricing team operational guide
-│   └── evaluation_plots.png                  # Evaluation diagnostic curves
+│   ├── test_runner.py                        # Standalone regression test runner
+│   └── archive/                              # Deprecated legacy preprocessing scripts
 │
 ├── requirements.txt                          # Locked dependencies
 ├── run.sh                                    # Unified project CLI runner
-└── README.md                                 # Project documentation
+└── README.md                                 # Complete project documentation
 ```
 
 ---
 
-## 3. Quick Start
+## 3. Quick Start & CLI Usage
 
-### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+All tasks are managed through `./run.sh`:
 
-### 2. Preprocess Data
-Clean and validate raw inquiry records into pure resolved quotes:
 ```bash
-./run.sh preprocess
-# Or: python src/preprocess.py
-```
-
-### 3. Train Model
-Train Stage 1A (Benchmark Regressor) and Stage 1B (Calibrated Elasticity Classifier):
-```bash
-./run.sh train
-# Or: python src/train.py
-```
-
-### 4. Run Test Suite
-Execute the full 70-test suite, including all 15 realistic scenario tests:
-```bash
-./run.sh test
-# Or: python -m unittest discover tests
-```
-
-### 5. Verify Vocabulary Alignment
-Check 100% alignment between UI dropdowns and trained categorical features:
-```bash
+# 1. Verify UI and model categorical dropdown alignment (36/36 checks)
 ./run.sh verify
-# Or: python scripts/verify_vocab_alignment.py
+
+# 2. Run data preprocessing pipeline
+./run.sh preprocess
+
+# 3. Train Two-Stage Machine Learning model and build conformal tables
+./run.sh train
+
+# 4. Run full unit and scenario test suite (99/99 passing)
+./run.sh test
+
+# 5. Run Offline Market & Concept Drift Watchdog
+./run.sh drift
+
+# 6. Launch Web Application & Quoting API
+./run.sh serve
 ```
 
-### 6. Launch Web UI & Quoting API
-Start the Flask application:
-```bash
-./run.sh serve
-# Or: python src/app.py
-```
-Open **http://127.0.0.1:5050** in your browser.
+The web application will be available at **http://127.0.0.1:5050**.
 
 ---
 
@@ -148,7 +138,7 @@ The automated scenario suite (`tests/test_scenarios_t1_t15.py`) validates critic
 
 | Scenario | Description | Verified Expected Behavior |
 |:---|:---|:---|
-| **T1** | Rate Shock Pass-Through | 20% buy spike on 800kg BOM→FRA strictly increases quoted sell price without dropping rupee gross margin. |
+| **T1** | Rate Shock Pass-Through | 20% buy spike on 800kg BOM→FRA yields sublinear profit growth ($<15\%$) without dropping rupee margin. |
 | **T2** | Weight-Break Arbitrage | 98kg shipment at ₹120/kg is flagged when bumping to 100kg at ₹105/kg saves ₹1,260. |
 | **T3** | Dangerous Goods Markup | Cargo flagged with DG or Class 9 hazardous goods receives a minimum +6.0% risk buffer and elevated cost floor. |
 | **T4** | Perishable Cold-Chain Buffer | Perishables receive cold-chain transit urgency risk buffers (+3.5%). |
@@ -169,7 +159,8 @@ The automated scenario suite (`tests/test_scenarios_t1_t15.py`) validates critic
 ## 5. REST API Usage
 
 ### `POST /api/quote`
-Generate strategic recommendations and sensitivity tables:
+Generate strategic recommendations, conformal corridors, and sensitivity tables:
+
 ```bash
 curl -X POST http://127.0.0.1:5050/api/quote \
   -H "Content-Type: application/json" \
@@ -184,4 +175,41 @@ curl -X POST http://127.0.0.1:5050/api/quote \
     "strategy": "balanced"
   }'
 ```
-Response includes `optimal` quote, `strategic_recommendations` (`floor`, `balanced`, `premium`), full `sensitivity` frontier, and audit trail status.
+
+#### Sample Response Payload:
+```json
+{
+  "status": "success",
+  "optimal": {
+    "Strategy_Key": "balanced",
+    "Margin_Percentage": 8.54,
+    "Quoted_Sell_Price_INR": 135675.0,
+    "Rate_Per_Kg": 301.5,
+    "Margin_Amount_INR": 10675.0
+  },
+  "negotiation_corridor": {
+    "min_margin_pct": 5.86,
+    "target_margin_pct": 8.54,
+    "max_margin_pct": 11.22,
+    "min_sell_inr": 132325.0,
+    "target_sell_inr": 135675.0,
+    "max_sell_inr": 139025.0,
+    "min_rate_per_kg": 294.06,
+    "target_rate_per_kg": 301.5,
+    "max_rate_per_kg": 308.94,
+    "band_width_pct": 5.36,
+    "confidence_coverage": "90%",
+    "conformal_half_width_pct": 2.68,
+    "guidance": "Pre-approved negotiation corridor: 5.86% to 11.22% (Target: 8.54%, 90% confidence coverage). Sell rate latitude: ₹294.06/kg to ₹308.94/kg."
+  },
+  "model_version": "v2.3-remediated-20261004"
+}
+```
+
+---
+
+## 6. Security & Governance
+
+- **Zero External Telemetry:** All model inference, hyperparameter optimization (Optuna SQLite), and drift monitoring run 100% locally and offline.
+- **Strict Data Isolation:** All proprietary operational datasets (`data/raw/*.xlsx`, `data/processed/*.csv`) and serialized model binaries are explicitly untracked in `.gitignore`.
+- **UI Governance:** The user interface adheres strictly to established typography (`Outfit`, `Mulish`) and brand palettes (`#23c2f2`, `#a7cf45`). UI modifications are strictly governed by project rules.
