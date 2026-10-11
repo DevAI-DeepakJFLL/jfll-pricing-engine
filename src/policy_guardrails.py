@@ -8,19 +8,35 @@ import re
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from constants import (
-    CLIENT_CATEGORY_MAX_MARGIN_CAPS,
-    COMMODITY_MAX_MARGIN_CAPS,
-    COMMODITY_RISK_BUFFERS,
-    MIN_CANDIDATE_MARGIN,
-    MIN_MARGIN_PER_AWB_INR,
-    MIN_MARGIN_PER_KG_INR,
-    OPS_HANDLING_FEE_AWB_INR,
-    compute_cost_floor_price,
-    get_commodity_max_margin,
-    get_client_category_max_margin,
-)
-from taxonomy import classify_commodity
+try:
+    from constants import (
+        CLIENT_CATEGORY_MAX_MARGIN_CAPS,
+        COMMODITY_MAX_MARGIN_CAPS,
+        COMMODITY_RISK_BUFFERS,
+        MIN_CANDIDATE_MARGIN,
+        MIN_MARGIN_PER_AWB_INR,
+        MIN_MARGIN_PER_KG_INR,
+        OPS_HANDLING_FEE_AWB_INR,
+        compute_cost_floor_price,
+        get_commodity_max_margin,
+        get_client_category_max_margin,
+    )
+    from taxonomy import classify_commodity
+except ImportError:
+    from src.constants import (
+        CLIENT_CATEGORY_MAX_MARGIN_CAPS,
+        COMMODITY_MAX_MARGIN_CAPS,
+        COMMODITY_RISK_BUFFERS,
+        MIN_CANDIDATE_MARGIN,
+        MIN_MARGIN_PER_AWB_INR,
+        MIN_MARGIN_PER_KG_INR,
+        OPS_HANDLING_FEE_AWB_INR,
+        compute_cost_floor_price,
+        get_commodity_max_margin,
+        get_client_category_max_margin,
+    )
+    from src.taxonomy import classify_commodity
+
 
 
 @dataclass(frozen=True)
