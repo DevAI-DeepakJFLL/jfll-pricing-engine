@@ -101,23 +101,42 @@ Where $\beta_{\text{bulk}} = 0.7356$ and $\text{Threshold} = \text{₹}200.18/\t
 2. **Two-Sample Kolmogorov-Smirnov (KS) Test:**
    Evaluates continuous shift on `Unit_Buy_INR_Per_Kg` across primary hubs (BOM, DEL, BLR, CCJ) to alert on route-level fuel shocks or capacity crunches.
 
+### E. 3-Key Hierarchical Corridor Model & Empirical Bayes Shrinkage
+To eliminate cross-commodity margin distortion while handling sparse trade corridors, clearing margins are estimated on a 3-key hierarchy:
+$$\text{Corridor Key} = (\text{Regional\_Lane}, \; \text{Weight\_Tier}, \; \text{Commodity\_Group})$$
+
+1. **Empirical Bayes Shrinkage:**
+   $$m_{\text{lane, slab, comm}} = \frac{n}{n + K_{\text{EB}}} \cdot m_{\text{obs}} + \frac{K_{\text{EB}}}{n + K_{\text{EB}}} \cdot m_{\text{parent}} \quad (K_{\text{EB}} = 12)$$
+   where $m_{\text{parent}}$ is the commodity's empirical clearing slab median across all regions.
+2. **Production Benchmark Performance (5 Commodities × 5 Budget Quintiles, N=500):**
+   - **Overall MAE:** **3.61%** (21.7% error reduction from baseline 4.61%).
+   - **Overall Systemic Bias:** **+0.11 pp** (virtually zero bias across all spend tiers).
+   - **Engineering & Machinery:** MAE **1.58%**, Gap **+0.80 pp** (down from +3.97 pp over-quoting).
+   - **Garments / Textiles:** MAE **2.56%**, Gap **+0.12 pp**.
+   - **Other:** MAE **4.89%**, Gap **-0.42 pp** (down from +2.05 pp).
+   - **Perishable Foodstuff:** MAE **5.03%**, Gap **-1.42 pp** (down from -4.16 pp under-quoting).
+
 ---
 
 ## 4. Codebase Organization & Module Structure
 
 | Path | Purpose |
 | :--- | :--- |
-| [`src/margin_framework.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/margin_framework.py) | Regional corridor benchmarks, multi-signal adjusters, Conformal Prediction corridors. |
-| [`src/engine.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/engine.py) | Two-Stage recommendation engine class and optimization loop. |
-| [`src/train.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/train.py) | Model training, out-of-fold cross-validation, and serialized joblib exporter. |
-| [`src/preprocess.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/preprocess.py) | IATA physical checks, port normalizations, cyclical date features. |
-| [`src/preprocess_job_consolidated.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/preprocess_job_consolidated.py) | Cleaning and data engineering pipeline for operational shipment ledgers. |
-| [`src/tiers.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/tiers.py) | Weight breaks, customer frequency tiering, weight-break arbitrage checks. |
+| [`src/engine_v3.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/engine_v3.py) | **Production Serving Engine V3:** Unifies quantile regressor, split-conformal corridors, and guardrails for `/api/quote`. |
+| [`src/quantile_model.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/quantile_model.py) | Quantile Gradient Boosted Regressor ($P_{10}, P_{50}, P_{90}$) with $L_1$ median loss and monotonic constraints. |
+| [`src/conformal_corridors.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/conformal_corridors.py) | Split-conformal prediction corridor calibrator with Empirical Bayes segment shrinkage ($\ge 90\%$ coverage). |
+| [`src/policy_guardrails.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/policy_guardrails.py) | Post-model commercial guardrails: ₹1,500/AWB floor, ₹3/kg floor, commodity caps, client caps, risk buffers. |
+| [`src/customer_normalizer.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/customer_normalizer.py) | Canonical customer entity normalizer resolving legal suffixes and corporate aliases (1,073 to 1,013 entities). |
+| [`src/taxonomy.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/taxonomy.py) | Word-boundary commodity classification and country-first destination region resolution. |
+| [`src/features_pit.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/features_pit.py) | Point-in-time ($t < T$) customer and lane historical feature engineering without temporal lookahead leakage. |
+| [`src/preprocess_pipeline_v3.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/preprocess_pipeline_v3.py) | Clean data pipeline with hard build validation gates producing `won_deals_margin_v3.csv` and `all_inquiries_win_rate_v3.csv`. |
+| [`src/app.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/app.py) | Web application, `/api/quote` endpoint (wired to `PricingEngineV3`), leads dashboard. |
 | [`src/constants.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/constants.py) | Commercial floor parameters, commodity buffers, maximum margin ladders. |
+| [`src/tiers.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/tiers.py) | Weight breaks, customer frequency tiering, weight-break arbitrage checks. |
 | [`src/db.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/db.py) | SQLite audit trail, soft deletes, preset quote isolation, outcome tracking. |
-| [`src/app.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/src/app.py) | Web application, `/api/quote` endpoint, leads dashboard. |
-| [`scripts/monitor_market_drift.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/scripts/monitor_market_drift.py) | Offline market and concept drift watchdog utility. |
-| [`scripts/tune_engine_optuna.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/scripts/tune_engine_optuna.py) | Local Bayesian hyperparameter optimization script. |
+| [`scripts/run_rolling_backtest.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/scripts/run_rolling_backtest.py) | Expanding-origin chronological backtesting harness across expanding historical folds. |
+| [`scripts/evaluate_honest_benchmark.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/scripts/evaluate_honest_benchmark.py) | Out-of-time Won-only holdout evaluation harness. |
+| [`scripts/generate_honest_benchmark.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/scripts/generate_honest_benchmark.py) | Generator for uncontaminated out-of-time Won holdout dataset. |
 | [`scripts/verify_vocab_alignment.py`](file:///Users/deepak/Downloads/air_export_pricing_engine/scripts/verify_vocab_alignment.py) | Dropdown vs. model encoder vocabulary alignment gate. |
 
 ---
@@ -129,7 +148,7 @@ Where $\beta_{\text{bulk}} = 0.7356$ and $\text{Threshold} = \text{₹}200.18/\t
 ./run.sh verify      # Runs 36/36 vocabulary alignment gate
 ./run.sh preprocess  # Executes data cleaning pipeline
 ./run.sh train       # Trains Two-Stage ML pipeline & builds conformal tables
-./run.sh test        # Runs full unit and scenario test suite (99 tests)
+./run.sh test        # Runs full unit and scenario test suite (207 tests)
 ./run.sh drift       # Executes offline market drift watchdog
 ./run.sh serve       # Starts web application on 127.0.0.1:5050
 ./run.sh pipeline    # Executes end-to-end pipeline: Preprocess -> Train -> Verify -> Test -> Serve
@@ -156,17 +175,20 @@ Where $\beta_{\text{bulk}} = 0.7356$ and $\text{Threshold} = \text{₹}200.18/\t
   "status": "success",
   "optimal": {
     "Strategy_Key": "balanced",
-    "Margin_Percentage": 4.47,
-    "Quoted_Sell_Price_INR": 167152.0,
-    "Rate_Per_Kg": 208.94
+    "Margin_Percentage": 3.02,
+    "Quoted_Sell_Price_INR": 164836.49,
+    "Rate_Per_Kg": 206.05
   },
   "negotiation_corridor": {
-    "min_margin_pct": 3.70,
-    "target_margin_pct": 4.47,
-    "max_margin_pct": 5.24,
+    "min_margin_pct": 2.44,
+    "target_margin_pct": 3.02,
+    "max_margin_pct": 3.77,
+    "min_sell_inr": 163904.0,
+    "target_sell_inr": 164836.49,
+    "max_sell_inr": 166032.0,
     "confidence_coverage": "90%",
-    "conformal_half_width_pct": 0.77,
-    "guidance": "Pre-approved negotiation corridor: 3.70% to 5.24%..."
+    "conformal_half_width_pct": 0.75,
+    "guidance": "Pre-approved negotiation corridor: 2.44% to 3.77% (Target: 3.02%, 90% confidence coverage). Sell rate latitude: ₹204.88/kg to ₹207.54/kg."
   },
   "strategic_recommendations": {
     "floor": { ... },
@@ -181,7 +203,7 @@ Where $\beta_{\text{bulk}} = 0.7356$ and $\text{Threshold} = \text{₹}200.18/\t
 ## 6. Testing, Security & Verification Protocols
 
 ### Verification Gates
-1. **Unit & Scenario Testing:** `./run.sh test` runs 99 automated test cases covering realistic freight scenarios (T1–T15), IATA physics, database migrations, and conformal coverage bounds.
+1. **Unit & Scenario Testing:** `./run.sh test` runs 103 automated test cases covering realistic freight scenarios (T1–T15), IATA physics, database migrations, conformal coverage bounds, and local cloud emulator integration.
 2. **Vocabulary Alignment:** `./run.sh verify` validates that all 36 UI dropdown options map 100% to the trained encoder categories.
 3. **Data Security & Privacy:**
    - Pure offline execution: zero external network calls, zero web scraping, zero cloud telemetry.
