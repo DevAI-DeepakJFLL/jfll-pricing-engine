@@ -377,18 +377,32 @@ class PricingEngineV3:
         m_floor = guard_floor.final_margin_pct
         m_bal = guard_bal.final_margin_pct
         m_prem = guard_prem.final_margin_pct
+        effective_cap = guard_bal.effective_cap_pct
+        cost_floor_pct = guard_bal.cost_floor_margin_pct
 
-        step = max(0.5, round(250.0 / buy_cost * 100.0, 2)) if buy_cost > 0 else 0.5
-        if m_bal <= m_floor:
-            m_bal = round(m_floor + step, 2)
-        if m_prem <= m_bal:
-            m_prem = round(m_bal + step, 2)
+        step = max(0.25, min(1.0, round(250.0 / buy_cost * 100.0, 2))) if buy_cost > 0 else 0.5
+        if effective_cap > cost_floor_pct:
+            if m_prem > effective_cap:
+                m_prem = effective_cap
+            if m_bal >= m_prem:
+                m_bal = max(m_floor + 0.05, round(m_prem - step, 2))
+            if m_floor >= m_bal:
+                m_floor = max(cost_floor_pct, round(m_bal - step, 2))
+                if m_floor == m_bal:
+                    m_bal = round(m_floor + 0.05, 2)
+                    m_prem = round(m_bal + 0.05, 2)
+        else:
+            if m_bal <= m_floor:
+                m_bal = round(m_floor + step, 2)
+            if m_prem <= m_bal:
+                m_prem = round(m_bal + step, 2)
 
         tier_margins = {
             "floor": m_floor,
             "balanced": m_bal,
             "premium": m_prem,
         }
+
 
         # 6. Conformal Corridor (Task 9)
         is_known = bool(pit_feats.get("cust_pit_won_count_180d", 0) > 0)
