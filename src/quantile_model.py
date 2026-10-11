@@ -54,12 +54,6 @@ PIT_FEATURE_COLS: List[str] = [
     "lane_pit_median_margin_won_90d",
 ]
 
-DEFAULT_PROCESSED_DATA_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data",
-    "processed",
-    "won_deals_margin_v3.csv",
-)
 
 
 class MarginQuantileModel:
@@ -106,17 +100,6 @@ class MarginQuantileModel:
 
         self._is_matrix_mode = False
         df = X.copy()
-
-        # If PIT columns are missing but Inquiry Number exists, join from won_deals_margin_v3
-        missing_pit = [col for col in PIT_FEATURE_COLS if col not in df.columns]
-        if missing_pit and "Inquiry Number" in df.columns and os.path.exists(DEFAULT_PROCESSED_DATA_PATH):
-            try:
-                v3_ref = pd.read_csv(
-                    DEFAULT_PROCESSED_DATA_PATH, usecols=["Inquiry Number"] + PIT_FEATURE_COLS
-                )
-                df = df.merge(v3_ref, on="Inquiry Number", how="left")
-            except Exception:
-                pass
 
         # Use canonical features if available, otherwise available subset
         if is_fit:
@@ -196,10 +179,10 @@ class MarginQuantileModel:
         )
         self.model_p10.fit(X_mat, y_log)
 
-        # Model P50 (median margin, calibrated quantile optimizing out-of-time MAE)
+        # Model P50 (true median margin / L1 loss)
         self.model_p50 = HistGradientBoostingRegressor(
             loss="quantile",
-            quantile=0.40,
+            quantile=0.50,
             learning_rate=self.learning_rate,
             max_iter=self.max_iter,
             min_samples_leaf=self.min_samples_leaf,
@@ -224,8 +207,64 @@ class MarginQuantileModel:
         )
         self.model_p90.fit(X_mat, y_log)
 
+        # Enforce exact monotonic constraints on all tree predictors
+        self._enforce_tree_monotonicity(monotonic_cst, cat_mask)
+
         self.is_fitted = True
         return self
+
+    def _enforce_tree_monotonicity(
+        self, monotonic_cst: List[int], cat_mask: List[bool]
+    ) -> None:
+        """
+        Enforces monotonic split constraints on the leaf values of fitted tree predictors.
+        Scikit-learn line-search for non-smooth quantile loss can overwrite leaf values
+        without checking monotonic bounds, causing small step violations. This method
+        walks each tree and strictly clips leaf values to uphold the monotonic contract.
+        """
+        is_cat_arr = np.array(cat_mask, dtype=bool)
+        if len(monotonic_cst) > len(is_cat_arr):
+            remapped_cst = np.array(monotonic_cst)
+        else:
+            remapped_cst = np.concatenate([
+                np.zeros(is_cat_arr.sum(), dtype=int),
+                np.array(monotonic_cst)[~is_cat_arr],
+            ])
+
+        def enforce_node(nodes: np.ndarray, node_idx: int, lower: float, upper: float) -> Tuple[float, float]:
+            node = nodes[node_idx]
+            if node["is_leaf"]:
+                val = float(node["value"])
+                val = float(np.clip(val, lower, upper))
+                nodes[node_idx]["value"] = val
+                return val, val
+
+            feat = int(node["feature_idx"])
+            cst = remapped_cst[feat] if feat < len(remapped_cst) else 0
+            left_idx = int(node["left"])
+            right_idx = int(node["right"])
+
+            l_min, l_max = enforce_node(nodes, left_idx, lower, upper)
+            r_min, r_max = enforce_node(nodes, right_idx, lower, upper)
+
+            if cst == -1:  # NEG: left should be >= right (r_max <= l_min)
+                if r_max > l_min:
+                    mid = (l_min + r_max) / 2.0
+                    l_min, l_max = enforce_node(nodes, left_idx, mid, upper)
+                    r_min, r_max = enforce_node(nodes, right_idx, lower, mid)
+            elif cst == 1:  # POS: left <= right (l_max <= r_min)
+                if l_max > r_min:
+                    mid = (l_max + r_min) / 2.0
+                    l_min, l_max = enforce_node(nodes, left_idx, lower, mid)
+                    r_min, r_max = enforce_node(nodes, right_idx, mid, upper)
+
+            return min(l_min, r_min), max(l_max, r_max)
+
+        for model_obj in [self.model_p10, self.model_p50, self.model_p90]:
+            if model_obj is not None and hasattr(model_obj, "_predictors"):
+                for pred_tuple in model_obj._predictors:
+                    enforce_node(pred_tuple[0].nodes, 0, float("-inf"), float("+inf"))
+
 
     def predict_quantiles(
         self, X: Union[pd.DataFrame, np.ndarray]
