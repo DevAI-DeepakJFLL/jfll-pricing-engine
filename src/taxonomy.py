@@ -91,20 +91,25 @@ RE_LIVE_ANIMALS = re.compile(
 )
 
 # 5. Pharmaceuticals (Vaccines, medicines, diagnostic kits, pharma)
+# Scoped so tablet computers / graphics tablets do NOT match.
 RE_PHARMACEUTICALS = re.compile(
     r"\b(?:"
     r"PHARMA|PHARMACEUTICALS?|MEDICINES?|MEDICATIONS?|DRUGS?|"
     r"VACCINES?|INSULIN|SERUM|BIOLOGICALS?|DIAGNOSTIC\s+KITS?|"
     r"HEALTHCARE|MEDICAL\s+DEVICES?|CLINICAL\s+TRIALS?|ANTIBIOTICS?|"
-    r"TABLETS?|CAPSULES?|SYRUP"
+    r"(?<!GRAPHICS\s)(?<!DIGITAL\s)(?<!DRAWING\s)TABLETS?(?!\s+(?:COMPUTER|PC|DEVICE))|"
+    r"CAPSULES?|SYRUP"
     r")\b",
     re.IGNORECASE,
 )
 
 # 6. Perishable Foodstuff (Fresh fruit, mangoes, seafood, meat, cut flowers)
+# Restricts handling code; removes bare \bPER\b to avoid 'AS PER INVOICE/PACKING LIST' collisions.
 RE_PERISHABLES = re.compile(
     r"\b(?:"
-    r"PERISHABLES?|PER|FOOD|FOODSTUFFS?|FRUITS?|VEGETABLES?|VEG|"
+    r"PERISHABLES?|"
+    r"(?:SPL:\s*)?PER\s+CARGO|"
+    r"FOOD|FOODSTUFFS?|FRUITS?|VEGETABLES?|VEG|"
     r"MEAT|FRESH\s+FISH|SEAFOOD|CRABS?|LOBSTERS?|PRAWNS?|SHRIMPS?|"
     r"MANGOES?|FLOWERS?|CUT\s+FLOWERS?|FLORAL|DAIRY|CHEESE|PRODUCE|"
     r"CHILLED|FROZEN\s+FOOD|FROZEN\s+MEAT|ASPARAGUS|BERRIES|BERRY"
@@ -113,34 +118,44 @@ RE_PERISHABLES = re.compile(
 )
 
 # 7. Auto Parts (Brake pads, transmission, tires, auto accessories)
-# Strict word boundary: \bAUTO\b avoids automation / automatic.
+# Strictly scoped to automotive contexts; bare 'SPARE PARTS' routes to Engineering & Machinery.
 RE_AUTO_PARTS = re.compile(
     r"\b(?:"
-    r"AUTO\s+PARTS?|AUTOMOTIVE(?:\s+PARTS?)?|CAR\s+PARTS?|MOTOR\s+PARTS?|VEHICLE\s+PARTS?|"
-    r"AUTO\s+ACCESSOR(?:Y|IES)|AUTOMOBILE\s+SPARE\s+PARTS?|SPARE\s+PARTS?|"
+    r"AUTO(?:MOBILE)?\s+(?:SPARE\s+)?PARTS?|"
+    r"AUTOMOTIVE(?:\s+SPARE)?\s+PARTS?|"
+    r"CAR\s+(?:SPARE\s+)?PARTS?|MOTOR\s+PARTS?|VEHICLE\s+(?:SPARE\s+)?PARTS?|"
+    r"AUTO\s+ACCESSOR(?:Y|IES)|VEHICLE\s+ACCESSOR(?:Y|IES)|"
     r"AUTO\s+COMPONENTS?|BRAKE\s+PADS?|CLUTCH|TRANSMISSION(?:\s+PARTS?)?|"
-    r"SHOCK\s+ABSORBERS?|TIRES?|TYRES?|CAR\s+ENGINE|VEHICLE\s+ACCESSOR(?:Y|IES)|"
+    r"SHOCK\s+ABSORBERS?|TIRES?|TYRES?|CAR\s+ENGINE|"
     r"AUTO"
     r")\b",
     re.IGNORECASE,
 )
 
 # 8. Garments & Textiles (Fabrics, cotton, carpets, apparel, leather footwear)
+# Excludes optical/carbon fiber which belongs in Engineering & Machinery.
 RE_GARMENTS = re.compile(
     r"\b(?:"
     r"GARMENTS?|TEXTILES?|APPAREL|CLOTHING|FABRICS?|COTTON|YARN|SILK|LEATHER|"
-    r"CARPETS?|RUGS?|WOVEN|KNITTED|FOOTWEAR|SHOES?|DENIM|FIBER|FIBRE|SHIRTS?|TROUSERS?|LINEN"
+    r"CARPETS?|RUGS?|WOVEN|KNITTED|FOOTWEAR|SHOES?|DENIM|"
+    r"(?<!OPTICAL\s)(?<!CARBON\s)FIB(?:ER|RE)(?!\s*OPTIC)|"
+    r"SHIRTS?|TROUSERS?|LINEN"
     r")\b",
     re.IGNORECASE,
 )
 
 # 9. Engineering & Machinery (Turbines, pumps, valves, machinery, automation, circuit boards)
+# Captures industrial/aviation spare parts, optical/carbon fiber, and computing tablets.
 RE_ENGINEERING = re.compile(
     r"\b(?:"
     r"ENGINEERING|MACHINERY|MACHINES?|EQUIPMENT|HARDWARE|"
     r"TURBINES?|PUMPS?|GENERATORS?|CIRCUIT\s+BOARDS?|VALVES?|TRANSFORMERS?|"
     r"COMPRESSORS?|INDUSTRIAL|ELECTRONICS?|MECHANICAL|TOOLS?|TOOLING|"
-    r"MOTORS?|AUTOMATION|ENGINES?|RADAR|SENSORS?|BOILERS?"
+    r"MOTORS?|AUTOMATION|ENGINES?|RADAR|SENSORS?|BOILERS?|"
+    r"(?:AVIATION|AIRCRAFT|AEROSPACE|MACHINE|MACHINERY|PUMP|INDUSTRIAL|TURBINE|GENERATOR|MECHANICAL|ENGINEERING)\s+SPARE\s+PARTS?|"
+    r"SPARE\s+PARTS?|"
+    r"OPTICAL\s+FIB(?:ER|RE)(?:\s+CABLES?)?|FIB(?:ER|RE)\s+OPTIC(?:S)?|CARBON\s+FIB(?:ER|RE)(?:\s+PANELS?|\s+COMPOSITES?)?|"
+    r"TABLET\s+COMPUTER(?:S)?|GRAPHICS\s+TABLET(?:S)?|DIGITAL\s+TABLET(?:S)?"
     r")\b",
     re.IGNORECASE,
 )

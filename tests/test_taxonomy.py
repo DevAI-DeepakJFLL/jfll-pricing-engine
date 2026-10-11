@@ -84,6 +84,40 @@ class TestCommodityWordBoundaries(unittest.TestCase):
         self.assertNotEqual(classify_commodity("PRINTED CATALOG SAMPLES"), "Live Animals")
         self.assertNotEqual(classify_commodity("UNHORSED SADDLE LEATHER"), "Live Animals")
 
+    def test_per_preposition_does_not_trigger_perishables(self):
+        # Commercial prepositions 'as per', 'per piece', 'per contract' must not trigger Perishables
+        self.assertEqual(classify_commodity("MACHINERY SPARE PARTS AS PER PACKING LIST"), "Engineering & Machinery")
+        self.assertEqual(classify_commodity("RATE AS PER CONTRACT - GENERAL GOODS"), "General Cargo")
+        self.assertEqual(classify_commodity("COTTON SHIRTS AS PER INVOICE"), "Garments / Textiles")
+        self.assertEqual(classify_commodity("10 USD PER PIECE - ELECTRONIC SENSORS"), "Engineering & Machinery")
+
+    def test_spare_parts_scoping_auto_vs_engineering(self):
+        # Automotive spare parts -> Auto Parts
+        self.assertEqual(classify_commodity("AUTO SPARE PARTS"), "Auto Parts")
+        self.assertEqual(classify_commodity("AUTOMOBILE SPARE PARTS"), "Auto Parts")
+        self.assertEqual(classify_commodity("CAR SPARE PARTS"), "Auto Parts")
+
+        # Aviation, industrial, and machinery spare parts -> Engineering & Machinery
+        self.assertEqual(classify_commodity("AVIATION SPARE PARTS"), "Engineering & Machinery")
+        self.assertEqual(classify_commodity("AIRCRAFT SPARE PARTS"), "Engineering & Machinery")
+        self.assertEqual(classify_commodity("PUMP SPARE PARTS"), "Engineering & Machinery")
+        self.assertEqual(classify_commodity("MACHINE SPARE PARTS"), "Engineering & Machinery")
+        self.assertEqual(classify_commodity("INDUSTRIAL SPARE PARTS"), "Engineering & Machinery")
+
+    def test_fiber_and_tablet_scoping(self):
+        # Optical and carbon fiber -> Engineering & Machinery (NOT Garments)
+        self.assertEqual(classify_commodity("OPTICAL FIBER CABLE"), "Engineering & Machinery")
+        self.assertEqual(classify_commodity("CARBON FIBER PANELS"), "Engineering & Machinery")
+        self.assertEqual(classify_commodity("COTTON FIBER YARN"), "Garments / Textiles")
+
+        # Computing tablets -> Engineering & Machinery (NOT Pharmaceuticals)
+        self.assertEqual(classify_commodity("TABLET COMPUTER"), "Engineering & Machinery")
+        self.assertEqual(classify_commodity("GRAPHICS TABLET"), "Engineering & Machinery")
+
+        # Medicinal tablets -> Pharmaceuticals
+        self.assertEqual(classify_commodity("PHARMACEUTICAL TABLETS"), "Pharmaceuticals")
+        self.assertEqual(classify_commodity("PARACETAMOL TABLETS"), "Pharmaceuticals")
+
 
 class TestRestoredCommodityClasses(unittest.TestCase):
     """
