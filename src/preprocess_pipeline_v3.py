@@ -285,13 +285,25 @@ def run_pipeline_v3(
 
     # 4. Taxonomy Standardization (src/taxonomy.py)
     print("[*] 4. Classifying commodities and destination corridors with word-boundary taxonomy...")
-    if "Commodity Type" in df.columns:
-        # Reclassify from raw commodity type where available to restore DG, Valuables, Live Animals
-        has_raw_comm = df["Commodity Type"].notna()
-        df.loc[has_raw_comm, "Commodity_Group"] = df.loc[has_raw_comm, "Commodity Type"].apply(classify_commodity)
-        df.loc[~has_raw_comm, "Commodity_Group"] = df.loc[~has_raw_comm, "Commodity_Group"].apply(classify_commodity)
-    else:
-        df["Commodity_Group"] = df["Commodity_Group"].apply(classify_commodity)
+    specialized_categories = {"Dangerous Goods", "Live Animals", "Valuables"}
+
+    def resolve_commodity(row: pd.Series) -> str:
+        curr = row.get("Commodity_Group", "General Cargo")
+        raw_desc = row.get("Commodity Type")
+        if pd.isna(raw_desc) or not str(raw_desc).strip():
+            return classify_commodity(curr)
+
+        new_cat = classify_commodity(str(raw_desc))
+        # Specialized categories (DG, Live Animals, Valuables) take precedence
+        if new_cat in specialized_categories:
+            return new_cat
+        # If existing is generic (General Cargo, Other), update with more specific
+        if curr in ["General Cargo", "Other"]:
+            return new_cat
+        # Otherwise preserve existing granular category (Perishable, Garments, Pharma, etc.)
+        return curr
+
+    df["Commodity_Group"] = df.apply(resolve_commodity, axis=1)
 
     # Destination Region Verification
     mapped_regions = df["Destination_Port"].apply(map_destination_region)
@@ -344,8 +356,14 @@ def run_pipeline_v3(
     df["Margin_Amount_INR"] = (df["Total_Sell_INR"] - df["Total_Buy_INR"]).round(2)
     df["Margin_Percentage"] = (df["Margin_Amount_INR"] / df["Total_Buy_INR"] * 100.0)
 
-    # Real quotes have authentic buy costs (Buy_Cost_Estimated = 0)
-    df["Buy_Cost_Estimated"] = 0
+    # Ensure no Buy_Cost_Estimated == 1 rows leak into training data
+    if "Buy_Cost_Estimated" in df.columns:
+        num_estimated = (df["Buy_Cost_Estimated"] == 1).sum()
+        if num_estimated > 0:
+            print(f"       Filtering out {num_estimated} rows with estimated buy costs (Buy_Cost_Estimated == 1)...")
+            df = df[df["Buy_Cost_Estimated"] != 1].copy()
+    else:
+        df["Buy_Cost_Estimated"] = 0
 
     # 7. Compute Point-in-Time Features (src/features_pit.py)
     print("[*] 7. Computing 7 leak-free point-in-time rolling customer & lane features...")

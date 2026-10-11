@@ -133,6 +133,29 @@ class TestDataPipelineV3Outputs(unittest.TestCase):
         # Note: if any row had is_won == 0, that was already asserted above, but check status labels explicitly
         self.assertNotIn("Lost", df["Quote Status"].unique())
 
+    def test_commodity_diversity_in_won_deals(self):
+        """won_deals_margin_v3.csv must retain granular commodity groups (>= 7 categories)."""
+        df = pd.read_csv(WON_DEALS_PATH, low_memory=False)
+        self.assertIn("Commodity_Group", df.columns, "Commodity_Group column missing in won_deals_margin_v3.csv")
+        unique_commodities = set(df["Commodity_Group"].dropna().unique())
+        self.assertGreaterEqual(
+            len(unique_commodities),
+            7,
+            f"Expected at least 7 commodity groups in won deals, found {len(unique_commodities)}: {unique_commodities}",
+        )
+        required_specialized = [
+            "Perishable Foodstuff",
+            "Garments / Textiles",
+            "Engineering & Machinery",
+            "Dangerous Goods",
+        ]
+        for comm in required_specialized:
+            self.assertIn(
+                comm,
+                unique_commodities,
+                f"Required commodity category '{comm}' missing from won_deals_margin_v3.csv",
+            )
+
     def test_no_estimated_buy_costs_in_margin_training(self):
         """No Buy_Cost_Estimated == 1 rows in won_deals_margin_v3.csv."""
         df = pd.read_csv(WON_DEALS_PATH)
