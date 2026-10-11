@@ -295,6 +295,83 @@ class TestApiV3QuoteIntegration(unittest.TestCase):
             prev_margin = curr_margin
             prev_win = curr_win
 
+    def test_edge_case_tiers_clamping_to_cost_floor(self):
+        """Verifies strict tier ordering, cap compliance, and monotonic win probabilities when tiers clamp to cost floor."""
+        payload = {
+            "buy": 300000,
+            "gross_wt": 100,
+            "chargeable_wt": 100,
+            "origin": "Bangalore",
+            "dest": "Dubai",
+            "client": "Shipper / Consignee",
+            "commodity": "Dangerous Goods",
+            "strategy": "balanced"
+        }
+        res = self.client.post("/api/quote", data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+
+        strat = data["strategic_recommendations"]
+        m_floor = strat["floor"]["Margin_Percentage"]
+        m_bal = strat["balanced"]["Margin_Percentage"]
+        m_prem = strat["premium"]["Margin_Percentage"]
+
+        # 1. Strict tier differentiation (floor < balanced < premium)
+        self.assertLess(m_floor, m_bal)
+        self.assertLess(m_bal, m_prem)
+
+        # 2. All tiers within effective cap
+        cap = strat["balanced"]["Effective_Max_Margin_Cap"]
+        self.assertLessEqual(m_prem, cap)
+        self.assertLessEqual(m_bal, cap)
+        self.assertLessEqual(m_floor, cap)
+
+        # 3. Monotonic win probabilities: P(Win|Floor) > P(Win|Balanced) > P(Win|Premium)
+        w_floor = strat["floor"]["Win_Probability"]
+        w_bal = strat["balanced"]["Win_Probability"]
+        w_prem = strat["premium"]["Win_Probability"]
+        self.assertGreater(w_floor, w_bal)
+        self.assertGreater(w_bal, w_prem)
+
+    def test_edge_case_tiers_clamping_to_effective_cap(self):
+        """Verifies no tier exceeds effective_cap when predictions clamp at or near ceiling."""
+        payload = {
+            "buy": 15000,
+            "gross_wt": 20,
+            "chargeable_wt": 20,
+            "origin": "Indira Gandhi International Airport",
+            "dest": "Heathrow Apt/London",
+            "client": "Courier",
+            "commodity": "Courier",
+            "strategy": "balanced"
+        }
+        res = self.client.post("/api/quote", data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+
+        strat = data["strategic_recommendations"]
+        m_floor = strat["floor"]["Margin_Percentage"]
+        m_bal = strat["balanced"]["Margin_Percentage"]
+        m_prem = strat["premium"]["Margin_Percentage"]
+
+        # Strict ordering
+        self.assertLess(m_floor, m_bal)
+        self.assertLess(m_bal, m_prem)
+
+        # Neither premium nor balanced nor floor exceeds effective cap
+        cap = strat["balanced"]["Effective_Max_Margin_Cap"]
+        self.assertLessEqual(m_prem, cap)
+        self.assertLessEqual(m_bal, cap)
+        self.assertLessEqual(m_floor, cap)
+
+        # Monotonic win probabilities
+        w_floor = strat["floor"]["Win_Probability"]
+        w_bal = strat["balanced"]["Win_Probability"]
+        w_prem = strat["premium"]["Win_Probability"]
+        self.assertGreater(w_floor, w_bal)
+        self.assertGreater(w_bal, w_prem)
+
 
 if __name__ == "__main__":
     unittest.main()
+

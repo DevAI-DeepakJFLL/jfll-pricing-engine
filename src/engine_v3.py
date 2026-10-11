@@ -380,28 +380,54 @@ class PricingEngineV3:
         effective_cap = guard_bal.effective_cap_pct
         cost_floor_pct = guard_bal.cost_floor_margin_pct
 
-        step = max(0.25, min(1.0, round(250.0 / buy_cost * 100.0, 2))) if buy_cost > 0 else 0.5
+        step = max(0.20, min(1.0, round(250.0 / buy_cost * 100.0, 2))) if buy_cost > 0 else 0.50
+        min_step = 0.05
+
         if effective_cap > cost_floor_pct:
-            if m_prem > effective_cap:
+            window = effective_cap - cost_floor_pct
+            if window >= 2 * min_step:
+                # Upward pass: anchor to cost floor and enforce strictly increasing margins
+                f = max(cost_floor_pct, m_floor)
+                b = max(f + min_step, m_bal)
+                p = max(b + min_step, m_prem)
+
+                # Downward pass: if premium breached effective_cap, push downward from cap
+                if p > effective_cap:
+                    p = effective_cap
+                    b = min(b, round(p - min_step, 2))
+                    f = min(f, round(b - min_step, 2))
+
+                # If downward push compressed floor below cost_floor_pct, partition [cost_floor_pct, effective_cap]
+                if f < cost_floor_pct:
+                    f = cost_floor_pct
+                    p = effective_cap
+                    b = round((f + p) / 2.0, 2)
+                    if b <= f:
+                        b = round(f + 0.01, 2)
+                    if p <= b:
+                        p = round(b + 0.01, 2)
+                m_floor, m_bal, m_prem = round(f, 2), round(b, 2), round(p, 2)
+            else:
+                # Very tight window: partition evenly
+                m_floor = cost_floor_pct
                 m_prem = effective_cap
-            if m_bal >= m_prem:
-                m_bal = max(m_floor + 0.05, round(m_prem - step, 2))
-            if m_floor >= m_bal:
-                m_floor = max(cost_floor_pct, round(m_bal - step, 2))
-                if m_floor == m_bal:
-                    m_bal = round(m_floor + 0.05, 2)
-                    m_prem = round(m_bal + 0.05, 2)
+                m_bal = round((m_floor + m_prem) / 2.0, 2)
+                if m_bal <= m_floor:
+                    m_bal = min(effective_cap, round(m_floor + 0.01, 2))
+                if m_prem <= m_bal:
+                    m_prem = min(effective_cap, round(m_bal + 0.01, 2))
         else:
-            if m_bal <= m_floor:
-                m_bal = round(m_floor + step, 2)
-            if m_prem <= m_bal:
-                m_prem = round(m_bal + step, 2)
+            # Cost floor exceeds cap: floor takes precedence to prevent sub-cost quotes
+            m_floor = cost_floor_pct
+            m_bal = round(m_floor + min_step, 2)
+            m_prem = round(m_bal + min_step, 2)
 
         tier_margins = {
             "floor": m_floor,
             "balanced": m_bal,
             "premium": m_prem,
         }
+
 
 
         # 6. Conformal Corridor (Task 9)
