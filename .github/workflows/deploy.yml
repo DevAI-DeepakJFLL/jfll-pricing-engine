@@ -120,37 +120,41 @@ jobs:
           LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME || secrets.LAMBDA_FUNCTION_NAME }}
           AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'ap-southeast-2' }}
         run: |
-          echo "### AWS Lambda Deployment Diagnostics" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Target Region:** \`$AWS_REGION\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Target Bucket:** \`$S3_DATA_BUCKET\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Target Lambda:** \`$LAMBDA_FUNCTION_NAME\`" >> "$GITHUB_STEP_SUMMARY"
+          set +e
+          echo "=========================================================="
+          echo "AWS Region  : $AWS_REGION"
+          echo "S3 Bucket   : $S3_DATA_BUCKET"
+          echo "Lambda Name : $LAMBDA_FUNCTION_NAME"
+          echo "=========================================================="
 
-          echo "Checking STS caller identity..."
-          CALLER_ID=$(aws sts get-caller-identity 2>&1)
-          echo "<details><summary>IAM Caller Identity</summary><pre>$CALLER_ID</pre></details>" >> "$GITHUB_STEP_SUMMARY"
+          echo "[1/4] Checking IAM Caller Identity:"
+          aws sts get-caller-identity
+          
+          echo "[2/4] Testing lambda:GetFunction:"
+          aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" --query "Configuration.[FunctionName,Runtime,State,LastUpdateStatus]"
+          GET_STATUS=$?
+          echo "get-function status: $GET_STATUS"
 
-          echo "Checking list-functions..."
-          FUNCS=$(aws lambda list-functions --region "$AWS_REGION" --query "Functions[].FunctionName" --output text 2>&1)
-          echo "<details><summary>Visible Functions in $AWS_REGION</summary><pre>$FUNCS</pre></details>" >> "$GITHUB_STEP_SUMMARY"
-
-          echo "Executing update-function-code..."
-          UPDATE_RES=$(aws lambda update-function-code \
+          echo "[3/4] Updating Lambda function code from S3:"
+          aws lambda update-function-code \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --s3-bucket "$S3_DATA_BUCKET" \
             --s3-key "builds/lambda_artifact.zip" \
-            --region "$AWS_REGION" 2>&1)
+            --region "$AWS_REGION"
           UPDATE_STATUS=$?
-
-          echo "<details open><summary>aws lambda update-function-code output (exit code: $UPDATE_STATUS)</summary><pre>$UPDATE_RES</pre></details>" >> "$GITHUB_STEP_SUMMARY"
+          echo "update-function-code status: $UPDATE_STATUS"
 
           if [ $UPDATE_STATUS -ne 0 ]; then
-            echo "::error::Lambda update failed: $UPDATE_RES"
+            echo "ERROR: update-function-code failed with exit code $UPDATE_STATUS"
             exit $UPDATE_STATUS
           fi
 
-          echo "Waiting for function update to finish..."
+          set -e
+          echo "[4/4] Waiting for function update to finish..."
           aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION"
-          echo "Lambda deployment successful!"
+          echo "=========================================================="
+          echo "SUCCESS: Air Export Pricing Engine deployed to Lambda!"
+          echo "=========================================================="
 
       - name: Invalidate CloudFront Cache (Optional)
         env:
