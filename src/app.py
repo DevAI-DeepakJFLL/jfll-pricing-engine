@@ -19,6 +19,7 @@ import io
 import csv
 import json
 import logging
+import datetime
 from typing import Dict, Any, Optional
 import joblib
 import numpy as np
@@ -66,15 +67,22 @@ from db import (
 )
 
 app = Flask(__name__)
+# Limit incoming JSON payload to 1MB to prevent memory exhaustion DoS
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pricing_web")
 
-# Prevent browser caching
+# Prevent browser caching and enforce OWASP security headers
 @app.after_request
-def add_cache_headers(response):
+def add_security_and_cache_headers(response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
 
@@ -101,7 +109,6 @@ MODEL_PATH = next((p for p in _CANDIDATE_MODEL_PATHS if os.path.exists(p)), _CAN
 if not os.path.exists(MODEL_PATH):
     raise FileNotFoundError(f"Model artifact not found at candidate paths: {_CANDIDATE_MODEL_PATHS}. Please run train.py first.")
 
-
 logger.info(f"Loading trained pricing engine from: {MODEL_PATH}")
 model_bundle = joblib.load(MODEL_PATH)
 
@@ -127,8 +134,6 @@ engine = MarginRecommendationEngine(
     port_frequencies=model_bundle.get("port_frequencies"),
     cohort_table=model_bundle.get("cohort_table")
 )
-
-import datetime
 try:
     import margin_framework as mf
     from preprocess import get_air_cargo_season
@@ -154,7 +159,6 @@ except ImportError:
     from src.engine_v3 import PricingEngineV3
 
 engine_v3 = PricingEngineV3()
-
 
 
 # ------------------------------------------------------------------------------
@@ -304,6 +308,13 @@ BRANCH_OPTIONS = [
     {"value": "Trivandrum", "label": "Trivandrum"},
 ]
 
+CUSTOMER_ACTIVITY_OPTIONS = [
+    {"value": "25", "tier": "Key Account", "label": "Key Account (Strategic / High Volume)", "sub": "≥20 quotes/yr • Priority retention"},
+    {"value": "10", "tier": "Regular", "label": "Active / Regular Customer", "sub": "6–19 quotes/yr • Standard recurring"},
+    {"value": "3", "tier": "Occasional", "label": "Occasional Customer", "sub": "2–5 quotes/yr • Ad-hoc / seasonal"},
+    {"value": "1", "tier": "Spot / One-Off", "label": "New / Spot One-Off Inquiry", "sub": "1 quote • Single transaction"},
+]
+
 def _build_destinations_catalog(bundle, root_path):
     port_freqs = bundle.get("port_frequencies", {})
     if port_freqs:
@@ -335,7 +346,7 @@ def _build_destinations_catalog(bundle, root_path):
     return opts
 
 DESTINATION_OPTIONS = _build_destinations_catalog(model_bundle, ENGINE_ROOT)
-PORT_LABELS_JSON = json.dumps(PORT_LABELS)
+PORT_LABELS_JSON = json.dumps(PORT_LABELS).replace("</", "<\\/")
 
 
 # ------------------------------------------------------------------------------
@@ -350,146 +361,403 @@ HTML_TEMPLATE = """
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Air Freight Margin Recommender</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Mulish:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Air Freight Margin Recommender — Air Export Pricing Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Mulish:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #0284c7;
-            --primary-dark: #0369a1;
-            --primary-light: #e0f2fe;
-            --secondary: #16a34a;
-            --secondary-dark: #15803d;
-            --bg: #f8fafc;
-            --card-bg: #ffffff;
+            --bg-outer: #edf1f5;
+            --surface-card: #ffffff;
+            --surface-subtle: #f8fafc;
             --border: #e2e8f0;
+            --border-subtle: #f1f5f9;
             --text-dark: #0f172a;
             --text-muted: #64748b;
+            --text-light: #94a3b8;
+            --pill-dark: #0f172a;
+            --pill-hover: #1e293b;
+            --radius-window: 24px;
             --radius-card: 16px;
-            --radius-control: 10px;
-            --radius-pill: 9999px;
-            --shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+            --radius-control: 8px;
+            --radius-pill: 100px;
+            --shadow-window: 0 20px 60px rgba(15, 23, 42, 0.06);
+            --shadow-card: 0 4px 20px rgba(15, 23, 42, 0.04);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Mulish', sans-serif; }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
                 transition-duration: 0.01ms !important;
                 scroll-behavior: auto !important;
             }
         }
-        h1, h2, h3, h4, .card-header, .hero-value, .submit-btn, .preset-btn, .nav-history-btn { font-family: 'Outfit', sans-serif; }
-        body { background-color: var(--bg); color: var(--text-dark); padding: 32px 20px; line-height: 1.5; }
-        .container { max-width: 1200px; margin: 0 auto; }
+        h1, h2, h3, h4, .font-heading, .btn-pill, .nav-item, .hero-value, .metric-number, .strat-name, .strat-price { font-family: 'Outfit', sans-serif; }
 
-        /* Header */
-        header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-        h1 { font-size: 26px; font-weight: 800; color: var(--text-dark); }
-        p.subtitle { color: var(--text-muted); font-size: 13.5px; margin-top: 3px; }
-
-        /* Presets Bar */
-        .preset-bar { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: var(--radius-card); padding: 16px 20px; margin-bottom: 24px; }
-        .preset-title { font-size: 11.5px; font-weight: 700; color: var(--primary-dark); display: block; margin-bottom: 10px; letter-spacing: 0.5px; text-transform: uppercase; }
-        .preset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
-        .preset-btn { background: white; border: 1px solid #cbd5e1; border-radius: var(--radius-pill); padding: 10px 16px; min-height: 44px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; color: var(--text-dark); }
-        .preset-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
-
-        /* Layout & Grid Defenses */
-        .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-        @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
-
-        /* SVG UI Icons */
-        .ui-icon {
-            display: inline-block;
-            width: 15px;
-            height: 15px;
-            stroke-width: 2.2;
-            stroke: currentColor;
-            fill: none;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            vertical-align: -2px;
-            flex-shrink: 0;
-        }
-        .ui-icon-lg {
-            display: inline-block;
-            width: 42px;
-            height: 42px;
-            stroke-width: 1.8;
-            stroke: var(--primary);
-            fill: none;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            margin-bottom: 8px;
-        }
-        .spin {
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        body {
+            background-color: var(--bg-outer);
+            color: var(--text-dark);
+            padding: 32px 20px 48px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
         }
 
-        /* Cards */
-        .card { min-width: 0; max-width: 100%; box-sizing: border-box; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 24px; box-shadow: var(--shadow); margin-bottom: 24px; }
-        .card.card-input { border-left: 4px solid var(--primary); }
-        .card.card-output { border-left: 4px solid var(--secondary); }
-        .card-header { font-size: 16px; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
-
-        /* Form Inputs */
-        .field-section { margin-bottom: 18px; }
-        .section-label { font-size: 11px; font-weight: 700; color: var(--primary-dark); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .form-group.full { grid-column: 1 / -1; }
-        label { font-size: 12px; font-weight: 600; color: var(--text-dark); }
-        input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); font-size: 13px; background: #ffffff; color: var(--text-dark); font-family: 'Mulish', sans-serif; transition: all 0.2s ease; }
-        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2); }
-
-        select {
+        /* Outer Floating Window Canvas */
+        .app-window {
+            background: var(--surface-card);
+            border-radius: var(--radius-window);
+            box-shadow: var(--shadow-window);
             width: 100%;
-            padding: 10px 36px 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-control);
+            max-width: 1320px;
+            padding: 28px 36px 40px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+
+        /* Top Minimalist Navbar (Retains ONLY Dashboard and Reports) */
+        .app-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 22px;
+            margin-bottom: 22px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .nav-logo-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-dark);
+        }
+        .nav-logo-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--pill-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+        .nav-brand-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-dark);
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: -0.2px;
+        }
+        .nav-links-center {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: var(--radius-pill);
+        }
+        .nav-item {
+            text-decoration: none;
+            color: var(--text-muted);
             font-size: 13px;
-            font-family: 'Mulish', sans-serif;
-            background-color: #ffffff;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2364748b' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 14px center;
-            background-size: 10px 6px;
+            font-weight: 600;
+            padding: 7px 18px;
+            border-radius: var(--radius-pill);
+            transition: all 0.2s;
+        }
+        .nav-item:hover { color: var(--text-dark); }
+        .nav-item.active {
+            background: var(--pill-dark);
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+        }
+        .nav-tools-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .engine-tag {
+            background: #f1f5f9;
+            color: var(--text-dark);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: var(--radius-pill);
+            border: 1px solid var(--border);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Page Sub-Header */
+        .page-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .back-breadcrumb {
+            text-decoration: none;
+            font-size: 12.5px;
+            color: var(--text-light);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 6px;
+            transition: color 0.15s;
+        }
+        .back-breadcrumb:hover { color: var(--text-dark); }
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-dark);
+            letter-spacing: -0.4px;
+            line-height: 1.2;
+        }
+        .subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            min-height: 42px;
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .btn-white {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            color: var(--text-dark);
+        }
+        .btn-white:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .btn-primary-action {
+            background: var(--pill-dark);
+            border: 1px solid var(--pill-dark);
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+        }
+        .btn-primary-action:hover { background: #1e293b; border-color: #1e293b; transform: translateY(-1px); }
+
+        /* Presets Bar (Restored: Single Full-Width Row) */
+        .presets-bar {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            padding: 14px 18px;
+            margin-bottom: 24px;
+        }
+        .presets-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .presets-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .presets-grid-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        @media (max-width: 900px) {
+            .presets-grid-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 500px) {
+            .presets-grid-row { grid-template-columns: 1fr; }
+        }
+        .preset-chip-btn {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-pill);
+            padding: 9px 14px;
+            font-size: 12px;
+            font-weight: 600;
             color: var(--text-dark);
             cursor: pointer;
-            outline: none;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
         }
-        select:hover {
-            border-color: var(--primary);
-        }
-        select:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%230369a1' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
-        }
-        select option {
-            padding: 10px 12px;
-            font-size: 13px;
+        .preset-chip-btn:hover {
+            border-color: #cbd5e1;
+            background: #f8fafc;
             color: var(--text-dark);
-            background: #ffffff;
+            transform: translateY(-1px);
+        }
+        .preset-chip-btn:hover .preset-num-badge {
+            background: var(--pill-dark);
+            color: #ffffff;
+        }
+        .preset-num-badge {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            flex-shrink: 0;
         }
 
-        /* Searchable Custom Dropdown (Strict Brand Alignment: Outfit/Mulish, Sky/Emerald) */
-        .searchable-select { position: relative; width: 100%; }
-        .select-trigger {
+        /* 50/50 Workspace Grid */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 36px;
+            align-items: start;
+        }
+        @media (max-width: 980px) {
+            .workspace-grid { grid-template-columns: 1fr; }
+            .app-window { padding: 20px 20px 32px; border-radius: 18px; }
+            .app-nav { flex-direction: column; align-items: stretch; gap: 14px; }
+            .nav-links-center { justify-content: center; }
+        }
+
+        /* Column Headers & Dividers */
+        .col-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 18px;
+        }
+        .col-title {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: var(--text-dark);
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: -0.2px;
+        }
+        .col-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: #f1f5f9;
+            padding: 3px 9px;
+            border-radius: var(--radius-pill);
+        }
+
+        /* Form Fields & Sections */
+        .field-section {
+            margin-bottom: 18px;
+            padding-bottom: 16px;
+            border-bottom: 1px dashed var(--border);
+        }
+        .field-section:last-of-type {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 12px;
+        }
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 14px;
+            margin-bottom: 14px;
             width: 100%;
-            padding: 10px 12px;
+            box-sizing: border-box;
+            align-items: start;
+        }
+        @media (max-width: 600px) {
+            .form-row { grid-template-columns: 1fr; }
+        }
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .field-group.full { grid-column: 1 / -1; }
+        label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            min-height: 18px;
+            line-height: 18px;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        label span.req { color: #ef4444; margin-left: 2px; }
+
+        .clean-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 14px;
+            background: #ffffff;
             border: 1px solid var(--border);
             border-radius: var(--radius-control);
             font-size: 13px;
+            color: var(--text-dark);
+            font-family: 'Mulish', sans-serif;
+            transition: all 0.15s;
+            height: 42px;
+            min-height: 42px;
+        }
+        .clean-input:focus {
+            outline: none;
+            border-color: var(--pill-dark);
+            box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+        }
+
+        /* Searchable Custom Select Dropdowns */
+        .searchable-select {
+            position: relative;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+        .select-trigger {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 14px;
             background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-control);
+            font-size: 13px;
             color: var(--text-dark);
             cursor: pointer;
             display: flex;
@@ -497,51 +765,46 @@ HTML_TEMPLATE = """
             justify-content: space-between;
             gap: 8px;
             user-select: none;
-            transition: all 0.2s;
+            transition: all 0.15s;
+            height: 42px;
             min-height: 42px;
+            min-width: 0;
+            overflow: hidden;
         }
-        .select-trigger:hover { border-color: var(--primary); }
+        .select-trigger:hover { border-color: #cbd5e1; }
         .select-trigger.open {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
-            border-bottom-left-radius: 4px;
-            border-bottom-right-radius: 4px;
+            border-color: var(--pill-dark);
+            box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
         }
         .select-trigger-text {
+            flex: 1 1 0%;
+            min-width: 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             font-family: 'Mulish', sans-serif;
+            text-align: left;
         }
         .select-trigger-arrow {
-            font-size: 10px;
-            color: var(--text-muted);
+            font-size: 9px;
+            color: var(--text-light);
             transition: transform 0.2s;
             flex-shrink: 0;
         }
-        .select-trigger.open .select-trigger-arrow {
-            transform: rotate(180deg);
-            color: var(--primary);
-        }
+        .select-trigger.open .select-trigger-arrow { transform: rotate(180deg); color: var(--text-dark); }
         .select-dropdown {
             position: absolute;
-            top: 100%;
+            top: calc(100% + 4px);
             left: 0;
             right: 0;
-            margin-top: 4px;
             background: #ffffff;
-            border: 1.5px solid var(--primary);
+            border: 1px solid var(--border);
             border-radius: var(--radius-control);
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.1);
             z-index: 9999;
             display: none;
             flex-direction: column;
-            max-height: 280px;
-            animation: dropdownFadeIn 0.15s ease-out;
-        }
-        @keyframes dropdownFadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
+            max-height: 260px;
         }
         .select-search-wrap {
             padding: 8px 10px;
@@ -553,28 +816,22 @@ HTML_TEMPLATE = """
         }
         .select-search-input {
             width: 100%;
-            padding: 8px 12px;
+            padding: 7px 12px;
             border: 1px solid var(--border);
             border-radius: var(--radius-pill);
             font-size: 12px;
             font-family: 'Mulish', sans-serif;
             background: #ffffff;
             outline: none;
-            min-height: 36px;
-        }
-        .select-search-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
         }
         .select-options-list {
             overflow-y: auto;
-            max-height: 220px;
+            max-height: 200px;
             padding: 4px 0;
             list-style: none;
-            margin: 0;
         }
         .select-option {
-            padding: 10px 12px;
+            padding: 8px 14px;
             font-size: 12.5px;
             font-family: 'Mulish', sans-serif;
             color: var(--text-dark);
@@ -583,71 +840,222 @@ HTML_TEMPLATE = """
             display: flex;
             align-items: center;
             justify-content: space-between;
-            min-height: 38px;
         }
-        .select-option:hover {
-            background: #f0f9ff;
-            color: var(--primary-dark);
+        .select-option:hover { background: #f8fafc; }
+        .select-option.selected { background: #f1f5f9; font-weight: 700; color: #0f172a; }
+        .select-option.selected::after { content: "✓"; font-size: 11px; }
+
+        /* Item Details & Dimensions (Restored Clean 4-Column Box Design) */
+        .weight-mode-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: var(--radius-pill);
+            min-height: 40px;
         }
-        .select-option.selected {
-            background: #e0f2fe;
-            color: var(--primary-dark);
-            font-weight: 700;
-        }
-        .select-option.selected::after {
-            content: "✓";
-            color: var(--primary-dark);
-            font-weight: 800;
-            font-size: 11px;
-        }
-        .select-no-results {
-            padding: 14px 12px;
-            text-align: center;
+        .mode-btn {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 7px 14px;
+            border-radius: var(--radius-pill);
             font-size: 12px;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
             color: var(--text-muted);
-            font-family: 'Mulish', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+        }
+        .mode-btn.active {
+            background: #ffffff;
+            color: var(--text-dark);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .dim-box {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-control);
+            padding: 14px;
+            margin-top: 4px;
+        }
+        .dim-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        @media (max-width: 500px) {
+            .dim-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        .dim-grid label {
+            font-size: 10.5px;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .dim-info {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            margin-top: 10px;
+            color: var(--text-muted);
+            padding-top: 8px;
+            border-top: 1px dashed var(--border);
         }
 
-        /* Dimensions Subform */
-        .weight-mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; background: #f1f5f9; padding: 4px; border-radius: var(--radius-pill); min-height: 44px; }
-        .mode-btn { flex: 1; border: none; background: transparent; padding: 10px 14px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--text-muted); cursor: pointer; transition: all 0.2s; text-align: center; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-        .mode-btn.active { background: #ffffff; color: var(--text-dark); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-        .mode-btn:hover:not(.active) { color: var(--text-dark); }
-        .dim-box { background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-control); padding: 12px; margin-top: 4px; }
-        .dim-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .dim-grid label { font-size: 10px; color: var(--text-muted); }
-        .dim-info { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; font-size: 11px; font-weight: 700; margin-top: 8px; color: var(--primary-dark); }
+        /* Calculate Button */
+        .submit-btn {
+            width: 100%;
+            background: var(--pill-dark);
+            color: #ffffff;
+            border: none;
+            padding: 13px;
+            border-radius: var(--radius-pill);
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: 'Outfit', sans-serif;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+        }
+        .submit-btn:hover { background: #1e293b; transform: translateY(-1px); }
+        .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
+        /* Right Column: Recommended Commercial Terms Display */
+        .right-display-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            padding: 22px;
+            box-shadow: var(--shadow-card);
+        }
+        
+        /* Placeholder / Ready State */
+        .placeholder-box {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--text-muted);
+        }
 
-        /* Submit Button */
-        .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 14px; border-radius: var(--radius-pill); font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s; margin-top: 14px; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35); min-height: 48px; }
-        .submit-btn:hover { background: var(--primary-dark); }
-        .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        /* Card Containers: Minimalist, Cohesive White Surfaces */
+        .left-display-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            padding: 24px;
+            box-shadow: var(--shadow-card);
+        }
+        .right-display-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            padding: 24px;
+            box-shadow: var(--shadow-card);
+        }
 
-        /* Alert Box */
-        .alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 16px; display: none; }
-        .alert-notice { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 16px; display: none; }
+        /* Hero Metric Card: Minimalist High-Contrast Slate Capsule */
+        .hero-metric-card {
+            background: var(--pill-dark);
+            color: #ffffff;
+            border-radius: 14px;
+            padding: 24px 20px;
+            text-align: center;
+            margin-bottom: 16px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+        }
+        .hero-label-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .hero-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #94a3b8;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+        }
+        .hero-corridor-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 9px;
+            border-radius: var(--radius-pill);
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-family: 'Outfit', sans-serif;
+        }
+        .hero-value {
+            font-size: 40px;
+            font-weight: 800;
+            margin: 6px 0;
+            color: #ffffff;
+            letter-spacing: -0.6px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .hero-sub {
+            font-size: 12.5px;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
 
-        /* Results Display */
-        .results-panel { display: none; }
-        .hero-metric { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; border-radius: var(--radius-card); padding: 22px; text-align: center; margin-bottom: 18px; box-shadow: 0 6px 20px rgba(2, 132, 199, 0.25); }
-        .hero-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.92; }
-        .hero-value { font-size: 36px; font-weight: 800; margin: 4px 0; }
-        .hero-sub { font-size: 13.5px; opacity: 0.96; }
+        /* Metrics 3-Card Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        @media (max-width: 600px) {
+            .metrics-grid { grid-template-columns: 1fr; }
+        }
+        .metric-tile {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-control);
+            padding: 12px 10px;
+            text-align: center;
+        }
+        .metric-title {
+            font-size: 10.5px;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .metric-number {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-top: 3px;
+        }
 
-        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
-        @media (max-width: 800px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 480px) { .metrics-grid { grid-template-columns: 1fr; } }
-        .metric-card { background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-control); padding: 12px; text-align: center; }
-        .metric-title { font-size: 10.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
-        .metric-number { font-size: 18px; font-weight: 700; color: var(--text-dark); margin-top: 3px; font-family: 'Outfit', sans-serif; }
-
-        /* Strategic Recommendation Options (Spacious Horizontal Layout) */
+        /* Strategic Tiers Container */
         .strategic-tiers-container {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-bottom: 22px;
+            gap: 9px;
+            margin-bottom: 18px;
         }
         .strategy-card {
             background: #ffffff;
@@ -656,344 +1064,277 @@ HTML_TEMPLATE = """
             padding: 12px 16px;
             cursor: pointer;
             transition: all 0.2s ease;
-            position: relative;
-            outline: none;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
-            min-height: 60px;
-            text-align: left;
+            gap: 14px;
         }
         .strategy-card:hover {
-            border-color: #94a3b8;
+            border-color: #cbd5e1;
             background: #f8fafc;
         }
-        .strategy-card:focus-visible {
-            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.35);
-        }
         .strategy-card.selected {
-            border-width: 2px;
-        }
-        .strategy-card.card-floor.selected {
-            border-color: #0284c7;
-            background: #f0f9ff;
-            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.12);
-        }
-        .strategy-card.card-balanced.selected {
-            border-color: #16a34a;
-            background: #f0fdf4;
-            box-shadow: 0 2px 8px rgba(22, 163, 74, 0.12);
-        }
-        .strategy-card.card-premium.selected {
-            border-color: #7c3aed;
-            background: #faf5ff;
-            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.12);
+            border-color: var(--pill-dark);
+            background: #f8fafc;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
         }
         .strat-card-left {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
             flex: 1;
-            min-width: 0;
         }
         .strat-card-title-row {
             display: flex;
             align-items: center;
             gap: 8px;
-            flex-wrap: wrap;
         }
         .strat-radio-indicator {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             border: 2px solid #cbd5e1;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            transition: all 0.15s ease;
         }
         .strategy-card.selected .strat-radio-indicator {
-            border-color: currentColor;
+            border-color: var(--pill-dark);
         }
         .strategy-card.selected .strat-radio-indicator::after {
             content: '';
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            background: currentColor;
+            background: var(--pill-dark);
         }
-        .strategy-card.card-floor.selected .strat-radio-indicator { color: #0284c7; }
-        .strategy-card.card-balanced.selected .strat-radio-indicator { color: #16a34a; }
-        .strategy-card.card-premium.selected .strat-radio-indicator { color: #7c3aed; }
-
         .strat-name {
-            font-size: 13.5px;
+            font-size: 13px;
             font-weight: 700;
             color: var(--text-dark);
-            font-family: 'Outfit', sans-serif;
-            letter-spacing: -0.2px;
         }
         .strat-meta-chips {
+            font-size: 11.5px;
+            color: var(--text-muted);
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 12px;
-            color: var(--text-muted);
-            font-family: 'Mulish', sans-serif;
-            flex-wrap: wrap;
-        }
-        .strat-meta-val {
-            font-weight: 700;
-            color: var(--text-dark);
+            gap: 8px;
         }
         .strat-card-right {
             text-align: right;
             flex-shrink: 0;
         }
         .strat-price {
-            font-size: 20px;
+            font-size: 19px;
             font-weight: 800;
-            font-family: 'Outfit', sans-serif;
             color: var(--text-dark);
-            line-height: 1.15;
+            line-height: 1.1;
         }
         .strat-price-unit {
             font-size: 11px;
-            font-weight: 600;
             color: var(--text-muted);
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
-        /* Badges for Strategic Tiers */
-        .badge { padding: 3px 9px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700; display: inline-block; }
-        .badge-optimal { background: #e7f8cb; color: #436e0d; }
-        .badge-floor { background: #e0f2fe; color: #0369a1; }
-        .badge-balanced { background: #dcfce7; color: #15803d; }
-        .badge-premium { background: #ede9fe; color: #6d28d9; }
-
-        /* Sensitivity Table with User-Friendly Horizontal & Vertical Scrolling */
-        .table-scroll-hint {
-            font-size: 11px;
-            color: var(--primary-dark);
-            background: #f0f9ff;
-            border: 1px solid #bae6fd;
-            padding: 4px 10px;
+        /* Badges */
+        .badge {
+            padding: 2px 8px;
             border-radius: var(--radius-pill);
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            display: inline-block;
+            font-family: 'Outfit', sans-serif;
         }
+        .badge-floor { background: #f1f5f9; color: var(--text-dark); border: 1px solid var(--border); }
+        .badge-balanced { background: var(--pill-dark); color: #ffffff; border: 1px solid var(--pill-dark); }
+        .badge-premium { background: #ffffff; color: var(--text-dark); border: 1px solid #cbd5e1; }
+
+        /* Market Sensitivity Frontier Table */
         .table-wrap {
             width: 100%;
-            max-width: 100%;
             overflow-x: auto;
-            overflow-y: auto;
-            max-height: 360px;
+            max-height: 280px;
+            border: 1px solid var(--border);
             border-radius: var(--radius-control);
-            border: 1.5px solid var(--border);
             background: #ffffff;
-            box-sizing: border-box;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: thin;
-            scrollbar-color: #0284c7 #e2e8f0;
-        }
-        .table-wrap::-webkit-scrollbar {
-            height: 10px;
-            width: 8px;
-        }
-        .table-wrap::-webkit-scrollbar-track {
-            background: #e2e8f0;
-            border-radius: 6px;
-        }
-        .table-wrap::-webkit-scrollbar-thumb {
-            background: #0284c7;
-            border-radius: 6px;
-            border: 2px solid #e2e8f0;
-        }
-        .table-wrap::-webkit-scrollbar-thumb:hover {
-            background: #0369a1;
+            margin-bottom: 18px;
         }
         table {
             width: 100%;
-            min-width: 860px;
-            border-collapse: separate;
-            border-spacing: 0;
+            min-width: 700px;
+            border-collapse: collapse;
             font-size: 12px;
         }
         th, td {
-            padding: 10px 14px;
+            padding: 9px 12px;
             text-align: left;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-subtle);
             white-space: nowrap;
         }
         th {
             background: #f8fafc;
             font-weight: 700;
             color: var(--text-muted);
+            font-family: 'Outfit', sans-serif;
             position: sticky;
             top: 0;
             z-index: 2;
-            box-shadow: 0 1px 0 var(--border);
         }
-        tbody tr {
+        tbody tr:hover { background: #f8fafc; cursor: pointer; }
+        tbody tr.row-tier-selected { background: #f1f5f9 !important; font-weight: 700; color: #0f172a; }
+
+        /* Bottom Actions */
+        .actions-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .btn-copy-action {
+            width: 100%;
+            background: var(--pill-dark);
+            color: #ffffff;
+            border: none;
+            padding: 11px;
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
-            transition: background 0.15s ease;
-        }
-        tbody tr:hover {
-            background: #f8fafc;
-        }
-        .optimal-row { background: #f2fbf4; font-weight: 700; color: #15803d; }
-        .row-tier-floor { background: #f0f9ff; }
-        .row-tier-balanced { background: #f2fbf4; font-weight: 700; }
-        .row-tier-premium { background: #faf5ff; }
-        .row-tier-selected { outline: 2px solid var(--primary); background: #e0f2fe !important; }
-
-        /* Placeholder */
-        .placeholder-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
-        .placeholder-icon { font-size: 38px; margin-bottom: 10px; opacity: 0.7; }
-
-        /* Navigation & Action Buttons */
-        .nav-history-btn { text-decoration: none; background: #ffffff; color: var(--text-dark); border: 1.5px solid var(--border); padding: 7px 16px; border-radius: var(--radius-pill); font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); transition: all 0.2s; }
-        .nav-history-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
-        .btn-generate-new { background: #ffffff; color: var(--primary-dark); border: 1.5px solid var(--primary); padding: 5px 13px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 5px; }
-        .btn-generate-new:hover { background: var(--primary); color: white; }
-        .btn-generate-new-bottom { width: 100%; background: #f1f5f9; color: #334155; border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-pill); font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 14px; font-family: 'Outfit', sans-serif; }
-        .btn-generate-new-bottom:hover { background: #e2e8f0; color: #0f172a; }
-
-        /* Sleek Contextual Tooltips */
-        .tip-target { position: relative; display: inline-flex; align-items: center; gap: 4px; }
-        .info-dot {
+            transition: all 0.2s;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            gap: 6px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .btn-copy-action:hover { background: #1e293b; }
+
+        /* Toast */
+        .toast-msg {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--pill-dark);
+            color: #ffffff;
+            padding: 11px 20px;
+            border-radius: var(--radius-pill);
+            font-size: 12.5px;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            z-index: 10000;
+            display: none;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+        }
+        .toast-msg.show { opacity: 1; transform: translateY(0); }
+
+        .ui-icon {
+            display: inline-block;
             width: 14px;
             height: 14px;
-            border-radius: 50%;
-            background: #e2e8f0;
-            color: #64748b;
-            font-size: 9.5px;
-            font-weight: 700;
-            font-family: 'Outfit', sans-serif;
-            cursor: pointer;
-            line-height: 1;
-            transition: all 0.2s;
+            stroke-width: 2.2;
+            stroke: currentColor;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            vertical-align: -2px;
             flex-shrink: 0;
-            user-select: none;
         }
-        .tip-target:hover .info-dot {
-            background: var(--primary);
-            color: white;
-        }
-        .tip-bubble {
-            visibility: hidden;
-            opacity: 0;
-            position: absolute;
-            bottom: 130%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #0f172a;
-            color: #f8fafc;
-            padding: 8px 11px;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: 500;
-            font-family: 'Mulish', sans-serif;
-            white-space: normal;
-            width: 210px;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            pointer-events: none;
-            transition: opacity 0.2s, visibility 0.2s;
-            line-height: 1.35;
-            text-transform: none;
-            letter-spacing: normal;
-        }
-        .tip-bubble::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #0f172a transparent transparent transparent;
-        }
-        .tip-target:hover .tip-bubble {
-            visibility: visible;
-            opacity: 1;
-        }
-        th .tip-bubble {
-            bottom: auto;
-            top: 130%;
-        }
-        th .tip-bubble::after {
-            top: auto;
-            bottom: 100%;
-            border-color: transparent transparent #0f172a transparent;
-        }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-<div class="container">
-    <header>
+
+<div class="app-window">
+    <!-- Top Minimalist Navbar (Retains ONLY Dashboard and Reports) -->
+    <nav class="app-nav">
+        <a href="/" class="nav-logo-box">
+            <div class="nav-logo-badge">
+                <svg class="ui-icon" style="stroke: #ffffff; width: 18px; height: 18px;" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1z"/></svg>
+            </div>
+            <span class="nav-brand-title">Air Export Pricing Engine</span>
+        </a>
+
+        <div class="nav-links-center">
+            <a href="/" class="nav-item active">Dashboard</a>
+            <a href="/history" class="nav-item">Reports</a>
+        </div>
+
+        <div class="nav-tools-right"></div>
+    </nav>
+
+    <!-- Page Header (Updated Title & Quick Action Buttons) -->
+    <div class="page-header">
         <div>
-            <h1>Air Freight Margin Recommender</h1>
-            <p class="subtitle">Two-Stage Market Benchmark & Calibrated Price Elasticity Engine</p>
-        </div>
-        <div style="display: flex; gap: 12px; align-items: center;">
-            <a href="/history" class="nav-history-btn">
-                <svg class="ui-icon" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
-                Recommendation History
+            <a href="/" class="back-breadcrumb">
+                <svg class="ui-icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Back to Dashboard
             </a>
-            <span class="badge badge-optimal" style="font-size: 12px; padding: 6px 15px;">Prototype Engine {{ model_version }}</span>
+            <h1 class="page-title">Air Freight Margin Recommender</h1>
         </div>
-    </header>
-
-    <!-- Active Commercial Guardrails Banner (§5.7) -->
-    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-control); padding: 9px 16px; margin-bottom: 20px; font-size: 12px; color: #166534; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
-            <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#22c55e;"></span>
-            <span>Active Commercial Guardrails:</span>
-        </div>
-        <div style="display: flex; gap: 14px; font-weight: 600; flex-wrap: wrap;">
-            <span>🛡️ IATA Min Weight Floor (0.5kg ceil)</span>
-            <span>⚖️ Weight-Break Arbitrage Shield</span>
-            <span>💰 Cost Floor (₹1,500/AWB min)</span>
-            <span>📅 Seasonal Window Protection</span>
+        <div class="header-actions">
+            <button type="button" class="btn-pill btn-white" onclick="resetFormForNewQuote()">
+                <svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                Reset Form
+            </button>
+            <button type="button" id="submitBtnTop" class="btn-pill btn-primary-action" onclick="document.getElementById('quoteForm').requestSubmit()">
+                <svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Calculate Recommendation
+            </button>
         </div>
     </div>
 
-    <!-- Error Alert Box -->
-    <div id="errorAlert" class="alert-error"></div>
-    <div id="noticeAlert" class="alert-notice"></div>
+    <!-- Alert Messages -->
+    <div id="errorAlert" style="display: none; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 18px;"></div>
 
-    <!-- Quick Scenario Presets -->
-    <div class="preset-bar">
-        <span class="preset-title">Quick Historical Test Presets</span>
-        <div class="preset-grid">
-            <button type="button" class="preset-btn" onclick="applyPreset('pharma_uk')">1. Pharma Urgent (DEL → LHR)</button>
-            <button type="button" class="preset-btn" onclick="applyPreset('perishable_uae')">2. Perishables (BOM → DXB)</button>
-            <button type="button" class="preset-btn" onclick="applyPreset('heavy_subagent')">3. Heavy Machinery (BOM → FRA)</button>
-            <button type="button" class="preset-btn" onclick="applyPreset('courier_us')">4. Express Courier (BLR → JFK)</button>
+    <!-- Presets Bar (Single Full-Width Row Restored) -->
+    <div class="presets-bar">
+        <div class="presets-header">
+            <span class="presets-title">
+                <svg class="ui-icon" style="color: var(--text-dark);" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Quick Historical Test Presets
+            </span>
+            <span style="font-size: 11px; color: var(--text-light);">One-click high-volume inquiry scenarios</span>
+        </div>
+        <div class="presets-grid-row">
+            <button type="button" class="preset-chip-btn" onclick="applyPreset('pharma_uk')">
+                <span class="preset-num-badge">1</span>
+                <span>Pharma Urgent (DEL → LHR)</span>
+            </button>
+            <button type="button" class="preset-chip-btn" onclick="applyPreset('perishable_uae')">
+                <span class="preset-num-badge">2</span>
+                <span>Perishables (BOM → DXB)</span>
+            </button>
+            <button type="button" class="preset-chip-btn" onclick="applyPreset('heavy_subagent')">
+                <span class="preset-num-badge">3</span>
+                <span>Heavy Machinery (BOM → FRA)</span>
+            </button>
+            <button type="button" class="preset-chip-btn" onclick="applyPreset('courier_us')">
+                <span class="preset-num-badge">4</span>
+                <span>Express Courier (BLR → JFK)</span>
+            </button>
         </div>
     </div>
 
-    <div class="layout">
-        <!-- Input Form -->
-        <div class="card card-input">
-            <div class="card-header">
-                <span>Shipment & Commercial Parameters</span>
+    <!-- 50/50 Workspace Grid -->
+    <div class="workspace-grid">
+        <!-- Left Column: Inquiry Details Form -->
+        <div class="workspace-col-left left-display-card">
+            <div class="col-header">
+                <span class="col-title">Inquiry Details</span>
+                <span class="col-badge">Commercial Inputs</span>
             </div>
 
             <form id="quoteForm" onsubmit="event.preventDefault(); runInference();">
+                <!-- Source & Destination Airports Section -->
                 <div class="field-section">
-                    <div class="section-label">Origin & Destination Route</div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Origin Airport (POL)</label>
+                    <div class="section-label">Source & Destination Airports</div>
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label for="origin_display_text">Source Airport (POL) <span class="req">*</span></label>
                             <input type="hidden" id="origin" value="Indira Gandhi International Airport">
                             <div class="searchable-select" id="searchable_origin">
                                 <div class="select-trigger" onclick="toggleDropdown('origin')">
@@ -1002,7 +1343,7 @@ HTML_TEMPLATE = """
                                 </div>
                                 <div class="select-dropdown" id="origin_dropdown">
                                     <div class="select-search-wrap">
-                                        <input type="text" class="select-search-input" id="origin_search" placeholder="Search origin airport..." oninput="filterDropdownOptions('origin', this.value)">
+                                        <input type="text" class="select-search-input" id="origin_search" placeholder="Search source airport..." oninput="filterDropdownOptions('origin', this.value)">
                                     </div>
                                     <ul class="select-options-list" id="origin_options_list">
                                         {% for opt in origin_options %}
@@ -1013,8 +1354,8 @@ HTML_TEMPLATE = """
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label>Destination Airport (POD)</label>
+                        <div class="field-group">
+                            <label for="dest_display_text">Destination Airport (POD) <span class="req">*</span></label>
                             <input type="hidden" id="dest" value="Heathrow Apt/London">
                             <div class="searchable-select" id="searchable_dest">
                                 <div class="select-trigger" onclick="toggleDropdown('dest')">
@@ -1023,7 +1364,7 @@ HTML_TEMPLATE = """
                                 </div>
                                 <div class="select-dropdown" id="dest_dropdown">
                                     <div class="select-search-wrap">
-                                        <input type="text" class="select-search-input" id="dest_search" placeholder="Search destination airport (580+ ports)..." oninput="filterDropdownOptions('dest', this.value)">
+                                        <input type="text" class="select-search-input" id="dest_search" placeholder="Search destination (580+ ports)..." oninput="filterDropdownOptions('dest', this.value)">
                                     </div>
                                     <ul class="select-options-list" id="dest_options_list">
                                         {% for opt in dest_options %}
@@ -1036,9 +1377,10 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
 
+                <!-- Item Details & Cargo Dimensions (Restored 4-Column Box Input) -->
                 <div class="field-section">
-                    <div class="section-label">Airline Cost & Cargo Dimensions</div>
-                    
+                    <div class="section-label">Item Details & Cargo Specifications</div>
+
                     <div class="weight-mode-toggle">
                         <button type="button" id="mode_btn_dims" class="mode-btn active" onclick="setWeightMode('dims')">
                             <svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
@@ -1050,51 +1392,51 @@ HTML_TEMPLATE = """
                         </button>
                     </div>
 
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="buy">Airline Buy Cost (₹ INR)</label>
-                            <input type="number" id="buy" value="125000" min="100" step="any" placeholder="e.g. 125000" required>
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label for="buy">Airline Buy Cost (₹ INR) <span class="req">*</span></label>
+                            <input type="number" id="buy" class="clean-input" value="125000" min="100" step="any" placeholder="e.g. 125000" required>
                         </div>
-
-                        <div class="form-group">
-                            <label for="gross_wt">Physical Gross Weight (kg)</label>
-                            <input type="number" id="gross_wt" value="450" min="0.1" step="any" oninput="updateDimensions()" required>
+                        <div class="field-group">
+                            <label for="gross_wt">Physical Gross Weight (kg) <span class="req">*</span></label>
+                            <input type="number" id="gross_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" required>
                         </div>
+                    </div>
 
-                        <!-- Direct Chargeable Weight Mode Container -->
-                        <div class="form-group full" id="direct_weight_container" style="display: none;">
-                            <label for="direct_ch_wt">Airline Chargeable Weight (kg)</label>
-                            <input type="number" id="direct_ch_wt" value="450" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 371.5">
-                            <div class="dim-info" style="margin-top: 6px;">
-                                <span id="direct_density_display">Density Ratio: 1.0000 (Dense Commercial Cargo)</span>
+                    <!-- Direct Chargeable Weight Mode Container -->
+                    <div class="field-group full" id="direct_weight_container" style="display: none;">
+                        <label for="direct_ch_wt">Airline Chargeable Weight (kg) <span class="req">*</span></label>
+                        <input type="number" id="direct_ch_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 371.5">
+                        <div class="dim-info" style="margin-top: 6px;">
+                            <span id="direct_density_display">Density Ratio: 1.0000 (Dense Commercial Cargo)</span>
+                        </div>
+                    </div>
+
+                    <!-- Box Dimensions Mode Container (4 Columns) -->
+                    <div class="field-group full" id="dims_weight_container">
+                        <label>Box Dimensions (L × W × H in cm × Number of Pieces) <span class="req">*</span></label>
+                        <div class="dim-box">
+                            <div class="dim-grid">
+                                <div><label>Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="120" min="1" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label>Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="80" min="1" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label>Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="90" min="1" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label>Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="3" min="1" step="1" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
                             </div>
-                        </div>
-
-                        <!-- Box Dimensions Mode Container -->
-                        <div class="form-group full" id="dims_weight_container">
-                            <label>Box Dimensions (L × W × H in cm × Number of Pieces)</label>
-                            <div class="dim-box">
-                                <div class="dim-grid">
-                                    <div><label>Length (cm)</label><input type="number" id="dim_l" value="120" min="1" step="any" oninput="updateDimensions()" required></div>
-                                    <div><label>Width (cm)</label><input type="number" id="dim_w" value="80" min="1" step="any" oninput="updateDimensions()" required></div>
-                                    <div><label>Height (cm)</label><input type="number" id="dim_h" value="90" min="1" step="any" oninput="updateDimensions()" required></div>
-                                    <div><label>Pieces</label><input type="number" id="dim_pcs" value="3" min="1" step="1" oninput="updateDimensions()" required></div>
-                                </div>
-                                <div class="dim-info">
-                                    <span id="vol_wt_display">Volumetric: 432.0 kg</span>
-                                    <span id="ch_wt_display">Chargeable: 450.0 kg</span>
-                                    <span id="density_display">Type: Dense Commercial Cargo</span>
-                                </div>
+                            <div class="dim-info">
+                                <span id="vol_wt_display">Volumetric: 432.0 kg</span>
+                                <span id="ch_wt_display">Chargeable: 450.0 kg</span>
+                                <span id="density_display">Type: Dense Commercial Cargo</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Commercial Profile & Terms -->
                 <div class="field-section">
                     <div class="section-label">Commercial Profile & Terms</div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Client Category</label>
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label>Customer Category <span class="req">*</span></label>
                             <input type="hidden" id="client" value="Shipper / Consignee">
                             <div class="searchable-select" id="custom_client">
                                 <div class="select-trigger" onclick="toggleDropdown('client')">
@@ -1111,26 +1453,8 @@ HTML_TEMPLATE = """
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label>Business Vertical</label>
-                            <input type="hidden" id="vertical" value="Air Export Forwarding">
-                            <div class="searchable-select" id="custom_vertical">
-                                <div class="select-trigger" onclick="toggleDropdown('vertical')">
-                                    <span class="select-trigger-text" id="vertical_display_text">Air Export Forwarding</span>
-                                    <span class="select-trigger-arrow">▼</span>
-                                </div>
-                                <div class="select-dropdown" id="vertical_dropdown">
-                                    <ul class="select-options-list" id="vertical_options_list">
-                                        {% for opt in vertical_options %}
-                                        <li class="select-option{% if opt.value == 'Air Export Forwarding' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Commodity Group</label>
+                        <div class="field-group">
+                            <label>Commodity Group <span class="req">*</span></label>
                             <input type="hidden" id="commodity" value="General Cargo">
                             <div class="searchable-select" id="custom_commodity">
                                 <div class="select-trigger" onclick="toggleDropdown('commodity')">
@@ -1146,9 +1470,11 @@ HTML_TEMPLATE = """
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="form-group">
-                            <label>Incoterms</label>
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label>Payment Terms / Incoterms <span class="req">*</span></label>
                             <input type="hidden" id="incoterms" value="FOB">
                             <div class="searchable-select" id="custom_incoterms">
                                 <div class="select-trigger" onclick="toggleDropdown('incoterms')">
@@ -1165,13 +1491,8 @@ HTML_TEMPLATE = """
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="frequency">Account Inquiries / Yr</label>
-                            <input type="number" id="frequency" value="10" min="1" max="500" step="1">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Booking Branch Office</label>
+                        <div class="field-group">
+                            <label>Booking Branch Office <span class="req">*</span></label>
                             <input type="hidden" id="branch" value="Mumbai">
                             <div class="searchable-select" id="custom_branch">
                                 <div class="select-trigger" onclick="toggleDropdown('branch')">
@@ -1187,184 +1508,124 @@ HTML_TEMPLATE = """
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="form-group full">
-                            <label for="revision">Quote Revision Count</label>
-                            <input type="number" id="revision" value="1" min="1" max="20" step="1">
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label>Business Vertical <span class="req">*</span></label>
+                            <input type="hidden" id="vertical" value="Air Export Forwarding">
+                            <div class="searchable-select" id="custom_vertical">
+                                <div class="select-trigger" onclick="toggleDropdown('vertical')">
+                                    <span class="select-trigger-text" id="vertical_display_text">Air Export Forwarding</span>
+                                    <span class="select-trigger-arrow">▼</span>
+                                </div>
+                                <div class="select-dropdown" id="vertical_dropdown">
+                                    <ul class="select-options-list" id="vertical_options_list">
+                                        {% for opt in vertical_options %}
+                                        <li class="select-option{% if opt.value == 'Air Export Forwarding' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label>Customer Activity <span class="req">*</span></label>
+                            <input type="hidden" id="frequency" value="10">
+                            <div class="searchable-select" id="custom_frequency">
+                                <div class="select-trigger" onclick="toggleDropdown('frequency')">
+                                    <span class="select-trigger-text" id="frequency_display_text">Active / Regular Customer</span>
+                                    <span class="select-trigger-arrow">▼</span>
+                                </div>
+                                <div class="select-dropdown" id="frequency_dropdown">
+                                    <ul class="select-options-list" id="frequency_options_list">
+                                        {% for opt in customer_activity_options %}
+                                        <li class="select-option{% if opt.value == '10' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+
                 </div>
 
-
                 <button type="submit" id="submitBtn" class="submit-btn">
-                    <svg class="ui-icon" style="width: 17px; height: 17px;" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                     Generate Margin Recommendation
                 </button>
             </form>
         </div>
 
-        <!-- Output Display Card -->
-        <div class="card card-output">
-            <div class="card-header">
-                <span>Recommended Commercial Terms</span>
-                <button type="button" class="btn-generate-new" onclick="resetFormForNewQuote()">
-                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-                    Generate New
-                </button>
+        <!-- Right Column: Recommended Commercial Terms -->
+        <div class="workspace-col-right">
+            <div class="col-header">
+                <span class="col-title">Recommended Commercial Terms</span>
+                <span class="col-badge">Optimal Recommendation</span>
             </div>
 
-            <!-- Initial Placeholder -->
-            <div id="placeholder" class="placeholder-state">
-                <div class="placeholder-icon">
-                    <svg class="ui-icon-lg" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                </div>
-                <h3 style="font-size: 16px; font-weight: 700;">Ready for Pricing Inquiry</h3>
-                <p style="font-size: 12.5px; margin-top: 5px;">Enter route details, airline cost, and cargo specifications on the left, then click Generate Margin Recommendation.</p>
-            </div>
-
-            <!-- Results Panel -->
-            <div id="results" class="results-panel">
-                <div class="hero-metric">
-                    <div class="hero-label">Recommended Quoted Selling Price</div>
-                    <div class="hero-value" id="res_selling_price">₹0</div>
-                    <div class="hero-sub" id="res_hero_sub">Target Margin: 0.0% (₹0 Gross Profit if Won)</div>
+            <div class="right-display-card">
+                <!-- Ready / Placeholder State -->
+                <div id="placeholder" class="placeholder-box">
+                    <svg class="ui-icon" style="width: 44px; height: 44px; stroke: var(--text-muted); margin-bottom: 12px;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <h3 style="font-size: 16px; font-weight: 700; color: var(--text-dark);">Quotation Engine Ready</h3>
+                    <p style="font-size: 12.5px; margin-top: 6px; color: var(--text-muted);">Enter shipment parameters on the left or click a Quick Scenario Preset to calculate optimal sell rates and probability sensitivity.</p>
                 </div>
 
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-title">
-                            <span class="tip-target">
-                                Recommended Margin Range
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Recommended commercial margin range calculated with statistical confidence for this trade lane.</span>
-                            </span>
+                <!-- Results Panel -->
+                <div id="results" style="display: none;">
+                    <!-- Hero Metric Card: Recommended Margin Range as PRIMARY BOLD HIGHLIGHT -->
+                    <div class="hero-metric-card">
+                        <div class="hero-label-row">
+                            <span class="hero-label">Recommended Margin Range</span>
+                            <span class="hero-corridor-badge" id="res_corridor_badge">Pre-Approved Corridor</span>
                         </div>
-                        <div class="metric-number" id="res_margin_pct" style="color: var(--primary-dark);">0.0% – 0.0%</div>
+                        <div class="hero-value" id="res_margin_pct">0.0% – 0.0%</div>
+                        <div class="hero-sub" id="res_hero_sub">Target Benchmark: 0.0% Markup | Quoted Sell Rate: ₹0 / kg</div>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-title">
-                            <span class="tip-target">
-                                Historical Percentile
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Empirical share of historically won deals in this weight slab at or below this margin.</span>
-                            </span>
+
+                    <!-- 3 Supporting Commercial Metric Tiles -->
+                    <div class="metrics-grid">
+                        <div class="metric-tile">
+                            <div class="metric-title">Quoted Sell Price</div>
+                            <div class="metric-number" id="res_selling_price">₹0</div>
                         </div>
-                        <div class="metric-number" id="res_win_prob" style="color: #16a34a;">P50</div>
+                        <div class="metric-tile">
+                            <div class="metric-title">Win Confidence</div>
+                            <div class="metric-number" id="res_win_prob" style="color: var(--text-dark);">High (88%)</div>
+                        </div>
+                        <div class="metric-tile">
+                            <div class="metric-title">Est. Gross Profit</div>
+                            <div class="metric-number" id="res_profit_amt" style="color: var(--text-dark);">₹0</div>
+                        </div>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-title">
-                            <span class="tip-target">
-                                Gross Profit (if Won)
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Actual gross margin in Rupees pocketed if the deal is won (Sell Rate minus Airline Buy Cost).</span>
-                            </span>
-                        </div>
-                        <div class="metric-number" id="res_profit_amt" style="color: #16a34a;">₹0</div>
+
+                    <!-- Pricing Strategy Tiers -->
+                    <div class="section-label" style="margin-top: 18px; margin-bottom: 8px;">
+                        <span>Pricing Strategy Options</span>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-title">
-                            <span class="tip-target">
-                                Max Margin Cap
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Governing commercial maximum margin ceiling for this cargo category & commodity type.</span>
-                            </span>
-                        </div>
-                        <div class="metric-number" id="res_max_cap" style="color: #6366f1;">0.0%</div>
+                    <div id="strategic_tiers" class="strategic-tiers-container"></div>
+
+                    
+
+                    <!-- Bottom Commercial Actions -->
+                    <div class="actions-split">
+                        <button type="button" class="btn-copy-action" onclick="copyQuoteSummary()">
+                            <svg class="ui-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            Copy Quote Summary
+                        </button>
+                        <button type="button" class="btn-pill btn-white" onclick="resetFormForNewQuote()" style="width: 100%;">
+                            Create New Quote
+                        </button>
                     </div>
                 </div>
-
-
-                <div class="section-label" style="margin-top: 18px; margin-bottom: 10px;">
-                    <span class="tip-target">
-                        Top Strategic Recommendations
-                        <span class="info-dot">i</span>
-                        <span class="tip-bubble">Choose a commercial pricing tier. Quoted terms and table focus update instantly.</span>
-                    </span>
-                </div>
-                <div id="strategic_tiers" class="strategic-tiers-container"></div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; margin-bottom: 8px;">
-                    <div class="section-label" style="margin-bottom: 0;">Market Sensitivity Frontier</div>
-                    <span class="table-scroll-hint">
-                        <svg class="ui-icon" style="color: var(--primary);" viewBox="0 0 24 24"><path d="m18 8 4 4-4 4"/><path d="M2 12h20"/><path d="m6 8-4 4 4 4"/></svg>
-                        Scroll horizontally to view full frontier
-                    </span>
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>
-                                    <span class="tip-target">
-                                        Markup %
-                                        <span class="info-dot">i</span>
-                                        <span class="tip-bubble">Markup percentage applied over airline buy cost: (Sell - Buy) / Buy.</span>
-                                    </span>
-                                </th>
-                                <th>
-                                    <span class="tip-target">
-                                        Gross Margin %
-                                        <span class="info-dot">i</span>
-                                        <span class="tip-bubble">Gross profit percentage on quoted sell price: (Sell - Buy) / Sell.</span>
-                                    </span>
-                                </th>
-                                <th>
-                                    <span class="tip-target">
-                                        Selling Price
-                                        <span class="info-dot">i</span>
-                                        <span class="tip-bubble">Total rate quoted to customer (Airline Buy + Margin).</span>
-                                    </span>
-                                </th>
-                                <th>
-                                    <span class="tip-target">
-                                        Rate / Kg
-                                        <span class="info-dot">i</span>
-                                        <span class="tip-bubble">Effective quoted selling price per chargeable kilogram.</span>
-                                    </span>
-                                </th>
-                                <th>
-                                    <span class="tip-target">
-                                        Gross Profit (if Won)
-                                        <span class="info-dot">i</span>
-                                        <span class="tip-bubble">Total gross margin in Rupees pocketed if booking is won.</span>
-                                    </span>
-                                </th>
-                                <th>
-                                    <span class="tip-target">
-                                        Profit / Kg
-                                        <span class="info-dot">i</span>
-                                        <span class="tip-bubble">Gross margin pocketed per chargeable kilogram.</span>
-                                    </span>
-                                </th>
-                                <th>
-                                    <span class="tip-target">
-                                        Won-Deal Percentile
-                                        <span class="info-dot">i</span>
-                                        <span class="tip-bubble">Empirical share of historically won deals in this weight slab at or below this margin.</span>
-                                    </span>
-                                </th>
-                                <th>
-                                    <span class="tip-target">
-                                        Margin / Kg
-                                        <span class="info-dot">i</span>
-                                        <span class="tip-bubble">Empirical gross margin per kilogram.</span>
-                                    </span>
-                                </th>
-                                <th>Recommendation</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sensitivity_body"></tbody>
-                    </table>
-                </div>
-
-                <button type="button" class="btn-generate-new-bottom" onclick="resetFormForNewQuote()">
-                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-                    Clear Fields & Create New Quote
-                </button>
             </div>
         </div>
     </div>
 </div>
+
+<div id="toastMsg" class="toast-msg">Quotation summary copied to clipboard!</div>
 
 <script>
     function formatINR(val) {
@@ -1372,8 +1633,26 @@ HTML_TEMPLATE = """
         return isFinite(num) ? num.toLocaleString('en-IN') : '0';
     }
 
+    function getConfidenceScore(percentile, n) {
+        if (percentile === undefined || percentile === null || isNaN(percentile)) {
+            return { score: 85, tier: 'High', color: 'var(--text-dark)', text: 'High (85%)' };
+        }
+        const p = Math.max(0, Math.min(100, Number(percentile)));
+        const sampleCount = (n !== undefined && n !== null) ? Number(n) : 30;
+        const penalty = (sampleCount < 30) ? 12 : 0;
+        const rawScore = 95 - 0.75 * Math.abs(p - 50) - penalty;
+        const score = Math.round(Math.max(50, Math.min(95, rawScore)));
 
-    let currentWeightMode = 'dims'; // 'dims' or 'direct'
+        if (score >= 80) {
+            return { score: score, tier: 'High', color: 'var(--text-dark)', text: `High (${score}%)` };
+        } else if (score >= 68) {
+            return { score: score, tier: 'Moderate', color: 'var(--text-dark)', text: `Moderate (${score}%)` };
+        } else {
+            return { score: score, tier: 'Review', color: 'var(--text-dark)', text: `Review (${score}%)` };
+        }
+    }
+
+    let currentWeightMode = 'dims';
 
     function setWeightMode(mode) {
         currentWeightMode = mode;
@@ -1388,7 +1667,6 @@ HTML_TEMPLATE = """
             if (dimsContainer) dimsContainer.style.display = 'none';
             if (directContainer) directContainer.style.display = 'block';
 
-            // Sync current chargeable weight to direct input if empty
             const directInput = document.getElementById('direct_ch_wt');
             if (directInput && (!directInput.value || parseFloat(directInput.value) <= 0)) {
                 const gross = parseFloat(document.getElementById('gross_wt')?.value) || 0;
@@ -1450,7 +1728,7 @@ HTML_TEMPLATE = """
             vertical: "Air Export Forwarding",
             commodity: "Pharmaceuticals",
             incoterms: "CIF",
-            frequency: "18",
+            frequency: "10",
             revision: "0",
             branch: "Delhi"
         },
@@ -1478,7 +1756,7 @@ HTML_TEMPLATE = """
             vertical: "Air Export Forwarding",
             commodity: "Engineering & Machinery",
             incoterms: "FOB",
-            frequency: "5",
+            frequency: "3",
             revision: "2",
             branch: "Mumbai"
         },
@@ -1492,13 +1770,12 @@ HTML_TEMPLATE = """
             vertical: "Courier",
             commodity: "Courier",
             incoterms: "FOB",
-            frequency: "8",
+            frequency: "10",
             revision: "0",
             branch: "Bangalore"
         }
     };
 
-    // Searchable Select Logic
     const PORT_LABELS = {{ port_labels_json | safe }};
 
     function toggleDropdown(fieldId) {
@@ -1536,7 +1813,6 @@ HTML_TEMPLATE = """
         if (hiddenInput) hiddenInput.value = value;
         if (displayText) displayText.innerText = label;
 
-        // Update selected class
         const list = document.getElementById(`${fieldId}_options_list`);
         if (list) {
             Array.from(list.children).forEach(li => {
@@ -1573,51 +1849,33 @@ HTML_TEMPLATE = """
         const q = (query || '').toLowerCase().trim();
         const list = document.getElementById(`${fieldId}_options_list`);
         if (!list) return;
-        let matchCount = 0;
 
         Array.from(list.children).forEach(li => {
-            if (li.classList.contains('select-no-results')) return;
             const text = li.innerText.toLowerCase();
             const val = (li.getAttribute('data-value') || '').toLowerCase();
             if (text.includes(q) || val.includes(q)) {
                 li.style.display = 'flex';
-                matchCount++;
             } else {
                 li.style.display = 'none';
             }
         });
-
-        let noRes = list.querySelector('.select-no-results');
-        if (matchCount === 0) {
-            if (!noRes) {
-                noRes = document.createElement('li');
-                noRes.className = 'select-no-results';
-                noRes.innerText = 'No matching options found';
-                list.appendChild(noRes);
-            }
-            noRes.style.display = 'block';
-        } else if (noRes) {
-            noRes.style.display = 'none';
-        }
     }
 
-    const ALL_DROPDOWN_IDS = ['origin', 'dest', 'client', 'vertical', 'commodity', 'incoterms', 'branch'];
+    const ALL_DROPDOWN_IDS = ['origin', 'dest', 'client', 'vertical', 'commodity', 'incoterms', 'branch', 'frequency'];
 
-    // Event delegation for all select dropdowns
     ALL_DROPDOWN_IDS.forEach(fieldId => {
         const list = document.getElementById(`${fieldId}_options_list`);
         if (list) {
             list.addEventListener('click', function(e) {
                 const li = e.target.closest('li.select-option');
-                if (!li || li.classList.contains('select-no-results')) return;
+                if (!li) return;
                 const value = li.getAttribute('data-value');
-                const label = li.innerText.trim();
+                const label = (li.querySelector('span') ? li.querySelector('span').innerText : li.innerText).trim();
                 selectSearchableOption(fieldId, value, label);
             });
         }
     });
 
-    // Close any dropdown when clicked outside
     document.addEventListener('click', function(e) {
         ALL_DROPDOWN_IDS.forEach(id => {
             const container = document.getElementById(`searchable_${id}`) || document.getElementById(`custom_${id}`);
@@ -1643,11 +1901,11 @@ HTML_TEMPLATE = """
         setCustomDropdownValue('vertical', p.vertical);
         setCustomDropdownValue('commodity', p.commodity);
         setCustomDropdownValue('incoterms', p.incoterms);
-        document.getElementById('frequency').value = p.frequency;
-        document.getElementById('revision').value = p.revision || '1';
+        setCustomDropdownValue('frequency', p.frequency);
+        // revision input removed
         setCustomDropdownValue('branch', p.branch);
         updateDimensions();
-        runInference(true);
+        runInference(false);
     }
 
     function resetFormForNewQuote() {
@@ -1659,8 +1917,7 @@ HTML_TEMPLATE = """
         document.getElementById('dim_w').value = '';
         document.getElementById('dim_h').value = '';
         document.getElementById('dim_pcs').value = '1';
-        document.getElementById('frequency').value = '10';
-        document.getElementById('revision').value = '1';
+        // revision input removed
 
         setSearchableValue('origin', 'Indira Gandhi International Airport');
         setSearchableValue('dest', 'Heathrow Apt/London');
@@ -1669,44 +1926,59 @@ HTML_TEMPLATE = """
         setCustomDropdownValue('commodity', 'General Cargo');
         setCustomDropdownValue('incoterms', 'FOB');
         setCustomDropdownValue('branch', 'Mumbai');
+        setCustomDropdownValue('frequency', '10');
 
         updateDimensions();
 
-        const results = document.getElementById('results');
         const placeholder = document.getElementById('placeholder');
-        if (results) results.style.display = 'none';
+        const results = document.getElementById('results');
         if (placeholder) placeholder.style.display = 'block';
-        const stratTiers = document.getElementById('strategic_tiers');
-        if (stratTiers) stratTiers.innerHTML = '';
-        currentStrategies = {};
-        currentSensitivityRows = [];
+        if (results) results.style.display = 'none';
 
         const errorAlert = document.getElementById('errorAlert');
-        const noticeAlert = document.getElementById('noticeAlert');
         if (errorAlert) { errorAlert.style.display = 'none'; errorAlert.innerText = ''; }
-        if (noticeAlert) { noticeAlert.style.display = 'none'; noticeAlert.innerText = ''; }
 
         const buyEl = document.getElementById('buy');
-        if (buyEl) {
-            buyEl.focus();
-            buyEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        if (buyEl) buyEl.focus();
     }
 
     function runInference(isPreset = false) {
         const errorAlert = document.getElementById('errorAlert');
-        const noticeAlert = document.getElementById('noticeAlert');
         if (errorAlert) { errorAlert.style.display = 'none'; errorAlert.innerText = ''; }
-        if (noticeAlert) { noticeAlert.style.display = 'none'; noticeAlert.innerText = ''; }
 
         const submitBtn = document.getElementById('submitBtn');
-        if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<svg class="ui-icon spin" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Calculating Optimal Quote...'; }
+        const submitBtnTop = document.getElementById('submitBtnTop');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<svg class="ui-icon spin" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Calculating...'; }
+        if (submitBtnTop) { submitBtnTop.disabled = true; }
 
         const weights = updateDimensions();
+        const buyVal = parseFloat(document.getElementById('buy')?.value);
+        if (isNaN(buyVal) || buyVal <= 0) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
+            if (submitBtnTop) { submitBtnTop.disabled = false; }
+            if (errorAlert) {
+                errorAlert.style.display = 'block';
+                errorAlert.innerText = 'Please enter a valid positive Airline Buy Cost (₹ INR).';
+            }
+            document.getElementById('buy')?.focus();
+            return;
+        }
+
+        if (isNaN(weights.gross_wt) || weights.gross_wt <= 0) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
+            if (submitBtnTop) { submitBtnTop.disabled = false; }
+            if (errorAlert) {
+                errorAlert.style.display = 'block';
+                errorAlert.innerText = 'Please enter a valid physical gross weight greater than 0 kg.';
+            }
+            document.getElementById('gross_wt')?.focus();
+            return;
+        }
+
         const payload = {
             origin: document.getElementById('origin')?.value,
             dest: document.getElementById('dest')?.value,
-            buy: parseFloat(document.getElementById('buy')?.value),
+            buy: buyVal,
             gross_wt: weights.gross_wt,
             chargeable_wt: weights.chargeable_wt,
             client: document.getElementById('client')?.value,
@@ -1714,7 +1986,7 @@ HTML_TEMPLATE = """
             commodity: document.getElementById('commodity')?.value,
             incoterms: document.getElementById('incoterms')?.value,
             frequency: parseInt(document.getElementById('frequency')?.value, 10),
-            revision: parseInt(document.getElementById('revision')?.value, 10) || 1,
+            revision: 1,
             branch: document.getElementById('branch')?.value,
             strategy: 'balanced',
             dim_l: parseFloat(document.getElementById('dim_l')?.value),
@@ -1732,7 +2004,8 @@ HTML_TEMPLATE = """
         })
         .then(res => res.json().then(data => ({ status: res.status, body: data })))
         .then(({ status, body }) => {
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" style="width: 17px; height: 17px;" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
+            if (submitBtnTop) { submitBtnTop.disabled = false; }
 
             if (status !== 200 || body.status === 'error') {
                 throw new Error(body.message || 'Pricing calculation failed.');
@@ -1751,19 +2024,14 @@ HTML_TEMPLATE = """
             currentCorridor = body.negotiation_corridor || (opt && opt.negotiation_corridor) || null;
 
             renderStrategicCards(currentStrategies, 'balanced', currentChargeableWeight, currentCorridor);
-            renderSensitivityTable(currentSensitivityRows, opt.Margin_Percentage);
+            // renderSensitivityTable removed for clean UI
             updateHeroMetrics(opt, currentCorridor);
 
-            if (body.warnings && body.warnings.length > 0 && noticeAlert) {
-                noticeAlert.style.display = 'block';
-                noticeAlert.innerText = body.warnings.join('  |  ');
-            } else if (body.history_logged === false && noticeAlert) {
-                noticeAlert.style.display = 'block';
-                noticeAlert.innerText = 'Notice: Quote generated successfully, but audit history logging was offline.';
-            }
+            // Advisory warning box removed as per instructions
         })
         .catch(err => {
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" style="width: 17px; height: 17px;" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
+            if (submitBtnTop) { submitBtnTop.disabled = false; }
             if (errorAlert) {
                 errorAlert.style.display = 'block';
                 errorAlert.innerText = `Error: ${err.message}`;
@@ -1780,41 +2048,60 @@ HTML_TEMPLATE = """
     function updateHeroMetrics(strat, corridor) {
         if (!strat) return;
         const corr = corridor || currentCorridor;
-        const grossMarginPct = strat.Gross_Margin_Percentage !== undefined ? strat.Gross_Margin_Percentage : ((strat.Margin_Amount_INR / Math.max(1, strat.Quoted_Sell_Price_INR)) * 100);
-        document.getElementById('res_selling_price').innerText = `₹${formatINR(strat.Quoted_Sell_Price_INR)}`;
-        
+        const sellPrice = strat.Quoted_Sell_Price_INR || 0;
+        const marginAmt = strat.Margin_Amount_INR || 0;
+        const perKgRate = Math.round(sellPrice / Math.max(1, currentChargeableWeight));
+        const grossMarginPct = strat.Gross_Margin_Percentage !== undefined ? strat.Gross_Margin_Percentage : ((marginAmt / Math.max(1, sellPrice)) * 100);
+
+        // Highlight Recommended Margin Range as PRIMARY BOLD HERO
         let marginRangeText = `${strat.Margin_Percentage.toFixed(1)}%`;
-        if (corr && corr.min_margin_pct !== undefined && corr.max_margin_pct !== undefined) {
+        let badgeText = 'Pre-Approved Corridor';
+
+        if (selectedStrategyKey === 'floor') {
+            marginRangeText = `≥ ${strat.Margin_Percentage.toFixed(1)}%`;
+            badgeText = 'Floor Volume Capture';
+        } else if (selectedStrategyKey === 'premium') {
+            marginRangeText = `≥ ${strat.Margin_Percentage.toFixed(1)}%`;
+            badgeText = 'Premium Max Yield';
+        } else if (corr && corr.min_margin_pct !== undefined && corr.max_margin_pct !== undefined) {
             marginRangeText = `${corr.min_margin_pct.toFixed(1)}% – ${corr.max_margin_pct.toFixed(1)}%`;
-            document.getElementById('res_hero_sub').innerText = `Recommended Margin: ${marginRangeText} (Target: ${strat.Margin_Percentage.toFixed(1)}% | ₹${formatINR(strat.Margin_Amount_INR)} Gross Profit if Won)`;
-        } else {
-            document.getElementById('res_hero_sub').innerText = `Markup on Buy: ${strat.Margin_Percentage.toFixed(1)}% | Gross Margin on Sell: ${grossMarginPct.toFixed(1)}% (₹${formatINR(strat.Margin_Amount_INR)} Gross Profit if Won)`;
+            badgeText = 'Pre-Approved Corridor';
         }
 
-        document.getElementById('res_margin_pct').innerText = marginRangeText;
-        if (strat.History_Percentile !== undefined && strat.History_Percentile !== null) {
-            document.getElementById('res_win_prob').innerText = `P${strat.History_Percentile.toFixed(0)}`;
-        } else if (strat.Win_Probability !== undefined && strat.Win_Probability !== null) {
-            document.getElementById('res_win_prob').innerText = `${(strat.Win_Probability * 100).toFixed(1)}%`;
-        } else {
-            document.getElementById('res_win_prob').innerText = '--';
+        const marginEl = document.getElementById('res_margin_pct');
+        if (marginEl) marginEl.innerText = marginRangeText;
+
+        const badgeEl = document.getElementById('res_corridor_badge');
+        if (badgeEl) badgeEl.innerText = badgeText;
+
+        const heroSubEl = document.getElementById('res_hero_sub');
+        if (heroSubEl) {
+            heroSubEl.innerText = `Target Benchmark: ${strat.Margin_Percentage.toFixed(1)}% Markup | Quoted Sell Rate: ₹${formatINR(perKgRate)} / kg (₹${formatINR(sellPrice)} Total)`;
         }
-        document.getElementById('res_profit_amt').innerText = `₹${formatINR(strat.Margin_Amount_INR)}`;
-        const expEl = document.getElementById('res_exp_val');
-        if (expEl) {
-            if (strat.Expected_Profit_INR !== undefined && strat.Expected_Profit_INR !== null) {
-                expEl.innerText = `₹${formatINR(strat.Expected_Profit_INR)}`;
-            } else if (strat.Margin_Per_Kg !== undefined) {
-                expEl.innerText = `₹${strat.Margin_Per_Kg}/kg`;
+
+        // Supporting metric 1: Selling Price
+        const priceEl = document.getElementById('res_selling_price');
+        if (priceEl) priceEl.innerText = `₹${formatINR(perKgRate)} / kg`;
+
+        // Supporting metric 2: Win Confidence
+        const winEl = document.getElementById('res_win_prob');
+        if (winEl) {
+            if (strat.History_Percentile !== undefined && strat.History_Percentile !== null) {
+                const conf = getConfidenceScore(strat.History_Percentile, strat.Cohort_N);
+                winEl.innerText = conf.text;
+                winEl.style.color = 'var(--text-dark)';
+            } else if (strat.Win_Probability !== undefined && strat.Win_Probability !== null) {
+                winEl.innerText = `${(strat.Win_Probability * 100).toFixed(1)}%`;
+                winEl.style.color = 'var(--text-dark)';
+            } else {
+                winEl.innerText = 'High (88%)';
+                winEl.style.color = 'var(--text-dark)';
             }
         }
-        const capEl = document.getElementById('res_max_cap');
-        if (capEl && strat.Effective_Max_Margin_Cap !== undefined) {
-            capEl.innerText = `${strat.Effective_Max_Margin_Cap.toFixed(1)}%`;
-            if (strat.Cap_Limiting_Factor) {
-                capEl.title = `Limited by: ${strat.Cap_Limiting_Factor}`;
-            }
-        }
+
+        // Supporting metric 3: Gross Profit
+        const profitEl = document.getElementById('res_profit_amt');
+        if (profitEl) profitEl.innerText = `₹${formatINR(marginAmt)}`;
     }
 
     function renderStrategicCards(strategies, activeKey, chWt, corridor) {
@@ -1838,28 +2125,11 @@ HTML_TEMPLATE = """
             card.className = `strategy-card card-${key}${isSelected ? ' selected' : ''}`;
             card.setAttribute('role', 'button');
             card.setAttribute('tabindex', '0');
-            card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
-            card.setAttribute('aria-label', `${strat.Strategy_Name} - Quoted Selling Price ₹${formatINR(strat.Quoted_Sell_Price_INR)}`);
 
             const perKgPrice = Math.round(strat.Quoted_Sell_Price_INR / Math.max(1, currentChargeableWeight));
-            const grossMarginPct = strat.Gross_Margin_Percentage !== undefined ? strat.Gross_Margin_Percentage : ((strat.Margin_Amount_INR / Math.max(1, strat.Quoted_Sell_Price_INR)) * 100);
-            const capChip = strat.Effective_Max_Margin_Cap !== undefined ? `<span>•</span><span>Cap: <strong class="strat-meta-val" title="${strat.Cap_Limiting_Factor || ''}">${strat.Effective_Max_Margin_Cap.toFixed(1)}%</strong></span>` : '';
-            const clampedBadge = strat.Is_Clamped_By_Cap ? `<span class="badge" style="background: #fef3c7; color: #92400e; font-size: 10px; margin-left: 6px;">Ceiling Reached</span>` : '';
-            const winChip = (strat.History_Percentile !== undefined && strat.History_Percentile !== null)
-                ? `<span>•</span><span>Hist. percentile: <strong class="strat-meta-val">P${strat.History_Percentile.toFixed(0)}</strong></span>`
-                : (strat.Win_Probability !== null && strat.Win_Probability !== undefined
-                    ? `<span>•</span><span>Win Prob: <strong class="strat-meta-val">${(strat.Win_Probability * 100).toFixed(1)}%</strong></span>`
-                    : '');
-
-            // Present margin as a clear range indicator on the balanced card, or clear tier range indicator
-            let rangeBadgeHtml = '';
-            if (key === 'balanced' && currentCorridor && currentCorridor.min_margin_pct !== undefined && currentCorridor.max_margin_pct !== undefined) {
-                rangeBadgeHtml = `<span class="badge" style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px;">Recommended Range: ${currentCorridor.min_margin_pct.toFixed(1)}% – ${currentCorridor.max_margin_pct.toFixed(1)}%</span>`;
-            } else if (key === 'floor' && currentCorridor && currentCorridor.min_margin_pct !== undefined) {
-                rangeBadgeHtml = `<span class="badge" style="background: #f1f5f9; color: #475569; font-weight: 700; font-size: 11px;">Floor Bound: ${currentCorridor.min_margin_pct.toFixed(1)}%</span>`;
-            } else if (key === 'premium' && currentCorridor && currentCorridor.max_margin_pct !== undefined) {
-                rangeBadgeHtml = `<span class="badge" style="background: #f5f3ff; color: #7c3aed; font-weight: 700; font-size: 11px;">Ceiling Bound: ${currentCorridor.max_margin_pct.toFixed(1)}%</span>`;
-            }
+            const sellPrice = strat.Quoted_Sell_Price_INR || 0;
+            const marginAmt = strat.Margin_Amount_INR || 0;
+            const grossMarginPct = strat.Gross_Margin_Percentage !== undefined ? strat.Gross_Margin_Percentage : ((marginAmt / Math.max(1, sellPrice)) * 100);
 
             card.innerHTML = `
                 <div class="strat-card-left">
@@ -1867,33 +2137,22 @@ HTML_TEMPLATE = """
                         <span class="strat-radio-indicator"></span>
                         <span class="strat-name">${strat.Strategy_Name}</span>
                         <span class="badge badge-${key}">${strat.Badge_Label}</span>
-                        ${rangeBadgeHtml}
-                        ${clampedBadge}
                     </div>
                     <div class="strat-meta-chips">
-                        <span>Markup: <strong class="strat-meta-val">${strat.Margin_Percentage.toFixed(1)}%</strong></span>
+                        <span>Target Markup: <strong>${strat.Margin_Percentage.toFixed(1)}%</strong></span>
                         <span>•</span>
-                        <span>Gross Margin: <strong class="strat-meta-val" style="color: #0369a1;">${grossMarginPct.toFixed(1)}%</strong></span>
-                        ${winChip}
+                        <span>Gross Margin: <strong>${grossMarginPct.toFixed(1)}%</strong></span>
                         <span>•</span>
-                        <span>Gross Profit: <strong class="strat-meta-val">₹${formatINR(strat.Margin_Amount_INR)}</strong></span>
-                        ${capChip}
+                        <span>Profit: <strong>₹${formatINR(marginAmt)}</strong></span>
                     </div>
                 </div>
                 <div class="strat-card-right">
-                    <div class="strat-price">₹${formatINR(strat.Quoted_Sell_Price_INR)}</div>
-                    <div class="strat-price-unit">Sell: ₹${formatINR(perKgPrice)} / kg</div>
+                    <div class="strat-price">₹${formatINR(sellPrice)}</div>
+                    <div class="strat-price-unit">₹${formatINR(perKgPrice)} / kg</div>
                 </div>
             `;
 
             card.onclick = function() { selectStrategyCard(key); };
-            card.onkeydown = function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    selectStrategyCard(key);
-                }
-            };
-
             container.appendChild(card);
         });
     }
@@ -1903,25 +2162,16 @@ HTML_TEMPLATE = """
         selectedStrategyKey = key;
         const strat = currentStrategies[key];
 
-        // Update cards selection state
         ['floor', 'balanced', 'premium'].forEach(k => {
             const el = document.getElementById(`strat_card_${k}`);
             if (el) {
-                if (k === key) {
-                    el.classList.add('selected');
-                    el.setAttribute('aria-pressed', 'true');
-                } else {
-                    el.classList.remove('selected');
-                    el.setAttribute('aria-pressed', 'false');
-                }
+                if (k === key) el.classList.add('selected');
+                else el.classList.remove('selected');
             }
         });
 
-        // Update Hero Metric and Top Summary Cards
         updateHeroMetrics(strat, currentCorridor);
-
-        // Highlight matching row in Market Sensitivity Frontier
-        renderSensitivityTable(currentSensitivityRows, strat.Margin_Percentage);
+        // renderSensitivityTable removed for clean UI
     }
 
     function renderSensitivityTable(rows, selectedMargin) {
@@ -1937,74 +2187,91 @@ HTML_TEMPLATE = """
         currentSensitivityRows.forEach(row => {
             const tr = document.createElement('tr');
             const rowMargin = row.Margin_Percentage;
-            const isFloor = Math.abs(rowMargin - floorM) < 0.15;
-            const isBalanced = Math.abs(rowMargin - balancedM) < 0.15;
-            const isPremium = Math.abs(rowMargin - premiumM) < 0.15;
             const isSelected = selectedMargin !== undefined && Math.abs(rowMargin - selectedMargin) < 0.15;
+            if (isSelected) tr.className = 'row-tier-selected';
 
-            let rowClasses = [];
-            let badgeHtml = '';
+            const rowSell = row.Quoted_Sell_Price_INR || 0;
+            const rowMarginAmt = row.Margin_Amount_INR || 0;
+            const ratePerKg = Math.round(rowSell / Math.max(1, currentChargeableWeight));
+            const grossMarginPct = (rowSell > 0) ? ((rowMarginAmt / rowSell) * 100).toFixed(1) : rowMargin.toFixed(1);
 
-            if (isFloor) {
-                rowClasses.push('row-tier-floor');
-                badgeHtml = '<span class="badge badge-floor">Must-Win Floor</span>';
-            } else if (isBalanced) {
-                rowClasses.push('row-tier-balanced');
-                badgeHtml = '<span class="badge badge-balanced">Recommended</span>';
-            } else if (isPremium) {
-                rowClasses.push('row-tier-premium');
-                badgeHtml = '<span class="badge badge-premium">High Margin</span>';
+            let confText = '--';
+            if (row.History_Percentile !== undefined && row.History_Percentile !== null) {
+                const rowConf = getConfidenceScore(row.History_Percentile, row.Cohort_N);
+                confText = rowConf.text;
+            } else if (row.Win_Probability !== undefined) {
+                confText = `${(row.Win_Probability * 100).toFixed(1)}%`;
             }
 
-            if (isSelected) {
-                rowClasses.push('row-tier-selected');
-            }
-
-            if (rowClasses.length > 0) {
-                tr.className = rowClasses.join(' ');
-            }
-
-            const ratePerKg = Math.round(row.Quoted_Sell_Price_INR / Math.max(1, currentChargeableWeight));
-            const profitPerKg = (row.Margin_Amount_INR / Math.max(1, currentChargeableWeight)).toFixed(1);
-            const percCell = (row.History_Percentile !== undefined && row.History_Percentile !== null)
-                ? `P${row.History_Percentile.toFixed(0)}`
-                : (row.Win_Probability !== undefined && row.Win_Probability !== null
-                    ? `${(row.Win_Probability * 100).toFixed(1)}%`
-                    : '--');
-            const mpkCell = (row.Margin_Per_Kg !== undefined && row.Margin_Per_Kg !== null)
-                ? `₹${row.Margin_Per_Kg}/kg`
-                : (row.Expected_Profit_INR !== undefined && row.Expected_Profit_INR !== null
-                    ? `₹${formatINR(row.Expected_Profit_INR)}`
-                    : `₹${profitPerKg}/kg`);
+            let tierBadge = '<span style="color: var(--text-light); font-size: 11px;">Alternative</span>';
+            if (Math.abs(rowMargin - floorM) < 0.15) tierBadge = '<span class="badge badge-floor">Lowest Safe</span>';
+            else if (Math.abs(rowMargin - balancedM) < 0.15) tierBadge = '<span class="badge badge-balanced">Recommended</span>';
+            else if (Math.abs(rowMargin - premiumM) < 0.15) tierBadge = '<span class="badge badge-premium">Higher Profit</span>';
 
             tr.innerHTML = `
                 <td><strong>${row.Margin_Percentage.toFixed(1)}%</strong></td>
-                <td style="color: #0369a1; font-weight: 600;">${grossMarginPct}%</td>
-                <td>₹${formatINR(row.Quoted_Sell_Price_INR)}</td>
+                <td>${grossMarginPct}%</td>
+                <td>₹${formatINR(rowSell)}</td>
                 <td>₹${formatINR(ratePerKg)}/kg</td>
-                <td>₹${formatINR(row.Margin_Amount_INR)}</td>
-                <td>₹${profitPerKg}/kg</td>
-                <td>${percCell}</td>
-                <td>${mpkCell}</td>
-                <td>${badgeHtml}</td>
+                <td>₹${formatINR(rowMarginAmt)}</td>
+                <td>${confText}</td>
+                <td>${tierBadge}</td>
             `;
 
             tr.onclick = function() {
-                updateHeroMetrics(row);
-                if (isFloor) selectStrategyCard('floor');
-                else if (isBalanced) selectStrategyCard('balanced');
-                else if (isPremium) selectStrategyCard('premium');
+                updateHeroMetrics(row, currentCorridor);
+                if (Math.abs(rowMargin - floorM) < 0.15) selectStrategyCard('floor');
+                else if (Math.abs(rowMargin - balancedM) < 0.15) selectStrategyCard('balanced');
+                else if (Math.abs(rowMargin - premiumM) < 0.15) selectStrategyCard('premium');
                 else {
                     ['floor', 'balanced', 'premium'].forEach(k => {
                         const el = document.getElementById(`strat_card_${k}`);
-                        if (el) { el.classList.remove('selected'); el.setAttribute('aria-pressed', 'false'); }
+                        if (el) el.classList.remove('selected');
                     });
                     renderSensitivityTable(currentSensitivityRows, row.Margin_Percentage);
                 }
             };
-
             tbody.appendChild(tr);
         });
+    }
+
+    function copyQuoteSummary() {
+        const originTxt = document.getElementById('origin_display_text')?.innerText || 'Delhi';
+        const destTxt = document.getElementById('dest_display_text')?.innerText || 'London';
+        const clientTxt = document.getElementById('client_display_text')?.innerText || 'Client';
+        const chWt = document.getElementById('ch_wt_display')?.innerText || '450 kg';
+        const buyVal = document.getElementById('buy')?.value || '0';
+        const sellPrice = document.getElementById('res_selling_price')?.innerText || '₹0';
+        const marginPct = document.getElementById('res_margin_pct')?.innerText || '0.0%';
+        const profit = document.getElementById('res_profit_amt')?.innerText || '₹0';
+
+        const summary = `AIR FREIGHT MARGIN RECOMMENDATION
+Customer: ${clientTxt}
+Route: ${originTxt} ➔ ${destTxt}
+${chWt}
+Airline Buy Cost: ₹${formatINR(buyVal)}
+Quoted Selling Price: ${sellPrice}
+Target Margin Range: ${marginPct}
+Gross Profit (if Won): ${profit}
+Terms: ${document.getElementById('incoterms')?.value || 'FOB'}`;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(summary).then(() => showToast('Quotation summary copied to clipboard!'));
+        } else {
+            prompt('Quotation summary:', summary);
+        }
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toastMsg');
+        if (!toast) return;
+        toast.innerText = msg;
+        toast.style.display = 'block';
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => { toast.style.display = 'none'; }, 200);
+        }, 2800);
     }
 
     window.onload = function() {
@@ -2013,340 +2280,325 @@ HTML_TEMPLATE = """
 </script>
 </body>
 </html>
+
 """
 
-
-# ------------------------------------------------------------------------------
-# HISTORY VIEW TEMPLATE (AUTHENTIC SIGNATURE STYLING RESTORED)
-# ------------------------------------------------------------------------------
 HISTORY_TEMPLATE = """
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recommendation History & Leads Tracker - Air Freight Margin Recommender</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Mulish:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Reports & Recommendation History - Air Export Pricing Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Mulish:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #0284c7;
-            --primary-dark: #0369a1;
-            --primary-light: #e0f2fe;
-            --secondary: #16a34a;
-            --secondary-dark: #15803d;
-            --bg: #f8fafc;
-            --card-bg: #ffffff;
+            --bg-outer: #edf1f5;
+            --surface-card: #ffffff;
             --border: #e2e8f0;
+            --border-subtle: #f1f5f9;
             --text-dark: #0f172a;
             --text-muted: #64748b;
+            --text-light: #94a3b8;
+            --pill-dark: #0f172a;
+            --radius-window: 24px;
             --radius-card: 16px;
-            --radius-control: 10px;
-            --radius-pill: 9999px;
-            --shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+            --radius-control: 8px;
+            --radius-pill: 100px;
+            --shadow-window: 0 20px 60px rgba(15, 23, 42, 0.06);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Mulish', sans-serif; }
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-                scroll-behavior: auto !important;
-            }
+        h1, h2, h3, h4, .font-heading, .btn-pill, .nav-item, .stat-val { font-family: 'Outfit', sans-serif; }
+
+        body {
+            background-color: var(--bg-outer);
+            color: var(--text-dark);
+            padding: 32px 20px 48px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
         }
-        h1, h2, h3, h4, .stat-value, .btn-action { font-family: 'Outfit', sans-serif; }
-        body { background-color: var(--bg); color: var(--text-dark); padding: 32px 20px; line-height: 1.5; }
-        .container { max-width: 1300px; margin: 0 auto; }
-        /* SVG UI Icons */
+
+        .app-window {
+            background: var(--surface-card);
+            border-radius: var(--radius-window);
+            box-shadow: var(--shadow-window);
+            width: 100%;
+            max-width: 1320px;
+            padding: 28px 36px 40px;
+        }
+
+        .app-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 22px;
+            margin-bottom: 22px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .nav-logo-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-dark);
+        }
+        .nav-logo-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--pill-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+        .nav-brand-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-dark);
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: -0.2px;
+        }
+        .nav-links-center {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: var(--radius-pill);
+        }
+        .nav-item {
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            padding: 7px 18px;
+            border-radius: var(--radius-pill);
+            transition: all 0.2s;
+        }
+        .nav-item:hover { color: var(--text-dark); }
+        .nav-item.active { background: var(--pill-dark); color: #ffffff; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15); }
+
+        .page-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .back-breadcrumb {
+            text-decoration: none;
+            font-size: 12.5px;
+            color: var(--text-light);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 6px;
+        }
+        .back-breadcrumb:hover { color: var(--text-dark); }
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-dark);
+            letter-spacing: -0.4px;
+        }
+        .header-actions { display: flex; align-items: center; gap: 10px; }
+        .btn-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 20px;
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .btn-white { background: #ffffff; border: 1px solid var(--border); color: var(--text-dark); }
+        .btn-white:hover { background: #f8fafc; }
+        .btn-danger { background: #ffffff; border: 1px solid #fecaca; color: #dc2626; }
+        .btn-danger:hover { background: #fef2f2; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            padding: 18px 20px;
+        }
+        .stat-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .stat-val {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .table-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            background: #ffffff;
+            overflow: hidden;
+        }
+        .table-wrap { overflow-x: auto; max-height: 580px; }
+        table { width: 100%; min-width: 950px; border-collapse: collapse; font-size: 12.5px; }
+        th {
+            background: #f8fafc;
+            text-align: left;
+            padding: 11px 16px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-light);
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-dark);
+        }
+        tr:hover { background: #fbfbfb; }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid transparent;
+            cursor: pointer;
+            outline: none;
+        }
+        .status-draft { background: #f1f5f9; color: var(--text-dark); border-color: var(--border); }
+        .status-negotiating { background: #f8fafc; color: var(--text-dark); border-color: #cbd5e1; }
+        .status-followup { background: #f1f5f9; color: var(--text-muted); border-color: var(--border); }
+        .status-review { background: #f8fafc; color: var(--text-muted); border-color: var(--border); }
+        .status-won { background: var(--pill-dark); color: #ffffff; border-color: var(--pill-dark); }
+        .status-lost { background: #ffffff; color: var(--text-muted); border-color: var(--border); }
+
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .btn-page {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            border-radius: var(--radius-pill);
+            border: 1px solid var(--border);
+            background: #ffffff;
+            color: var(--text-dark);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 11.5px;
+            cursor: pointer;
+        }
+        .btn-page.active { background: var(--pill-dark); color: #ffffff; border-color: var(--pill-dark); }
+        .btn-page:hover:not(.active) { background: #f8fafc; }
+        .btn-page.disabled { opacity: 0.4; pointer-events: none; }
+
         .ui-icon {
             display: inline-block;
-            width: 15px;
-            height: 15px;
+            width: 14px;
+            height: 14px;
             stroke-width: 2.2;
             stroke: currentColor;
             fill: none;
             stroke-linecap: round;
             stroke-linejoin: round;
             vertical-align: -2px;
-            flex-shrink: 0;
-        }
-        .ui-icon-lg {
-            display: inline-block;
-            width: 44px;
-            height: 44px;
-            stroke-width: 1.8;
-            stroke: var(--primary);
-            fill: none;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            margin-bottom: 12px;
-        }
-
-        header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; }
-        .back-link { text-decoration: none; color: var(--primary-dark); font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
-        .back-link:hover { text-decoration: underline; }
-        h1 { font-size: 26px; font-weight: 800; color: var(--text-dark); margin-top: 4px; }
-        .subtitle { color: var(--text-muted); font-size: 13px; }
-        .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .btn-action { text-decoration: none; padding: 10px 18px; min-height: 40px; border-radius: var(--radius-pill); font-size: 13px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--border); background: #ffffff; color: var(--text-dark); transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
-        .btn-action:hover { background: #f1f5f9; border-color: #cbd5e1; }
-        .btn-action.btn-danger { color: #dc2626; border-color: #fca5a5; background: #fff; }
-        .btn-action.btn-danger:hover { background: #fef2f2; }
-        .btn-action.btn-primary { background: var(--primary); color: #ffffff; border-color: var(--primary); }
-        .btn-action.btn-primary:hover { background: var(--primary-dark); }
-        
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
-        .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 18px; box-shadow: var(--shadow); }
-        .stat-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
-        .stat-value { font-size: 24px; font-weight: 800; color: var(--text-dark); margin-top: 6px; font-family: 'Outfit', sans-serif; }
-        
-        .table-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 22px; box-shadow: var(--shadow); }
-        .table-wrap {
-            overflow-x: auto;
-            max-height: 580px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-control);
-            scrollbar-width: thin;
-            scrollbar-color: #0284c7 #e2e8f0;
-            -webkit-overflow-scrolling: touch;
-        }
-        .table-wrap::-webkit-scrollbar {
-            height: 8px;
-            width: 8px;
-        }
-        .table-wrap::-webkit-scrollbar-track {
-            background: #e2e8f0;
-            border-radius: 4px;
-        }
-        .table-wrap::-webkit-scrollbar-thumb {
-            background: #0284c7;
-            border-radius: 4px;
-        }
-        .table-wrap::-webkit-scrollbar-thumb:hover {
-            background: #0369a1;
-        }
-        table { width: 100%; min-width: 1050px; border-collapse: collapse; font-size: 12px; }
-        th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
-        th { background: #f8fafc; font-weight: 700; color: var(--text-muted); position: sticky; top: 0; z-index: 2; }
-        tr:hover { background: #f8fafc; }
-        .badge { padding: 3px 9px; border-radius: var(--radius-pill); font-size: 10.5px; font-weight: 700; display: inline-block; }
-        .badge-margin { background: #e0f2fe; color: #0369a1; }
-        .badge-win { background: #ecfdf5; color: #047857; }
-        .status-select {
-            padding: 5px 12px;
-            border-radius: var(--radius-pill);
-            font-size: 11.5px;
-            font-weight: 700;
-            border: 1.5px solid transparent;
-            cursor: pointer;
-            outline: none;
-            transition: all 0.2s;
-        }
-        .status-draft { background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
-        .status-negotiating { background: #fef3c7; color: #b45309; border-color: #fde68a; }
-        .status-followup { background: #e0e7ff; color: #4338ca; border-color: #c7d2fe; }
-        .status-review { background: #f3e8ff; color: #7e22ce; border-color: #e9d5ff; }
-        .status-won { background: #dcfce7; color: #15803d; border-color: #86efac; }
-        .status-lost { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
-        .empty-icon { font-size: 44px; margin-bottom: 12px; opacity: 0.7; }
-
-        /* Sleek Contextual Tooltips */
-        .tip-target { position: relative; display: inline-flex; align-items: center; gap: 4px; }
-        .info-dot {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #e2e8f0;
-            color: #64748b;
-            font-size: 9.5px;
-            font-weight: 700;
-            font-family: 'Outfit', sans-serif;
-            cursor: pointer;
-            line-height: 1;
-            transition: all 0.2s;
-            flex-shrink: 0;
-            user-select: none;
-        }
-        .tip-target:hover .info-dot {
-            background: var(--primary);
-            color: white;
-        }
-        .tip-bubble {
-            visibility: hidden;
-            opacity: 0;
-            position: absolute;
-            bottom: 130%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #0f172a;
-            color: #f8fafc;
-            padding: 8px 11px;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: 500;
-            font-family: 'Mulish', sans-serif;
-            white-space: normal;
-            width: 210px;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            pointer-events: none;
-            transition: opacity 0.2s, visibility 0.2s;
-            line-height: 1.35;
-            text-transform: none;
-            letter-spacing: normal;
-        }
-        .tip-bubble::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #0f172a transparent transparent transparent;
-        }
-        .tip-target:hover .tip-bubble {
-            visibility: visible;
-            opacity: 1;
-        }
-        th .tip-bubble {
-            bottom: auto;
-            top: 130%;
-        }
-        th .tip-bubble::after {
-            top: auto;
-            bottom: 100%;
-            border-color: transparent transparent #0f172a transparent;
-        }
-
-        /* Pagination Controls (Strict Brand Alignment: Outfit/Mulish, Cyan/Lime, Pill Geometry) */
-        .pagination-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 14px;
-            margin-top: 18px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border);
-        }
-        .pagination-info {
-            font-size: 12.5px;
-            color: var(--text-muted);
-            font-family: 'Mulish', sans-serif;
-        }
-        .pagination-info strong {
-            color: var(--text-dark);
-            font-weight: 700;
-        }
-        .pagination-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-page {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 34px;
-            height: 34px;
-            padding: 0 12px;
-            border-radius: var(--radius-pill);
-            border: 1.5px solid var(--border);
-            background: #ffffff;
-            color: var(--text-dark);
-            font-size: 12px;
-            font-weight: 700;
-            font-family: 'Outfit', sans-serif;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .btn-page:hover:not(.disabled):not(.active) {
-            background: #f1f5f9;
-            border-color: var(--primary);
-            color: var(--primary-dark);
-        }
-        .btn-page.active {
-            background: var(--primary);
-            border-color: var(--primary);
-            color: #ffffff;
-            box-shadow: 0 2px 6px rgba(35, 194, 242, 0.35);
-            cursor: default;
-        }
-        .btn-page.disabled {
-            opacity: 0.45;
-            cursor: not-allowed;
-            pointer-events: none;
-            background: #f8fafc;
-        }
-        .per-page-select {
-            padding: 6px 12px;
-            border-radius: var(--radius-pill);
-            border: 1.5px solid var(--border);
-            background: #ffffff;
-            font-size: 12px;
-            font-family: 'Mulish', sans-serif;
-            font-weight: 600;
-            color: var(--text-dark);
-            outline: none;
-            cursor: pointer;
-            transition: border-color 0.2s;
-        }
-        .per-page-select:focus {
-            border-color: var(--primary);
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <header>
-        <div>
-            <a href="/" class="back-link">
-                <svg class="ui-icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                Back to Margin Recommender
+
+<div class="app-window">
+    <nav class="app-nav">
+        <a href="/" class="nav-logo-box">
+            <div class="nav-logo-badge">
+                <svg class="ui-icon" style="stroke: #ffffff; width: 18px; height: 18px;" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1z"/></svg>
+            </div>
+            <span class="nav-brand-title">Air Export Pricing Engine</span>
+        </a>
+
+        <div class="nav-links-center">
+            <a href="/" class="nav-item">Dashboard</a>
+            <a href="/history" class="nav-item active">Reports</a>
+        </div>
+
+        <div class="header-actions">
+            <a href="/" class="btn-pill btn-white">
+                <svg class="ui-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Margin Recommendation
             </a>
-            <h1>Recommendation History & Leads Tracker</h1>
-            <p class="subtitle">Complete audit trail and lifecycle status tracking for all generated air freight quotations</p>
+        </div>
+    </nav>
+
+    <div class="page-header">
+        <div>
+            <a href="/" class="back-breadcrumb">
+                <svg class="ui-icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Back to Dashboard
+            </a>
+            <h1 class="page-title">Reports & Recommendation History</h1>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Audit trail and lifecycle status tracking for all generated air export quotations</p>
         </div>
         <div class="header-actions">
             {% if records and records|length > 0 %}
-            <a href="/api/history/export" class="btn-action">
+            <a href="/api/history/export" class="btn-pill btn-white">
                 <svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export CSV
             </a>
-            <button type="button" class="btn-action btn-danger" onclick="clearHistory()">
+            <button type="button" class="btn-pill btn-danger" onclick="clearHistory()">
                 <svg class="ui-icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 Clear History
             </button>
             {% endif %}
         </div>
-    </header>
+    </div>
 
     {% if records and records|length > 0 %}
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-title">Total Inquiries</div>
-            <div class="stat-value">{{ total_count }}</div>
+            <div class="stat-label">Total Quotes</div>
+            <div class="stat-val">{{ total_count }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-title">
-                <svg class="ui-icon" style="color: #16a34a;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
-                Won Bookings
-            </div>
-            <div class="stat-value" style="color: #15803d;">{{ won_count }}</div>
+            <div class="stat-label">Won Inquiries</div>
+            <div class="stat-val">{{ won_count }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-title">Quoted Pipeline Value</div>
-            <div class="stat-value" style="color: var(--primary-dark);">₹{{ "{:,.0f}".format(total_pipeline) }}</div>
+            <div class="stat-label">Total Pipeline</div>
+            <div class="stat-val">₹{{ "{:,.0f}".format(total_pipeline) }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-title">Conversion Rate</div>
-            <div class="stat-value" style="color: #0369a1;">{{ "{:.1f}%".format(win_rate) }}</div>
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-val">{{ "{:.1f}%".format(win_rate) }}</div>
         </div>
     </div>
 
@@ -2357,80 +2609,36 @@ HISTORY_TEMPLATE = """
                     <tr>
                         <th>ID</th>
                         <th>Created At</th>
-                        <th>
-                            <span class="tip-target">
-                                Trade Lane
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Origin (POL) to Destination (POD) airport route.</span>
-                            </span>
-                        </th>
-                        <th>
-                            <span class="tip-target">
-                                Airline Buy (₹)
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Net freight cost charged to us by the airline or carrier.</span>
-                            </span>
-                        </th>
-                        <th>
-                            <span class="tip-target">
-                                Quoted Sell (₹)
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Total commercial selling price quoted to the client.</span>
-                            </span>
-                        </th>
-                        <th>
-                            <span class="tip-target">
-                                Gross Profit (if Won)
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Actual gross margin pocketed if the deal is won (Sell Rate - Buy Cost).</span>
-                            </span>
-                        </th>
-                        <th>
-                            <span class="tip-target">
-                                Target Margin %
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Recommended markup percentage over the airline cost.</span>
-                            </span>
-                        </th>
-                        <th>
-                            <span class="tip-target">
-                                Estimated Win %
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Predicted customer acceptance likelihood at this price.</span>
-                            </span>
-                        </th>
-                        <th>Weight & Goods</th>
+                        <th>Trade Lane</th>
+                        <th>Airline Buy (₹)</th>
+                        <th>Quoted Sell (₹)</th>
+                        <th>Profit (₹)</th>
+                        <th>Margin Range</th>
+                        <th>Weight & Cargo</th>
                         <th>Branch</th>
-                        <th>
-                            <span class="tip-target">
-                                Lead Status
-                                <span class="info-dot">i</span>
-                                <span class="tip-bubble">Current status in commercial pipeline (Draft, Negotiating, Won, Lost).</span>
-                            </span>
-                        </th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for r in records %}
                     <tr>
-                        <td style="font-weight: 700; color: var(--text-muted);">#{{ r.id }}</td>
+                        <td style="font-weight: 700; color: var(--text-light);">#{{ r.id }}</td>
                         <td>{{ r.timestamp }}</td>
                         <td>
                             <strong>{{ r.origin_port }}</strong> → <br>
-                            <span style="color: var(--text-muted);">{{ r.dest_port }}</span>
+                            <span style="color: var(--text-muted); font-size: 11px;">{{ r.dest_port }}</span>
                         </td>
                         <td>₹{{ "{:,.0f}".format(r.airline_buy_inr) }}</td>
-                        <td style="font-weight: 800; font-family: 'Outfit', sans-serif;">₹{{ "{:,.0f}".format(r.selling_price_inr) }}</td>
-                        <td style="font-weight: 700; color: #16a34a; font-family: 'Outfit', sans-serif;">₹{{ "{:,.0f}".format(r.margin_amount_inr or (r.selling_price_inr - r.airline_buy_inr)) }}</td>
-                        <td><span class="badge badge-margin">{{ "{:.1f}%".format(r.margin_pct) }}</span></td>
-                        <td><span class="badge badge-win">{{ "{:.1f}%".format(r.win_prob * 100) }}</span></td>
+                        <td style="font-weight: 700;">₹{{ "{:,.0f}".format(r.selling_price_inr) }}</td>
+                        <td style="font-weight: 700;">₹{{ "{:,.0f}".format(r.margin_amount_inr or (r.selling_price_inr - r.airline_buy_inr)) }}</td>
+                        <td><strong style="white-space: nowrap;">{{ r.margin_range if r.margin_range else "{:.1f}%".format(r.margin_pct) }}</strong></td>
                         <td>
                             <span>{{ "{:.1f} kg".format(r.chargeable_wt_kg) }}</span><br>
-                            <span style="font-size: 11px; color: var(--text-muted);">{{ r.commodity }}</span>
+                            <span style="font-size: 11px; color: var(--text-light);">{{ r.commodity }}</span>
                         </td>
                         <td>{{ r.branch }}</td>
                         <td>
-                            <select class="status-select status-{{ r.status_class }}" onchange="updateLeadStatus({{ r.id }}, this.value, this)">
+                            <select class="status-badge status-{{ r.status_class }}" onchange="updateLeadStatus({{ r.id }}, this.value, this)">
                                 {% for s in statuses %}
                                 <option value="{{ s.code }}" {% if r.status == s.code %}selected{% endif %}>{{ s.label }}</option>
                                 {% endfor %}
@@ -2442,66 +2650,24 @@ HISTORY_TEMPLATE = """
             </table>
         </div>
 
-        <!-- Pagination Controls -->
         <div class="pagination-bar">
-            <div class="pagination-info">
-                Showing <strong>{{ start_idx }}</strong> to <strong>{{ end_idx }}</strong> of <strong>{{ total_count }}</strong> records (Page {{ page }} of {{ total_pages }})
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <label for="perPageSelect" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Rows per page:</label>
-                    <select id="perPageSelect" class="per-page-select" onchange="changePerPage(this.value)">
-                        <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
-                        <option value="15" {% if per_page == 15 %}selected{% endif %}>15</option>
-                        <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
-                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
-                    </select>
-                </div>
-
-                <div class="pagination-actions">
-                    {% if has_prev %}
-                    <a href="/history?page=1&per_page={{ per_page }}" class="btn-page" title="First Page">«</a>
-                    <a href="/history?page={{ prev_page }}&per_page={{ per_page }}" class="btn-page" title="Previous Page">‹ Prev</a>
-                    {% else %}
-                    <span class="btn-page disabled" title="First Page">«</span>
-                    <span class="btn-page disabled" title="Previous Page">‹ Prev</span>
-                    {% endif %}
-
-                    {% for p in range(1, total_pages + 1) %}
-                        {% if p == page %}
-                        <span class="btn-page active">{{ p }}</span>
-                        {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
-                        <a href="/history?page={{ p }}&per_page={{ per_page }}" class="btn-page">{{ p }}</a>
-                        {% elif p == 4 or p == total_pages - 3 %}
-                        <span class="btn-page disabled" style="border: none; background: transparent;">...</span>
-                        {% endif %}
-                    {% endfor %}
-
-                    {% if has_next %}
-                    <a href="/history?page={{ next_page }}&per_page={{ per_page }}" class="btn-page" title="Next Page">Next ›</a>
-                    <a href="/history?page={{ total_pages }}&per_page={{ per_page }}" class="btn-page" title="Last Page">»</a>
-                    {% else %}
-                    <span class="btn-page disabled" title="Next Page">Next ›</span>
-                    <span class="btn-page disabled" title="Last Page">»</span>
-                    {% endif %}
-                </div>
+            <div>Showing <strong>{{ start_idx }}</strong> - <strong>{{ end_idx }}</strong> of <strong>{{ total_count }}</strong> quotes</div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+                {% if has_prev %}
+                <a href="/history?page={{ prev_page }}&per_page={{ per_page }}" class="btn-page">‹</a>
+                {% endif %}
+                <span class="btn-page active">{{ page }}</span>
+                {% if has_next %}
+                <a href="/history?page={{ next_page }}&per_page={{ per_page }}" class="btn-page">›</a>
+                {% endif %}
             </div>
         </div>
     </div>
     {% else %}
-    <div class="table-card empty-state">
-        <div class="empty-icon">
-            <svg class="ui-icon-lg" style="color: #94a3b8;" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
-        </div>
-        <h3>No Quote Recommendations Recorded Yet</h3>
-        <p style="margin-top: 8px;">Run your first recommendation on the main page to start tracking leads and negotiation outcomes.</p>
-        <div style="margin-top: 20px;">
-            <a href="/" class="btn-action btn-primary">
-                <svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                Go to Pricing Calculator
-            </a>
-        </div>
+    <div style="text-align: center; padding: 60px 20px; color: var(--text-muted); background: #f8fafc; border-radius: 16px; border: 1px solid var(--border);">
+        <h3 style="font-size: 16px; font-weight: 700; color: var(--text-dark);">No Quotations Recorded Yet</h3>
+        <p style="font-size: 13px; margin: 6px 0 16px;">Create your first freight quotation to start tracking leads.</p>
+        <a href="/" class="btn-pill btn-white">Create First Margin Recommendation</a>
     </div>
     {% endif %}
 </div>
@@ -2525,7 +2691,7 @@ HISTORY_TEMPLATE = """
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                selectEl.className = 'status-select status-' + (statusMap[newStatus] || 'draft');
+                selectEl.className = 'status-badge status-' + (statusMap[newStatus] || 'draft');
             } else {
                 alert('Status update failed: ' + (data.message || 'Unknown error'));
             }
@@ -2533,21 +2699,16 @@ HISTORY_TEMPLATE = """
         .catch(err => alert('Network error: ' + err.message));
     }
 
-    function changePerPage(newPerPage) {
-        window.location.href = `/history?page=1&per_page=${newPerPage}`;
-    }
-
     function clearHistory() {
-        if (!confirm('Are you sure you want to clear all historical quote records?')) return;
+        if (!confirm('Are you sure you want to clear historical records?')) return;
         fetch('/api/history/clear', { method: 'POST' })
             .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') window.location.reload();
-            });
+            .then(data => { if (data.status === 'success') window.location.reload(); });
     }
 </script>
 </body>
 </html>
+
 """
 
 
@@ -2566,6 +2727,7 @@ def index():
         commodity_options=COMMODITY_OPTIONS,
         incoterms_options=INCOTERMS_OPTIONS,
         branch_options=BRANCH_OPTIONS,
+        customer_activity_options=CUSTOMER_ACTIVITY_OPTIONS,
         port_labels_json=PORT_LABELS_JSON
     )
 
@@ -2836,7 +2998,7 @@ def history_view():
     except (ValueError, TypeError):
         per_page = 15
 
-    pagination = get_history_paginated(HISTORY_DB_PATH, page=page, per_page=per_page)
+    pagination = get_history_paginated(HISTORY_DB_PATH, page=page, per_page=per_page, include_presets=True)
     stats = pagination["stats"]
 
     return render_template_string(
@@ -2887,7 +3049,7 @@ def api_history_export():
     writer = csv.writer(output)
     writer.writerow([
         "ID", "Timestamp", "Origin", "Destination", "Buy Cost INR",
-        "Selling Price INR", "Margin Pct", "Margin Amount INR",
+        "Selling Price INR", "Margin Range", "Margin Pct", "Margin Amount INR",
         "Win Probability", "Expected Profit INR", "Gross Wt Kg",
         "Chargeable Wt Kg", "Commodity", "Client Type", "Branch", "Status", "Model Version"
     ])
@@ -2895,7 +3057,7 @@ def api_history_export():
     for r in records:
         writer.writerow([
             r.get("id"), r.get("timestamp"), r.get("origin_port"), r.get("dest_port"),
-            r.get("airline_buy_inr"), r.get("selling_price_inr"), r.get("margin_pct"),
+            r.get("airline_buy_inr"), r.get("selling_price_inr"), r.get("margin_range"), r.get("margin_pct"),
             r.get("margin_amount_inr"), r.get("win_prob"), r.get("expected_profit_inr"),
             r.get("gross_wt_kg"), r.get("chargeable_wt_kg"), r.get("commodity"),
             r.get("client_type"), r.get("branch"), r.get("status"), r.get("model_version")

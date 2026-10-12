@@ -1,19 +1,23 @@
 # Air Export Pricing Engine — Project Guidelines & Rules
 
 ## 1. Strict UI & Design Governance Rule
-- **NO UI CHANGES WITHOUT EXPLICIT INSTRUCTION:** Do NOT make any UI/UX changes, layout changes, component additions/removals, or styling alterations unless the user explicitly instructs you to do so.
-- **ESTABLISHED DESIGN PRINCIPLES & COLOR SCHEME:** When any UI modifications or additions are explicitly requested by the user, you MUST strictly adhere to the established design principles:
+- **APPROVED DESIGN PHILOSOPHY:** The user has explicitly mandated and approved the minimalist, clean Notion-inspired UI redesign (reference: `refernce_ui.jpg` / `ui_ux_redesign_workflow_task.md`). Do NOT revert this design to the old cyan/lime theme.
+- **ESTABLISHED DESIGN PRINCIPLES & COLOR SCHEME:**
   - **Typography:** Google Fonts `Outfit` (headings, large metrics, buttons, badges) and `Mulish` (body copy, form labels, inputs, table rows).
-  - **Color Palette:**
-    - Primary Cyan: `#23c2f2`
-    - Primary Dark: `#0ea8da`
-    - Secondary Lime Green: `#a7cf45`
-    - Dark Text: `#0f172a`
-    - Muted Text: `#64748b`
-    - Background: `#f8fafc`
-  - **Card Accents:** Input card top border `4px solid var(--primary)` (`#23c2f2`); Output card top border `4px solid var(--secondary)` (`#a7cf45`).
-  - **Geometry:** Pill-shaped controls and badges (`border-radius: 100px`), smooth rounded cards (`border-radius: 18px`).
-  - **No Plain Blue Overhauls:** Do not replace the signature cyan/lime theme with generic corporate blue styles.
+  - **Color Palette (Minimalist Notion Monochrome):**
+    - Window Background: `#edf1f5`
+    - Surface Card: `#ffffff`
+    - Deep Slate / Dark Text: `#0f172a`
+    - Muted Slate: `#64748b`
+    - Light Slate / Accents: `#94a3b8`
+    - Borders: `#e2e8f0` (subtle: `#f1f5f9`)
+  - **Layout & Structure:**
+    - Single-screen application container (`.app-window`).
+    - Symmetrical 50/50 POL / POD input grid (`minmax(0, 1fr)`).
+    - Single-row preset scenario bar.
+    - Clean Commercial Terms card prominently featuring the Recommended Margin Range.
+    - History table with pre-approved Margin Range column.
+  - **Do NOT Revert:** Never revert back to the legacy cyan (`#23c2f2`) or lime green (`#a7cf45`) theme.
 
 ## 2. Core Engine Architecture
 - **Two-Stage ML Pipeline:**
