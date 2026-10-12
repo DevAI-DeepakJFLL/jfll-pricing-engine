@@ -121,14 +121,13 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'ap-southeast-2' }}
         run: |
           echo "Target Lambda: $LAMBDA_FUNCTION_NAME in $AWS_REGION"
-          
-          # Check if the function exists
-          aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" --query "Configuration.FunctionName" || {
-            echo "ERROR: Function $LAMBDA_FUNCTION_NAME was not found in region $AWS_REGION!"
-            exit 1
-          }
+          echo "Current IAM Caller Identity:"
+          aws sts get-caller-identity
 
-          echo "Updating function code from S3..."
+          echo "Listing all functions in $AWS_REGION:"
+          aws lambda list-functions --region "$AWS_REGION" --query "Functions[].FunctionName" --output text
+
+          echo "Executing update-function-code directly..."
           aws lambda update-function-code \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --s3-bucket "$S3_DATA_BUCKET" \
