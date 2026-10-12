@@ -79,10 +79,12 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Sync Model Artifacts & Cleaned Datasets to S3
+        env:
+          S3_DATA_BUCKET: ${{ vars.S3_DATA_BUCKET || secrets.S3_DATA_BUCKET }}
         run: |
-          echo "Uploading trained ML models and datasets to S3 bucket: ${{ secrets.S3_DATA_BUCKET }}"
-          aws s3 sync models/ s3://${{ secrets.S3_DATA_BUCKET }}/models/ --delete
-          aws s3 sync data/processed/ s3://${{ secrets.S3_DATA_BUCKET }}/data/processed/ --delete
+          echo "Uploading trained ML models and datasets to S3 bucket: $S3_DATA_BUCKET"
+          aws s3 sync models/ "s3://${S3_DATA_BUCKET}/models/" --delete
+          aws s3 sync data/processed/ "s3://${S3_DATA_BUCKET}/data/processed/" --delete
 
       - name: Build Lambda Deployment Package
         run: |
@@ -110,24 +112,27 @@ jobs:
           ls -lh lambda_artifact.zip
 
       - name: Upload Lambda Package to S3 & Update Function Code
+        env:
+          S3_DATA_BUCKET: ${{ vars.S3_DATA_BUCKET || secrets.S3_DATA_BUCKET }}
+          LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME || secrets.LAMBDA_FUNCTION_NAME }}
         run: |
-          echo "Uploading zip package to s3://${{ secrets.S3_DATA_BUCKET }}/builds/lambda_artifact.zip"
-          aws s3 cp lambda_artifact.zip s3://${{ secrets.S3_DATA_BUCKET }}/builds/lambda_artifact.zip
+          echo "Uploading zip package to s3://${S3_DATA_BUCKET}/builds/lambda_artifact.zip"
+          aws s3 cp lambda_artifact.zip "s3://${S3_DATA_BUCKET}/builds/lambda_artifact.zip"
 
-          echo "Updating Lambda function: ${{ secrets.LAMBDA_FUNCTION_NAME }}"
+          echo "Updating Lambda function: $LAMBDA_FUNCTION_NAME"
           aws lambda update-function-code \
-            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
-            --s3-bucket ${{ secrets.S3_DATA_BUCKET }} \
-            --s3-key builds/lambda_artifact.zip
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --s3-bucket "$S3_DATA_BUCKET" \
+            --s3-key "builds/lambda_artifact.zip"
 
           echo "Waiting for Lambda function update to complete..."
-          aws lambda wait function-updated --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }}
+          aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION_NAME"
           echo "Lambda deployment successful!"
 
       - name: Invalidate CloudFront Cache (Optional)
-        if: env.CLOUDFRONT_DISTRIBUTION_ID != ''
         env:
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID || secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        if: env.CLOUDFRONT_DISTRIBUTION_ID != ''
         run: |
           echo "Invalidating CloudFront CDN cache for distribution: $CLOUDFRONT_DISTRIBUTION_ID"
           aws cloudfront create-invalidation \
