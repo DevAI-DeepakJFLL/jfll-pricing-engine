@@ -36,7 +36,18 @@ The engine integrates hard freight-forwarding operational guardrails with an hon
 ### Conformal Prediction Negotiation Corridors (v2.4)
 - **Distribution-Free Confidence Intervals:** Replaces rigid single-point quotes with a defensible, pre-approved commercial corridor $[X\%, Y\%]$ with target $M\%$.
 - **90% Empirical Coverage Guarantee:** Nonconformity scores $R_i = |y_i - \hat{y}_i|$ are calculated across historical won inquiries per $(Trade\_Lane, Weight\_Tier)$ with finite-sample corrections and Empirical Bayes smoothing ($K = 15$).
-- **Strict Invariance:** The balanced target quote $M\%$ remains invariant, preserving our benchmark accuracy (**0.2295% MAE**) with 100% empirical corridor coverage on benchmark test cases.
+- **Strict Invariance:** The balanced target quote $M\%$ remains invariant with 100% empirical corridor coverage on benchmark test cases.
+
+### Hierarchical 3-Key Corridors & 500-Sample Benchmark
+- **3-Key Hierarchy:** Anchors quotations to $(Regional\_Lane, Weight\_Tier, Commodity\_Group)$ with Empirical Bayes shrinkage ($K = 12$) to eliminate commodity tariff contamination.
+- **Production Benchmark Results (5 Commodities × 5 Budget Quintiles, N=500):**
+  - **Overall MAE:** **3.61%** (-21.7% error reduction from baseline).
+  - **Overall Mean Gap (Bias):** **+0.11 pp** (virtually zero systemic bias).
+  - **Engineering & Machinery:** MAE **1.58%**, Gap **+0.80 pp** (down from +3.97 pp over-quoting).
+  - **Garments / Textiles:** MAE **2.56%**, Gap **+0.12 pp**.
+  - **Other:** MAE **4.89%**, Gap **-0.42 pp** (down from +2.05 pp).
+  - **Perishable Foodstuff:** MAE **5.03%**, Gap **-1.42 pp** (down from -4.16 pp under-quoting).
+  - **Budget Quintiles:** All 5 spend tiers aligned within $\pm 0.57$ pp of actual clearing margins.
 
 ### Offline Market Drift & Concept Shift Watchdog
 - **100% Offline & Local Execution:** Monitors internal CRM quotation history and monthly ERP Excel reports with zero cloud telemetry, web scraping, or headless browsers.
@@ -58,8 +69,7 @@ air_export_pricing_engine/
 │   └── recommendations_history.db            # SQLite audit trail & leads store
 │
 ├── models/
-│   ├── freight_margin_recommender.joblib     # Production model artifact bundle (v2.4)
-│   └── backups/                              # Checkpoint baselines
+│   └── freight_margin_recommender.joblib     # Production model artifact bundle (v2.4)
 │
 ├── src/
 │   ├── __init__.py
@@ -68,13 +78,19 @@ air_export_pricing_engine/
 │   ├── preprocess.py                         # Cleaning, IATA physics, and geographic mapping
 │   ├── preprocess_job_consolidated.py        # Operational ledger data engineering pipeline
 │   ├── train.py                              # Two-Stage ML training with honest OOF benchmarks
-│   ├── margin_framework.py                   # Multi-pillar corridor pricing & Conformal Prediction
+│   ├── margin_framework.py                   # 3-key hierarchical corridors & Conformal Prediction
 │   ├── engine.py                             # Decision engine, cohort lookup & strategic tiers
 │   ├── history.py                            # Customer historical deal aggregation
 │   ├── db.py                                 # SQLite audit history, soft-delete & preset isolation
+│   ├── aws_floci.py                          # AWS S3 & SSM cloud emulator connector
 │   └── app.py                                # Flask web app, REST API & leads dashboard
 │
 ├── tests/
+│   ├── data/                                 # Golden test suites & evaluation fixtures
+│   │   ├── benchmark_500_records.csv         # 500-sample production matrix (5 commodities x 5 budgets)
+│   │   ├── benchmark_100_optimization_cases.json # Multi-corridor optimization benchmark
+│   │   ├── unit_test_cases_20.json           # 20 balanced historical regression cases
+│   │   └── README.md                         # Test dataset specifications
 │   ├── test_guardrails.py                    # Hard commercial guardrails & cost floors
 │   ├── test_tiers.py                         # Weight tiers & weight-break arbitrage
 │   ├── test_preprocess_validation.py         # Physical validation & IATA physics
@@ -88,17 +104,21 @@ air_export_pricing_engine/
 │   ├── test_margin_framework.py              # Conformal corridor ordering & coverage guarantees
 │   ├── test_db_audit.py                      # SQLite migrations, soft delete & preset isolation
 │   ├── test_api_quote.py                     # Web API integration & HTTP 400 validation
+│   ├── test_aws_floci.py                     # Floci S3 & SSM connector tests
+│   ├── test_floci_e2e_smoke.py               # Live E2E smoke tests
 │   └── test_scenarios_t1_t15.py              # 15 realistic end-to-end air-export scenarios
 │
 ├── scripts/
+│   ├── deploy_floci.py                       # Cloud resource provisioning & container deployment
 │   ├── monitor_market_drift.py               # Offline Market & Concept Drift Watchdog
 │   ├── tune_engine_optuna.py                 # Local Bayesian hyperparameter optimization
 │   ├── verify_vocab_alignment.py             # UI vs. model encoder vocabulary alignment gate
-│   ├── test_runner.py                        # Standalone regression test runner
-│   └── archive/                              # Deprecated legacy preprocessing scripts
+│   └── test_runner.py                        # Standalone regression test runner
 │
 ├── requirements.txt                          # Locked dependencies
 ├── run.sh                                    # Unified project CLI runner
+├── Dockerfile                                # Production container definition
+├── docker-compose.floci.yml                  # Floci container orchestration
 └── README.md                                 # Complete project documentation
 ```
 
@@ -109,7 +129,7 @@ air_export_pricing_engine/
 All tasks are managed through `./run.sh`:
 
 ```bash
-# 1. Verify UI and model categorical dropdown alignment (36/36 checks)
+# 1. Verify UI and model categorical dropdown alignment (36/36 passed, 100% alignment)
 ./run.sh verify
 
 # 2. Run data preprocessing pipeline
@@ -118,17 +138,26 @@ All tasks are managed through `./run.sh`:
 # 3. Train Two-Stage Machine Learning model and build conformal tables
 ./run.sh train
 
-# 4. Run full unit and scenario test suite (99/99 passing)
+# 4. Run full unit and scenario test suite (103/103 passing)
 ./run.sh test
 
 # 5. Run Offline Market & Concept Drift Watchdog
 ./run.sh drift
 
-# 6. Launch Web Application & Quoting API
+# 6. Launch Web Application & Quoting API (Local Dev)
 ./run.sh serve
+
+# 7. Provision & Deploy to Local Cloud Emulator (Floci AWS)
+./run.sh floci-provision  # Uploads model to Floci S3 & configures Floci SSM
+./run.sh floci-deploy     # Builds Docker container and launches on http://localhost:5055
+./run.sh floci-test       # Runs live E2E smoke tests against the Floci container
+./run.sh floci-down       # Stops the deployed container
 ```
 
-The web application will be available at **http://127.0.0.1:5050**.
+The web application will be available at:
+- **Local Dev Server:** `http://127.0.0.1:5050`
+- **Floci Container Server:** `http://localhost:5055`
+- **Floci AWS Console UI:** `http://localhost:4500`
 
 ---
 
@@ -182,25 +211,25 @@ curl -X POST http://127.0.0.1:5050/api/quote \
   "status": "success",
   "optimal": {
     "Strategy_Key": "balanced",
-    "Margin_Percentage": 8.54,
-    "Quoted_Sell_Price_INR": 135675.0,
-    "Rate_Per_Kg": 301.5,
-    "Margin_Amount_INR": 10675.0
+    "Margin_Percentage": 4.91,
+    "Quoted_Sell_Price_INR": 131136.85,
+    "Rate_Per_Kg": 291.42,
+    "Margin_Amount_INR": 6136.85
   },
   "negotiation_corridor": {
-    "min_margin_pct": 5.86,
-    "target_margin_pct": 8.54,
-    "max_margin_pct": 11.22,
-    "min_sell_inr": 132325.0,
-    "target_sell_inr": 135675.0,
-    "max_sell_inr": 139025.0,
-    "min_rate_per_kg": 294.06,
-    "target_rate_per_kg": 301.5,
-    "max_rate_per_kg": 308.94,
-    "band_width_pct": 5.36,
+    "min_margin_pct": 3.93,
+    "target_margin_pct": 4.91,
+    "max_margin_pct": 5.89,
+    "min_sell_inr": 129912.5,
+    "target_sell_inr": 131136.85,
+    "max_sell_inr": 132362.5,
+    "min_rate_per_kg": 288.69,
+    "target_rate_per_kg": 291.42,
+    "max_rate_per_kg": 294.14,
+    "band_width_pct": 1.96,
     "confidence_coverage": "90%",
-    "conformal_half_width_pct": 2.68,
-    "guidance": "Pre-approved negotiation corridor: 5.86% to 11.22% (Target: 8.54%, 90% confidence coverage). Sell rate latitude: ₹294.06/kg to ₹308.94/kg."
+    "conformal_half_width_pct": 0.98,
+    "guidance": "Pre-approved negotiation corridor: 3.93% to 5.89% (Target: 4.91%, 90% confidence coverage). Sell rate latitude: ₹288.69/kg to ₹294.14/kg."
   },
   "model_version": "v2.3-remediated-20261004"
 }

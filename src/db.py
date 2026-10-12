@@ -409,15 +409,26 @@ def get_history_stats(db_path: str, include_presets: bool = False) -> Dict[str, 
     init_history_db(db_path)
     with sqlite3.connect(db_path, timeout=5.0) as conn:
         cursor = conn.cursor()
-        where_clause = "WHERE is_deleted = 0" if include_presets else "WHERE is_deleted = 0 AND is_preset = 0"
-        cursor.execute(f"""
-            SELECT 
-                COUNT(*),
-                SUM(CASE WHEN status = 'Won' THEN 1 ELSE 0 END),
-                SUM(COALESCE(selling_price_inr, 0))
-            FROM recommendation_history
-            {where_clause}
-        """)
+        if include_presets:
+            query = """
+                SELECT 
+                    COUNT(*),
+                    SUM(CASE WHEN status = 'Won' THEN 1 ELSE 0 END),
+                    SUM(COALESCE(selling_price_inr, 0))
+                FROM recommendation_history
+                WHERE is_deleted = 0
+            """
+            cursor.execute(query)
+        else:
+            query = """
+                SELECT 
+                    COUNT(*),
+                    SUM(CASE WHEN status = 'Won' THEN 1 ELSE 0 END),
+                    SUM(COALESCE(selling_price_inr, 0))
+                FROM recommendation_history
+                WHERE is_deleted = 0 AND is_preset = 0
+            """
+            cursor.execute(query)
         row = cursor.fetchone()
         total_count = row[0] if row and row[0] is not None else 0
         won_count = row[1] if row and row[1] is not None else 0

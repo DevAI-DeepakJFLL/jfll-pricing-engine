@@ -21,49 +21,49 @@ fi
 case "$1" in
     verify)
         echo "[*] Running verification gate: checking UI vs model vocabulary alignment..."
-        $PYTHON scripts/verify_vocab_alignment.py
+        "$PYTHON" scripts/verify_vocab_alignment.py
         ;;
     preprocess)
         echo "[*] Running data preprocessing..."
-        $PYTHON src/preprocess.py
+        "$PYTHON" src/preprocess.py
         ;;
     train)
         echo "[*] Training two-stage machine learning model..."
-        $PYTHON src/train.py
+        "$PYTHON" src/train.py
         ;;
     test)
         echo "[*] Executing unit tests and scenario tests T1-T15..."
-        $PYTHON -m unittest discover tests
+        "$PYTHON" -m unittest discover tests
         ;;
     serve)
         echo "[*] Starting Web UI on http://127.0.0.1:5050..."
-        $PYTHON src/app.py
+        "$PYTHON" src/app.py
         ;;
     drift)
         echo "[*] Running offline market drift & concept shift watchdog..."
-        $PYTHON scripts/monitor_market_drift.py
+        "$PYTHON" scripts/monitor_market_drift.py
         ;;
     pipeline)
         echo "[*] Running end-to-end pipeline: Preprocess -> Train -> Verify -> Test -> Serve..."
-        $PYTHON src/preprocess.py
-        $PYTHON src/train.py
-        $PYTHON scripts/verify_vocab_alignment.py
-        $PYTHON scripts/test_runner.py
-        $PYTHON src/app.py
+        "$PYTHON" src/preprocess.py
+        "$PYTHON" src/train.py
+        "$PYTHON" scripts/verify_vocab_alignment.py
+        "$PYTHON" scripts/test_runner.py
+        "$PYTHON" src/app.py
         ;;
     floci-provision)
         echo "[*] Provisioning S3 & SSM cloud resources in Floci..."
-        $PYTHON scripts/deploy_floci.py
+        "$PYTHON" scripts/deploy_floci.py
         ;;
     floci-deploy)
         echo "[*] Deploying pricing engine to Floci cloud container..."
-        $PYTHON scripts/deploy_floci.py
+        "$PYTHON" scripts/deploy_floci.py
         docker compose -f docker-compose.floci.yml up -d --build
         echo "[SUCCESS] Container running on http://localhost:5055 (connected to Floci on :4566)"
         ;;
     floci-test)
         echo "[*] Executing live E2E smoke tests against Floci container..."
-        $PYTHON -m unittest tests/test_floci_e2e_smoke.py
+        "$PYTHON" -m unittest tests/test_floci_e2e_smoke.py
         ;;
     floci-down)
         echo "[*] Stopping Floci pricing engine container..."
@@ -72,6 +72,6 @@ case "$1" in
     *)
         echo "Usage: ./run.sh {verify|preprocess|train|test|serve|drift|pipeline|floci-provision|floci-deploy|floci-test|floci-down}"
         echo "Defaulting to starting the web app..."
-        $PYTHON src/app.py
+        "$PYTHON" src/app.py
         ;;
 esac
