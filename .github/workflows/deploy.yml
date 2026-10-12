@@ -120,19 +120,33 @@ jobs:
           LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME || secrets.LAMBDA_FUNCTION_NAME }}
           AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'ap-southeast-2' }}
         run: |
-          echo "Target Lambda: $LAMBDA_FUNCTION_NAME in $AWS_REGION"
-          echo "Current IAM Caller Identity:"
-          aws sts get-caller-identity
+          echo "### AWS Lambda Deployment Diagnostics" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Target Region:** \`$AWS_REGION\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Target Bucket:** \`$S3_DATA_BUCKET\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Target Lambda:** \`$LAMBDA_FUNCTION_NAME\`" >> "$GITHUB_STEP_SUMMARY"
 
-          echo "Listing all functions in $AWS_REGION:"
-          aws lambda list-functions --region "$AWS_REGION" --query "Functions[].FunctionName" --output text
+          echo "Checking STS caller identity..."
+          CALLER_ID=$(aws sts get-caller-identity 2>&1)
+          echo "<details><summary>IAM Caller Identity</summary><pre>$CALLER_ID</pre></details>" >> "$GITHUB_STEP_SUMMARY"
 
-          echo "Executing update-function-code directly..."
-          aws lambda update-function-code \
+          echo "Checking list-functions..."
+          FUNCS=$(aws lambda list-functions --region "$AWS_REGION" --query "Functions[].FunctionName" --output text 2>&1)
+          echo "<details><summary>Visible Functions in $AWS_REGION</summary><pre>$FUNCS</pre></details>" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Executing update-function-code..."
+          UPDATE_RES=$(aws lambda update-function-code \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --s3-bucket "$S3_DATA_BUCKET" \
             --s3-key "builds/lambda_artifact.zip" \
-            --region "$AWS_REGION"
+            --region "$AWS_REGION" 2>&1)
+          UPDATE_STATUS=$?
+
+          echo "<details open><summary>aws lambda update-function-code output (exit code: $UPDATE_STATUS)</summary><pre>$UPDATE_RES</pre></details>" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ $UPDATE_STATUS -ne 0 ]; then
+            echo "::error::Lambda update failed: $UPDATE_RES"
+            exit $UPDATE_STATUS
+          fi
 
           echo "Waiting for function update to finish..."
           aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION"
