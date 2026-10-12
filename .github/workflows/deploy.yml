@@ -1,0 +1,114 @@
+name: Deploy Air Export Pricing Engine to AWS Free Tier
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: aws-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run Unit Tests & Vocabulary Alignment Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt moto[s3]
+
+      - name: Verify Categorical Vocabulary Alignment (36/36)
+        run: |
+          python scripts/verify_vocab_alignment.py
+
+      - name: Run Test Suite
+        run: |
+          python -m unittest discover tests
+
+  deploy-aws:
+    name: Package & Deploy to AWS Free Tier
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Sync Model Artifacts & Cleaned Datasets to S3
+        run: |
+          echo "Uploading trained ML models and datasets to S3 bucket: ${{ secrets.S3_DATA_BUCKET }}"
+          aws s3 sync models/ s3://${{ secrets.S3_DATA_BUCKET }}/models/ --delete
+          aws s3 sync data/processed/ s3://${{ secrets.S3_DATA_BUCKET }}/data/processed/ --delete
+
+      - name: Build Lambda Deployment Package
+        run: |
+          echo "Building Lambda serverless zip artifact..."
+          mkdir -p build_package
+          
+          # Install production packages targeting Lambda Linux x86_64
+          pip install \
+            --platform manylinux2014_x86_64 \
+            --target=build_package \
+            --implementation cp \
+            --python-version 3.11 \
+            --only-binary=:all: \
+            -r requirements.txt
+
+          # Copy core application code, handler, models, and metadata
+          cp -r src build_package/
+          cp -r models build_package/
+          cp lambda_handler.py build_package/
+
+          # Package zip
+          cd build_package
+          zip -q -r ../lambda_artifact.zip .
+          cd ..
+          ls -lh lambda_artifact.zip
+
+      - name: Upload Lambda Package to S3 & Update Function Code
+        run: |
+          echo "Uploading zip package to s3://${{ secrets.S3_DATA_BUCKET }}/builds/lambda_artifact.zip"
+          aws s3 cp lambda_artifact.zip s3://${{ secrets.S3_DATA_BUCKET }}/builds/lambda_artifact.zip
+
+          echo "Updating Lambda function: ${{ secrets.LAMBDA_FUNCTION_NAME }}"
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --s3-bucket ${{ secrets.S3_DATA_BUCKET }} \
+            --s3-key builds/lambda_artifact.zip
+
+          echo "Waiting for Lambda function update to complete..."
+          aws lambda wait function-updated --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }}
+          echo "Lambda deployment successful!"
+
+      - name: Invalidate CloudFront Cache (Optional)
+        if: env.CLOUDFRONT_DISTRIBUTION_ID != ''
+        env:
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          echo "Invalidating CloudFront CDN cache for distribution: $CLOUDFRONT_DISTRIBUTION_ID"
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/*"
