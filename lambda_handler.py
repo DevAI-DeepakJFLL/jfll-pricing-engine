@@ -13,24 +13,37 @@ src_dir = os.path.join(BASE_DIR, "src")
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
+import json
+
+_init_err = None
+_init_tb = None
+_wsgi_handler = None
+
 try:
     from apig_wsgi import make_lambda_handler
     from src.app import app
     _wsgi_handler = make_lambda_handler(app, binary_support=True)
-except Exception as _init_err:
+except BaseException as err:
     import traceback
-    print(f"FATAL: Error during lambda module initialization: {_init_err}")
-    traceback.print_exc()
+    _init_err = str(err)
+    _init_tb = traceback.format_exc()
+    print(f"FATAL: Error during lambda module initialization: {_init_err}\n{_init_tb}")
     _wsgi_handler = None
 
 
 def handler(event, context):
     if _wsgi_handler is None:
-        import traceback
+        import sys
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
-            "body": '{"error": "Lambda initialization failed. Check CloudWatch logs."}'
+            "body": json.dumps({
+                "error": "Lambda initialization failed",
+                "python_version": sys.version,
+                "executable": sys.executable,
+                "exception": _init_err,
+                "traceback": _init_tb,
+            }, indent=2)
         }
     try:
         return _wsgi_handler(event, context)
@@ -43,4 +56,5 @@ def handler(event, context):
             "headers": {"Content-Type": "application/json"},
             "body": f'{{"error": "Internal Server Error: {str(exc)}"}}'
         }
+
 

@@ -94,7 +94,7 @@ jobs:
           # Install stripped production dependencies for Lambda
           pip install --no-cache-dir --target=build_package -r requirements-lambda.txt
 
-          # Strip heavy, non-runtime assets from python packages to stay well under the 250MB unzipped AWS limit
+          # Clean non-runtime assets from python packages to stay well under the 250MB unzipped AWS limit
           find build_package -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
           find build_package -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
           find build_package -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -102,7 +102,6 @@ jobs:
           find build_package -name "*.pyo" -delete 2>/dev/null || true
           find build_package -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
           find build_package -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-          find build_package -type f -name "*.so*" -exec strip --strip-unneeded {} + 2>/dev/null || true
 
           # Copy core application code, handler, models, and metadata
           cp -r src build_package/
