@@ -111,6 +111,8 @@ htmlcov/
 
 # Agent tooling
 .agents/
+*.zip
+
 
 
 # Retained active project documentation

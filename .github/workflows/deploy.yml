@@ -146,9 +146,26 @@ jobs:
           aws sts get-caller-identity
           
           echo "[2/4] Testing lambda:GetFunction:"
-          aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" --query "Configuration.[FunctionName,Runtime,State,LastUpdateStatus]"
+          aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" --query "Configuration.[FunctionName,Runtime,Handler,State,LastUpdateStatus]"
           GET_STATUS=$?
           echo "get-function status: $GET_STATUS"
+
+          echo "[2.5/4] Checking and syncing Lambda configuration (Runtime: python3.11, Handler: lambda_handler.handler)..."
+          CURRENT_RUNTIME=$(aws lambda get-function-configuration --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" --query "Runtime" --output text 2>/dev/null || echo "unknown")
+          CURRENT_HANDLER=$(aws lambda get-function-configuration --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" --query "Handler" --output text 2>/dev/null || echo "unknown")
+          echo "Current Runtime: $CURRENT_RUNTIME, Current Handler: $CURRENT_HANDLER"
+          
+          if [ "$CURRENT_RUNTIME" != "python3.11" ] || [ "$CURRENT_HANDLER" != "lambda_handler.handler" ]; then
+            echo "Updating Lambda runtime to python3.11 and handler to lambda_handler.handler..."
+            aws lambda update-function-configuration \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --runtime python3.11 \
+              --handler lambda_handler.handler \
+              --timeout 30 \
+              --memory-size 512 \
+              --region "$AWS_REGION" 2>&1 || echo "::warning::Could not automatically update runtime/handler via CLI (IAM user may lack lambda:UpdateFunctionConfiguration). If needed, update Runtime to Python 3.11 and Handler to lambda_handler.handler in AWS Console."
+            aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" 2>/dev/null || true
+          fi
 
           echo "[3/4] Updating Lambda function code from S3:"
           aws lambda update-function-code \

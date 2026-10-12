@@ -81,18 +81,26 @@ def add_cache_headers(response):
 # ------------------------------------------------------------------------------
 # SQLITE HISTORY TRACKING STORE
 # ------------------------------------------------------------------------------
-HISTORY_DB_PATH = os.path.join(ENGINE_ROOT, "data", "recommendations_history.db")
+if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("LAMBDA_TASK_ROOT"):
+    HISTORY_DB_PATH = "/tmp/recommendations_history.db"
+else:
+    HISTORY_DB_PATH = os.path.join(ENGINE_ROOT, "data", "recommendations_history.db")
 init_history_db(HISTORY_DB_PATH)
 
 
 # ------------------------------------------------------------------------------
 # LOAD MODEL ARTIFACT ON STARTUP (§1.4, §5.6)
 # ------------------------------------------------------------------------------
-MODEL_PATH = os.path.join(ENGINE_ROOT, "models", "freight_margin_recommender.joblib")
+_CANDIDATE_MODEL_PATHS = [
+    os.path.join(ENGINE_ROOT, "models", "freight_margin_recommender.joblib"),
+    os.path.join(BASE_DIR, "models", "freight_margin_recommender.joblib"),
+    os.path.join(os.getcwd(), "models", "freight_margin_recommender.joblib"),
+    os.path.join("/var/task", "models", "freight_margin_recommender.joblib"),
+]
+MODEL_PATH = next((p for p in _CANDIDATE_MODEL_PATHS if os.path.exists(p)), _CANDIDATE_MODEL_PATHS[0])
 if not os.path.exists(MODEL_PATH):
-    MODEL_PATH = os.path.join(BASE_DIR, "models", "freight_margin_recommender.joblib")
-if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError(f"Model artifact not found at canonical path: {MODEL_PATH}. Please run train.py first.")
+    raise FileNotFoundError(f"Model artifact not found at candidate paths: {_CANDIDATE_MODEL_PATHS}. Please run train.py first.")
+
 
 logger.info(f"Loading trained pricing engine from: {MODEL_PATH}")
 model_bundle = joblib.load(MODEL_PATH)

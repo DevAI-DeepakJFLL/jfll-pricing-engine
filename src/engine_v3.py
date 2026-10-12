@@ -50,11 +50,13 @@ except ImportError:
     from src.tiers import get_weight_tier
 
 
-DEFAULT_BUNDLE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "models",
-    "engine_v3_bundle.joblib",
-)
+_CANDIDATE_BUNDLE_PATHS = [
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "engine_v3_bundle.joblib"),
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "engine_v3_bundle.joblib"),
+    os.path.join(os.getcwd(), "models", "engine_v3_bundle.joblib"),
+    os.path.join("/var/task", "models", "engine_v3_bundle.joblib"),
+]
+DEFAULT_BUNDLE_PATH = next((p for p in _CANDIDATE_BUNDLE_PATHS if os.path.exists(p)), _CANDIDATE_BUNDLE_PATHS[0])
 DEFAULT_DATA_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "data",
