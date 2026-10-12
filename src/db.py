@@ -15,7 +15,7 @@ from constants import MODEL_VERSION
 
 logger = logging.getLogger("pricing_db")
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 LEAD_STATUSES = [
     {"code": "Draft / Quoted", "label": "Draft / Quoted", "css": "draft"},
@@ -49,13 +49,15 @@ LOSS_REASONS = ["price", "capacity", "schedule_transit", "customer_cancelled", "
 def migrate_outcome_columns(db_path: str):
     """Ensure outcome tracking columns exist in the database."""
     abs_path = os.path.abspath(db_path)
-    with sqlite3.connect(abs_path) as conn:
+    with sqlite3.connect(abs_path, timeout=15.0) as conn:
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(recommendation_history)")
         have = {c[1] for c in cur.fetchall()}
         for col, typ in NEW_COLUMNS.items():
             if col not in have:
-                cur.execute(f"ALTER TABLE recommendation_history ADD COLUMN {col} {typ}")
+                # Validate against known column definitions to prevent any dynamic injection
+                if col in NEW_COLUMNS and typ in ("REAL", "TEXT", "INTEGER"):
+                    cur.execute(f"ALTER TABLE recommendation_history ADD COLUMN {col} {typ}")
         conn.commit()
 
 
@@ -221,7 +223,10 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
                 final_price_inr REAL,
                 competitor_rate_per_kg REAL,
                 user_id TEXT,
-                is_deleted INTEGER DEFAULT 0
+                is_deleted INTEGER DEFAULT 0,
+                margin_range TEXT,
+                min_margin_pct REAL,
+                max_margin_pct REAL
             )
         """)
 
@@ -247,13 +252,18 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
             "final_price_inr": "REAL",
             "competitor_rate_per_kg": "REAL",
             "user_id": "TEXT",
-            "is_deleted": "INTEGER DEFAULT 0"
+            "is_deleted": "INTEGER DEFAULT 0",
+            "margin_range": "TEXT",
+            "min_margin_pct": "REAL",
+            "max_margin_pct": "REAL"
         }
 
 
         for col, col_type in col_defs.items():
             if col not in existing_cols:
-                cursor.execute(f"ALTER TABLE recommendation_history ADD COLUMN {col} {col_type}")
+                # Ensure column name and type match pre-declared dictionary exactly
+                if col in col_defs and any(col_type.startswith(t) for t in ("TEXT", "REAL", "INTEGER", "DATETIME")):
+                    cursor.execute(f"ALTER TABLE recommendation_history ADD COLUMN {col} {col_type}")
 
         # Performance indexes (created after all columns exist)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_time ON recommendation_history(timestamp DESC)")
@@ -261,7 +271,7 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_id_desc ON recommendation_history(id DESC)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_active ON recommendation_history(is_deleted, is_preset)")
 
-        cursor.execute(f"PRAGMA user_version = {CURRENT_SCHEMA_VERSION}")
+        cursor.execute(f"PRAGMA user_version = {int(CURRENT_SCHEMA_VERSION)}")
         conn.commit()
 
     _INITIALIZED_DBS.add(abs_path)
@@ -292,12 +302,34 @@ def log_recommendation(
 
         win_prob = float(optimal["Win_Probability"]) if optimal.get("Win_Probability") is not None else None
         exp_profit = float(optimal["Expected_Profit_INR"]) if optimal.get("Expected_Profit_INR") is not None else None
-        buy_inr = float(payload["Total_Buy_INR"]) if payload.get("Total_Buy_INR") is not None else 0.0
-        sell_inr = float(optimal["Quoted_Sell_Price_INR"]) if optimal.get("Quoted_Sell_Price_INR") is not None else 0.0
-        margin_pct = float(optimal["Margin_Percentage"]) if optimal.get("Margin_Percentage") is not None else 0.0
-        margin_amt = float(optimal["Margin_Amount_INR"]) if optimal.get("Margin_Amount_INR") is not None else 0.0
-        gross_wt = float(payload["Gross_Weight_Kg"]) if payload.get("Gross_Weight_Kg") is not None else 0.0
-        chg_wt = float(payload["Chargeable_Weight_Kg"]) if payload.get("Chargeable_Weight_Kg") is not None else 0.0
+        buy_inr = float(payload.get("Total_Buy_INR") or payload.get("buy") or 0.0)
+        sell_inr = float(optimal.get("Quoted_Sell_Price_INR") or 0.0)
+        margin_pct = float(optimal.get("Margin_Percentage") or 0.0)
+        margin_amt = float(optimal.get("Margin_Amount_INR") or 0.0)
+        gross_wt = float(payload.get("Gross_Weight_Kg") or payload.get("gross_wt") or 0.0)
+        chg_wt = float(payload.get("Chargeable_Weight_Kg") or payload.get("chargeable_wt") or 0.0)
+
+        # Extract recommended margin range
+        corr = optimal.get("negotiation_corridor") or payload.get("negotiation_corridor") or {}
+        min_m_val = optimal.get("min_margin_pct")
+        max_m_val = optimal.get("max_margin_pct")
+        if min_m_val is None and isinstance(corr, dict):
+            min_m_val = corr.get("min_margin_pct")
+        if max_m_val is None and isinstance(corr, dict):
+            max_m_val = corr.get("max_margin_pct")
+
+        if min_m_val is not None and max_m_val is not None:
+            min_m = float(min_m_val)
+            max_m = float(max_m_val)
+            margin_range = optimal.get("margin_range") or (f"{min_m:.1f}%" if min_m == max_m else f"{min_m:.1f}% – {max_m:.1f}%")
+        elif optimal.get("margin_range"):
+            margin_range = str(optimal["margin_range"])
+            min_m = margin_pct
+            max_m = margin_pct
+        else:
+            min_m = round(max(0.0, margin_pct - 0.75), 2) if margin_pct > 0 else 0.0
+            max_m = round(margin_pct + 0.75, 2) if margin_pct > 0 else 0.0
+            margin_range = f"{min_m:.1f}% – {max_m:.1f}%" if margin_pct > 0 else f"{margin_pct:.1f}%"
 
         with sqlite3.connect(db_path, timeout=5.0) as conn:
             cursor = conn.cursor()
@@ -308,8 +340,9 @@ def log_recommendation(
                     gross_wt_kg, chargeable_wt_kg, commodity, client_type, branch,
                     status, model_version, customer_name, inquiry_ref,
                     chosen_strategy, is_preset, rate_per_kg, cost_floor_price_inr,
-                    max_margin_cap, override_reason, user_id, is_deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    max_margin_cap, override_reason, user_id, is_deleted,
+                    margin_range, min_margin_pct, max_margin_pct
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
             """, (
                 str(payload.get("Origin_Port", "")),
                 str(payload.get("Destination_Port", "")),
@@ -334,7 +367,10 @@ def log_recommendation(
                 floor_price,
                 max_margin_cap,
                 override_reason,
-                user_id
+                user_id,
+                margin_range,
+                round(min_m, 2),
+                round(max_m, 2)
             ))
             conn.commit()
             return True
@@ -356,25 +392,31 @@ def get_all_history(db_path: str) -> List[Dict[str, Any]]:
             rec["status"] = rec.get("status") or "Draft / Quoted"
             rec["status_class"] = get_status_class(rec["status"])
             rec["model_version"] = rec.get("model_version") or MODEL_VERSION
+            if not rec.get("margin_range") and rec.get("margin_pct") is not None:
+                if rec.get("min_margin_pct") is not None and rec.get("max_margin_pct") is not None:
+                    rec["margin_range"] = f"{rec['min_margin_pct']:.1f}% – {rec['max_margin_pct']:.1f}%"
+                else:
+                    rec["margin_range"] = f"{rec['margin_pct']:.1f}%"
             records.append(rec)
     return records
 
 
-def get_history_stats(db_path: str) -> Dict[str, Any]:
+def get_history_stats(db_path: str, include_presets: bool = False) -> Dict[str, Any]:
     """
     Retrieve aggregate statistics across real commercial inquiries.
-    Excludes test presets and soft-deleted records from KPI conversion metrics.
+    Excludes test presets and soft-deleted records from KPI conversion metrics by default.
     """
     init_history_db(db_path)
     with sqlite3.connect(db_path, timeout=5.0) as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        where_clause = "WHERE is_deleted = 0" if include_presets else "WHERE is_deleted = 0 AND is_preset = 0"
+        cursor.execute(f"""
             SELECT 
                 COUNT(*),
                 SUM(CASE WHEN status = 'Won' THEN 1 ELSE 0 END),
                 SUM(COALESCE(selling_price_inr, 0))
             FROM recommendation_history
-            WHERE is_deleted = 0 AND is_preset = 0
+            {where_clause}
         """)
         row = cursor.fetchone()
         total_count = row[0] if row and row[0] is not None else 0
@@ -402,24 +444,32 @@ def get_history_paginated(
     migrate_outcome_columns(db_path)
     page = max(1, page)
     per_page = max(5, min(100, per_page))
-    where = "is_deleted = 0" + ("" if include_presets else " AND is_preset = 0")
 
-    with sqlite3.connect(db_path, timeout=5.0) as conn:
+    with sqlite3.connect(db_path, timeout=15.0) as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        total = cur.execute(f"SELECT COUNT(*) FROM recommendation_history WHERE {where}").fetchone()[0]
+        if include_presets:
+            total = cur.execute("SELECT COUNT(*) FROM recommendation_history WHERE is_deleted = 0").fetchone()[0]
+        else:
+            total = cur.execute("SELECT COUNT(*) FROM recommendation_history WHERE is_deleted = 0 AND is_preset = 0").fetchone()[0]
         pages = max(1, (total + per_page - 1) // per_page)
         page = min(page, pages)
         off = (page - 1) * per_page
         recs = []
-        for r in cur.execute(
-            f"SELECT * FROM recommendation_history WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?",
-            (per_page, off)
-        ):
+        if include_presets:
+            query = "SELECT * FROM recommendation_history WHERE is_deleted = 0 ORDER BY id DESC LIMIT ? OFFSET ?"
+        else:
+            query = "SELECT * FROM recommendation_history WHERE is_deleted = 0 AND is_preset = 0 ORDER BY id DESC LIMIT ? OFFSET ?"
+        for r in cur.execute(query, (per_page, off)):
             d = dict(r)
             d["status"] = d.get("status") or "Draft / Quoted"
             d["status_class"] = get_status_class(d["status"])
             d["model_version"] = d.get("model_version") or MODEL_VERSION
+            if not d.get("margin_range") and d.get("margin_pct") is not None:
+                if d.get("min_margin_pct") is not None and d.get("max_margin_pct") is not None:
+                    d["margin_range"] = f"{d['min_margin_pct']:.1f}% – {d['max_margin_pct']:.1f}%"
+                else:
+                    d["margin_range"] = f"{d['margin_pct']:.1f}%"
             recs.append(d)
 
     return {
@@ -434,7 +484,7 @@ def get_history_paginated(
         "next_page": page + 1,
         "start_idx": off + 1 if total else 0,
         "end_idx": min(off + per_page, total),
-        "stats": get_history_stats(db_path)
+        "stats": get_history_stats(db_path, include_presets=include_presets)
     }
 
 
@@ -442,7 +492,7 @@ def get_history_paginated_fixed(
     db_path: str,
     page: int = 1,
     per_page: int = 15,
-    include_presets: bool = False
+    include_presets: bool = True
 ) -> Dict[str, Any]:
     return get_history_paginated(db_path, page, per_page, include_presets)
 

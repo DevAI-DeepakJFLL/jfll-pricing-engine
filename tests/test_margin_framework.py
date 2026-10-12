@@ -110,8 +110,11 @@ class TestMarginFramework(unittest.TestCase):
             # Target margin must fall strictly within the [min, max] corridor
             self.assertGreaterEqual(corr["target_margin_pct"], corr["min_margin_pct"])
             self.assertLessEqual(corr["target_margin_pct"], corr["max_margin_pct"])
-            # Width must be strictly positive
+            # Width must be strictly positive and commercially reasonable
             self.assertGreater(corr["band_width_pct"], 0.0)
+            if inq["Chargeable_Weight_Kg"] >= 500:
+                # Heavy consolidated cargo must not have impractical wide spreads (> 4.0% margin points)
+                self.assertLessEqual(corr["band_width_pct"], 4.0)
 
 
 if __name__ == "__main__":

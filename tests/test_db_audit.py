@@ -109,6 +109,30 @@ class TestDBAuditEnhancements(unittest.TestCase):
         records = get_all_history(self.test_db)
         self.assertEqual(len(records), 0)
 
+    def test_margin_range_logging_with_corridor(self):
+        payload = {
+            "Customer_Company": "Tata Motors",
+            "Total_Buy_INR": 100000,
+            "Gross_Weight_Kg": 500,
+            "Chargeable_Weight_Kg": 500
+        }
+        optimal = {
+            "Quoted_Sell_Price_INR": 105000.0,
+            "Margin_Percentage": 5.0,
+            "Margin_Amount_INR": 5000.0,
+            "Rate_Per_Kg": 210.0,
+            "negotiation_corridor": {
+                "min_margin_pct": 4.0,
+                "max_margin_pct": 6.0
+            }
+        }
+        log_recommendation(self.test_db, payload, optimal)
+        records = get_all_history(self.test_db)
+        r = [rec for rec in records if rec.get("customer_name") == "Tata Motors"][0]
+        self.assertEqual(r["margin_range"], "4.0% – 6.0%")
+        self.assertEqual(r["min_margin_pct"], 4.0)
+        self.assertEqual(r["max_margin_pct"], 6.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -115,12 +115,8 @@ htmlcov/
 .agents/
 
 
-# Local internal documentation & audits
-docs/*
-!docs/USER_GUIDE.md
-!docs/TECHNICAL_DOCUMENTATION.md
-CODEBASE_REVIEW_REPORT.md
-GEMINI.md
-REMEDIATION_FIXES_SUMMARY.md
-margin_engine_test_cases.md
+# Retained active project documentation
+!docs/*.md
+!margin_engine_test_cases.md
+docs/*.png
 

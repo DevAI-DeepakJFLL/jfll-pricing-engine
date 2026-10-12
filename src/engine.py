@@ -578,9 +578,9 @@ class MarginRecommendationEngine:
             }
 
 
-        rec_floor = _format_card(raw_floor, "floor", "Competitive Floor", "Must-Win / Volume", "Highest Win Probability • Secure Booking", "cyan")
-        rec_balanced = _format_card(raw_balanced, "balanced", "Best-Recommended Balance", "Recommended", "Max Expected Profit • Standard Target", "emerald")
-        rec_premium = _format_card(raw_premium, "premium", "High-Margin Premium", "Capacity Constrained", "Peak Margin Capture • Selective Volume", "violet")
+        rec_floor = _format_card(raw_floor, "floor", "Lowest Safe Price", "Best Chance to Win", "Minimum safe price that covers airline costs and protects profitability", "cyan")
+        rec_balanced = _format_card(raw_balanced, "balanced", "Recommended Standard Price", "Most Balanced", "Optimal price balancing high win chance with standard business profits", "emerald")
+        rec_premium = _format_card(raw_premium, "premium", "Higher Profit Price", "Maximum Earnings", "Higher margin price suited for urgent cargo, peak season, or premium service", "violet")
 
         strat_dict = {
             "floor": rec_floor,
