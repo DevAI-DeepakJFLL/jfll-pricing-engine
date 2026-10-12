@@ -91,19 +91,34 @@ jobs:
           echo "Building Lambda serverless zip artifact..."
           mkdir -p build_package
           
-          # Install production dependencies for the Lambda package
-          pip install --target=build_package -r requirements.txt
+          # Install stripped production dependencies for Lambda
+          pip install --no-cache-dir --target=build_package -r requirements-lambda.txt
+
+          # Strip heavy, non-runtime assets from python packages to stay well under the 250MB unzipped AWS limit
+          find build_package -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find build_package -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          find build_package -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find build_package -name "*.pyc" -delete 2>/dev/null || true
+          find build_package -name "*.pyo" -delete 2>/dev/null || true
+          find build_package -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
+          find build_package -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+          find build_package -type f -name "*.so*" -exec strip --strip-unneeded {} + 2>/dev/null || true
 
           # Copy core application code, handler, models, and metadata
           cp -r src build_package/
           cp -r models build_package/
           cp lambda_handler.py build_package/
 
+          # Clean any stray pycache from copied code
+          find build_package/src -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+
           # Package zip
           cd build_package
-          zip -q -r ../lambda_artifact.zip .
+          zip -9 -q -r ../lambda_artifact.zip .
           cd ..
           ls -lh lambda_artifact.zip
+          echo "Unzipped size (bytes):"
+          du -sb build_package || du -sk build_package
 
       - name: Upload Lambda Package to S3
         env:
