@@ -13,7 +13,7 @@ class TestDatasetIntegrity(unittest.TestCase):
     def setUpClass(cls):
         cls.data_path = "data/processed/Air_Export_Pricing_Combined_ML.csv"
         if not os.path.exists(cls.data_path):
-            raise FileNotFoundError(f"Clean dataset missing at {cls.data_path}")
+            raise unittest.SkipTest(f"Clean dataset not present at {cls.data_path} (data excluded from git repo).")
         cls.df = pd.read_csv(cls.data_path)
 
     def test_pure_quote_status(self):
@@ -63,7 +63,7 @@ class TestJobConsolidatedDatasetIntegrity(unittest.TestCase):
     def setUpClass(cls):
         cls.data_path = "data/processed/Job_Wise_Consolidated_Cleaned_ML.csv"
         if not os.path.exists(cls.data_path):
-            raise FileNotFoundError(f"Clean dataset missing at {cls.data_path}")
+            raise unittest.SkipTest(f"Clean dataset not present at {cls.data_path} (data excluded from git repo).")
         cls.df = pd.read_csv(cls.data_path)
 
     def test_pure_quote_status(self):

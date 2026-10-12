@@ -14,6 +14,8 @@ CSV = os.environ.get("PRICING_CSV", "data/processed/Air_Export_Pricing_Combined_
 class TestMarginFramework(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if not os.path.exists(CSV):
+            raise unittest.SkipTest(f"Processed dataset not present at {CSV} (excluded from git).")
         df = pd.read_csv(CSV)
         cls.won = df[df.is_won == 1]
         cls.t = mf.build_tables(cls.won)

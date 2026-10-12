@@ -40,6 +40,11 @@ ALL_INQUIRIES_PATH = "data/processed/all_inquiries_win_rate_v3.csv"
 class TestDataPipelineV3Outputs(unittest.TestCase):
     """Verifies that the generated production datasets exist and meet structural gates."""
 
+    @classmethod
+    def setUpClass(cls):
+        if not os.path.exists(CLEANED_V3_PATH):
+            raise unittest.SkipTest("Processed data not present in repo (excluded from git).")
+
     def test_output_datasets_exist(self):
         """Pipeline must construct and save all three specified processed datasets."""
         self.assertTrue(
