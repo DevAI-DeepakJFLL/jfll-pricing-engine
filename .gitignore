@@ -40,16 +40,14 @@ data/recommendations_history.db
 # ------------------------------------------------------------------------------
 # 3. SERIALIZED MACHINE LEARNING MODEL ARTIFACTS
 # ------------------------------------------------------------------------------
-# Serialized models contain proprietary customer lookup tables & cohort stats
-*.joblib
+# Serialized models needed for serving and CI/CD verification
+# Large raw intermediate pickles are excluded
 *.pkl
 *.pickle
 *.h5
 *.pt
 *.pth
 *.onnx
-models/*
-!models/.gitkeep
 
 # ------------------------------------------------------------------------------
 # 4. ENVIRONMENT VARIABLES, SECRETS & CREDENTIALS
