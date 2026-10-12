@@ -91,14 +91,8 @@ jobs:
           echo "Building Lambda serverless zip artifact..."
           mkdir -p build_package
           
-          # Install production packages targeting Lambda Linux x86_64
-          pip install \
-            --platform manylinux2014_x86_64 \
-            --target=build_package \
-            --implementation cp \
-            --python-version 3.11 \
-            --only-binary=:all: \
-            -r requirements.txt
+          # Install production dependencies for the Lambda package
+          pip install --target=build_package -r requirements.txt
 
           # Copy core application code, handler, models, and metadata
           cp -r src build_package/
