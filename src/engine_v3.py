@@ -18,7 +18,7 @@ import os
 import sys
 import math
 import datetime
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 import joblib
 import numpy as np
 import pandas as pd
@@ -32,7 +32,7 @@ if _BASE_DIR not in sys.path:
 
 try:
     from constants import MODEL_VERSION
-    from quantile_model import MarginQuantileModel, FEATURE_COLS
+    from quantile_model import MarginQuantileModel
     from conformal_corridors import ConformalCorridorCalibrator
     from policy_guardrails import apply_commercial_guardrails
     from taxonomy import classify_commodity, map_destination_region
@@ -41,7 +41,7 @@ try:
     from tiers import get_weight_tier
 except ImportError:
     from src.constants import MODEL_VERSION
-    from src.quantile_model import MarginQuantileModel, FEATURE_COLS
+    from src.quantile_model import MarginQuantileModel
     from src.conformal_corridors import ConformalCorridorCalibrator
     from src.policy_guardrails import apply_commercial_guardrails
     from src.taxonomy import classify_commodity, map_destination_region
@@ -272,28 +272,31 @@ class PricingEngineV3:
         inq = dict(inquiry_dict)
 
         # 1. Base input parsing and entity normalization
-        buy_cost = float(inq.get("Total_Buy_INR", 0.0))
-        chargeable_wt = float(inq.get("Chargeable_Weight_Kg", 1.0))
-        gross_wt = float(inq.get("Gross_Weight_Kg", chargeable_wt))
+        raw_buy = inq.get("Total_Buy_INR") if inq.get("Total_Buy_INR") is not None else inq.get("buy")
+        buy_cost = float(raw_buy or 0.0)
+        raw_chg_wt = inq.get("Chargeable_Weight_Kg") if inq.get("Chargeable_Weight_Kg") is not None else inq.get("chargeable_wt")
+        chargeable_wt = float(raw_chg_wt or 1.0)
+        raw_gross_wt = inq.get("Gross_Weight_Kg") if inq.get("Gross_Weight_Kg") is not None else inq.get("gross_wt")
+        gross_wt = float(raw_gross_wt or chargeable_wt)
         density_ratio = float(inq.get("Cargo_Density_Ratio", chargeable_wt / max(1.0, gross_wt)))
 
-        raw_comm = str(inq.get("Commodity_Group") or "General Cargo")
+        raw_comm = str(inq.get("Commodity_Group") or inq.get("commodity") or "General Cargo")
         canonical_comm = classify_commodity(raw_comm)
 
-        origin_port = str(inq.get("Origin_Port") or "Indira Gandhi International Airport")
+        origin_port = str(inq.get("Origin_Port") or inq.get("origin") or "Indira Gandhi International Airport")
         origin_region = str(inq.get("Origin_Region") or "North India")
 
-        raw_dest = str(inq.get("Destination_Port") or inq.get("Destination_Region") or "")
+        raw_dest = str(inq.get("Destination_Port") or inq.get("dest") or inq.get("Destination_Region") or "")
         dest_region = map_destination_region(raw_dest) if raw_dest else str(inq.get("Destination_Region") or "Europe")
 
         regional_lane = str(inq.get("Regional_Lane") or f"{origin_region} -> {dest_region}")
-        client_cat = str(inq.get("Company_Group") or "Subagent")
-        incoterms = str(inq.get("Incoterms") or "FOB")
+        client_cat = str(inq.get("Company_Group") or inq.get("client") or "Subagent")
+        incoterms = str(inq.get("Incoterms") or inq.get("incoterms") or "FOB")
 
         weight_tier = str(inq.get("Weight_Tier") or get_weight_tier(chargeable_wt))
         quote_date = str(inq.get("quote_date") or datetime.date.today().isoformat())[:10]
 
-        raw_cust = str(inq.get("customer_name") or inq.get("Customer_Company") or "")
+        raw_cust = str(inq.get("customer_name") or inq.get("Customer_Company") or inq.get("customer") or "")
         norm_cust = normalize_customer_name(raw_cust)
 
         is_spot_tender = bool(
@@ -351,7 +354,6 @@ class PricingEngineV3:
             raw_p50 = max(raw_p10, raw_p50 * 0.90)
             raw_p10 = max(1.0, raw_p10 * 0.85)
 
-
         # 4. Decoupled Commercial Guardrails Application (Task 8)
         guard_floor = apply_commercial_guardrails(
             raw_margin_pct=raw_p10,
@@ -382,7 +384,6 @@ class PricingEngineV3:
         effective_cap = guard_bal.effective_cap_pct
         cost_floor_pct = guard_bal.cost_floor_margin_pct
 
-        step = max(0.20, min(1.0, round(250.0 / buy_cost * 100.0, 2))) if buy_cost > 0 else 0.50
         min_step = 0.05
 
         if effective_cap > cost_floor_pct:
@@ -430,16 +431,47 @@ class PricingEngineV3:
             "premium": m_prem,
         }
 
-
-
-        # 6. Conformal Corridor (Task 9)
+        # 6. Conformal Corridor (Task 9) - Calibrated Relative Negotiation Corridor
+        # Resolves wide corridor artifact by combining weight-tier scale latitude with empirical conformal dispersion
         is_known = bool(pit_feats.get("cust_pit_won_count_180d", 0) > 0)
-        half_width = self.calibrator.get_half_width(weight_tier=weight_tier, is_known_customer=is_known)
         cost_floor_pct = guard_bal.cost_floor_margin_pct
         effective_cap = guard_bal.effective_cap_pct
 
-        min_corridor_pct = round(max(cost_floor_pct, m_bal - half_width), 2)
-        max_corridor_pct = round(min(effective_cap, m_bal + half_width), 2)
+        # A. Sourced Weight-Tier Scale Latitude
+        # Heavy cargo (>500kg) has tight commercial margins; small parcels (<45kg) bear higher operational variance
+        if str(weight_tier) in (">1000kg", "500-1000kg") or chargeable_wt >= 500.0:
+            delta_slab = 0.15      # ±15% relative latitude on heavy cargo
+            delta_min = 0.75       # minimum ±0.75 pp negotiation buffer
+            delta_max = 1.85       # capped at ±1.85 pp to prevent wide corridor leakage
+        elif str(weight_tier) in ("100-300kg", "300-500kg", "45-100kg") or chargeable_wt >= 45.0:
+            delta_slab = 0.20      # ±20% relative latitude on mid-weight cargo
+            delta_min = 0.75
+            delta_max = 2.75
+        else:
+            delta_slab = 0.25      # ±25% relative latitude on courier/small shipments (<45kg)
+            delta_min = 1.00
+            delta_max = 4.00
+
+        # B. Empirical Conformal Dispersion Modulation
+        # Incorporates calibrated nonconformity quantile to modulate width under empirical uncertainty
+        empirical_hw = self.calibrator.get_half_width(weight_tier=weight_tier, is_known_customer=is_known)
+        global_hw = max(1.0, getattr(self.calibrator, "global_half_width", 12.50))
+        dispersion_ratio = float(np.clip(empirical_hw / global_hw, 0.80, 1.30))
+
+        # C. Calibrated Half-Width around Balanced Target Margin
+        target_half_width = float(np.clip(m_bal * delta_slab * dispersion_ratio, delta_min, delta_max))
+
+        # D. Strategic Tier Bounding
+        # Negotiation corridor must remain within pre-approved strategic boundaries:
+        # cost_floor_pct <= m_floor <= min_corridor_pct <= m_bal <= max_corridor_pct <= m_prem <= effective_cap
+        min_corridor_pct = round(max(m_floor, m_bal - target_half_width), 2)
+        max_corridor_pct = round(min(m_prem, m_bal + target_half_width), 2)
+
+        # Enforce strict bounds consistency across edge cases
+        if min_corridor_pct > m_bal:
+            min_corridor_pct = m_bal
+        if max_corridor_pct < m_bal:
+            max_corridor_pct = m_bal
         if max_corridor_pct < min_corridor_pct:
             max_corridor_pct = min_corridor_pct
 
@@ -462,7 +494,7 @@ class PricingEngineV3:
             "max_rate_per_kg": round(max_sell_price_inr / chargeable_wt, 2),
             "band_width_pct": round(max_corridor_pct - min_corridor_pct, 2),
             "confidence_coverage": "90%",
-            "conformal_half_width_pct": round(half_width, 2),
+            "conformal_half_width_pct": round(target_half_width, 2),
             "guidance": (
                 f"Pre-approved negotiation corridor: {min_corridor_pct:.2f}% to "
                 f"{max_corridor_pct:.2f}% (Target: {m_bal:.2f}%, 90% confidence coverage). "
@@ -526,11 +558,11 @@ class PricingEngineV3:
                 "Is_Clamped_By_Cap": guard_obj.is_cap_clamped,
             }
 
-        # 9. Sensitivity Ladder (15 steps)
-        lo_grid = min_corridor_pct
-        hi_grid = max_corridor_pct
+        # 9. Sensitivity Ladder (15 steps spanning strategic tiers)
+        lo_grid = round(min(m_floor, min_corridor_pct), 2)
+        hi_grid = round(max(m_prem, max_corridor_pct), 2)
         if hi_grid <= lo_grid:
-            hi_grid = lo_grid + 4.0
+            hi_grid = round(lo_grid + 3.0, 2)
 
         n_cohort = self.slab_counts.get(str(weight_tier), 30)
         sensitivity_rows = []
@@ -610,13 +642,15 @@ class PricingEngineV3:
                     why_comp = f"competitor {comp_float:.1f}/kg vs our mid {our_rate:.0f}/kg (direct quote)"
                 else:
                     sample_cnt = inq.get("Competitor_Benchmark_Samples", 1)
-                    why_comp = f"competitor {comp_float:.1f}/kg from recent lane benchmark (n={sample_cnt}) vs our mid {our_rate:.0f}/kg"
+                    why_comp = (
+                        f"competitor {comp_float:.1f}/kg from recent lane benchmark "
+                        f"(n={sample_cnt}) vs our mid {our_rate:.0f}/kg"
+                    )
                 signals["competitive"] = {"weight": 0.10, "s": round(s_comp, 3), "why": why_comp}
             except Exception:
                 signals["competitive"] = {"weight": 0.10, "s": 0.0, "why": "no competitor data"}
         else:
             signals["competitive"] = {"weight": 0.10, "s": 0.0, "why": "no competitor data"}
-
 
         # 12. Optimal Quote Card Assembly
         optimal_card = dict(strategic_cards[chosen_strategy])

@@ -90,7 +90,8 @@ def add_security_and_cache_headers(response):
 # SQLITE HISTORY TRACKING STORE
 # ------------------------------------------------------------------------------
 if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("LAMBDA_TASK_ROOT"):
-    HISTORY_DB_PATH = "/tmp/recommendations_history.db"
+    # Standard AWS Lambda ephemeral storage directory
+    HISTORY_DB_PATH = "/tmp/recommendations_history.db"  # nosec B108
 else:
     HISTORY_DB_PATH = os.path.join(ENGINE_ROOT, "data", "recommendations_history.db")
 init_history_db(HISTORY_DB_PATH)

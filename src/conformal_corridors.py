@@ -195,9 +195,11 @@ class ConformalCorridorCalibrator:
         # 1. If weight tier is fitted in slab dictionary, use its shrunk quantile
         if weight_tier is not None and str(weight_tier) in self.slab_half_widths:
             hw = self.slab_half_widths[str(weight_tier)]
-            # If customer is explicitly new and we have new customer calibration, expand band
+            # If customer is explicitly new and we have new customer calibration, expand band proportionally
+            # (Prevents Simpson's paradox / small retail courier variance leakage into heavy cargo)
             if not is_known_customer and "new" in self.customer_type_half_widths:
-                hw = max(hw, self.customer_type_half_widths["new"])
+                expansion = min(1.30, max(1.05, self.customer_type_half_widths["new"] / max(1.0, self.global_half_width)))
+                hw = hw * expansion
             return float(hw)
 
         # 2. Fall back to customer relationship type if available
