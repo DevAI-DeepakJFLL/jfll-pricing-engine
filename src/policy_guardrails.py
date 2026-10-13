@@ -6,12 +6,10 @@ risk buffers, and governance approval rules. (Issue M1, Fix 4)
 
 import re
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 try:
     from constants import (
-        CLIENT_CATEGORY_MAX_MARGIN_CAPS,
-        COMMODITY_MAX_MARGIN_CAPS,
         COMMODITY_RISK_BUFFERS,
         MIN_CANDIDATE_MARGIN,
         MIN_MARGIN_PER_AWB_INR,
@@ -24,8 +22,6 @@ try:
     from taxonomy import classify_commodity
 except ImportError:
     from src.constants import (
-        CLIENT_CATEGORY_MAX_MARGIN_CAPS,
-        COMMODITY_MAX_MARGIN_CAPS,
         COMMODITY_RISK_BUFFERS,
         MIN_CANDIDATE_MARGIN,
         MIN_MARGIN_PER_AWB_INR,
@@ -36,7 +32,6 @@ except ImportError:
         get_client_category_max_margin,
     )
     from src.taxonomy import classify_commodity
-
 
 
 @dataclass(frozen=True)
