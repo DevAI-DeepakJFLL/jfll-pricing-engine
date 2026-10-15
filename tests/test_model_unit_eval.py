@@ -69,7 +69,7 @@ class TestPricingModelEvaluation(unittest.TestCase):
         cls.test_df = pd.concat([cls.sample_won, cls.sample_lost]).reset_index(drop=True)
 
         # Save test cases for auditability
-        cases_json_path = os.path.join(BASE_DIR, "tests", "unit_test_cases_20.json")
+        cases_json_path = os.path.join(BASE_DIR, "tests", "data", "unit_test_cases_20.json")
         cls.test_df.to_json(cases_json_path, orient="records", indent=2)
 
     def test_01_dataset_mix_verification(self):

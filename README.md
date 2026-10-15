@@ -111,9 +111,10 @@ air_export_pricing_engine/
 ├── scripts/
 │   ├── deploy_floci.py                       # Cloud resource provisioning & container deployment
 │   ├── monitor_market_drift.py               # Offline Market & Concept Drift Watchdog
-│   ├── tune_engine_optuna.py                 # Local Bayesian hyperparameter optimization
 │   ├── verify_vocab_alignment.py             # UI vs. model encoder vocabulary alignment gate
-│   └── test_runner.py                        # Standalone regression test runner
+│   ├── test_runner.py                        # Standalone regression test runner
+│   ├── test_200_random_samples.py            # Stratified 200-sample validation harness
+│   └── test_very_low_budget.py               # Low-budget stress test across commodity verticals
 │
 ├── requirements.txt                          # Locked dependencies
 ├── run.sh                                    # Unified project CLI runner
