@@ -83,6 +83,15 @@ def add_security_and_cache_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self';"
+    )
     return response
 
 
@@ -413,6 +422,22 @@ HTML_TEMPLATE = """
             border: 1px solid rgba(255, 255, 255, 0.8);
         }
 
+        @media (max-width: 980px) {
+            .app-window { padding: 24px 20px 32px; border-radius: 18px; }
+            .app-nav { flex-direction: column; align-items: stretch; gap: 14px; }
+            .nav-links-center { justify-content: center; }
+        }
+
+        @media (max-width: 640px) {
+            body { padding: 12px 10px 24px; }
+            .app-window { padding: 16px 14px 24px; border-radius: 16px; }
+            .app-nav { gap: 10px; margin-bottom: 16px; padding-bottom: 16px; }
+            .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .page-title { font-size: 22px; }
+            .header-actions { width: 100%; gap: 8px; }
+            .header-actions .btn-pill { flex: 1 1 0; padding: 10px 12px; font-size: 12px; justify-content: center; text-align: center; }
+        }
+
         /* Top Minimalist Navbar (Retains ONLY Dashboard and Reports) */
         .app-nav {
             display: flex;
@@ -459,7 +484,11 @@ HTML_TEMPLATE = """
             color: var(--text-muted);
             font-size: 13px;
             font-weight: 600;
-            padding: 7px 18px;
+            padding: 8px 18px;
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             border-radius: var(--radius-pill);
             transition: all 0.2s;
         }
@@ -497,7 +526,7 @@ HTML_TEMPLATE = """
         .back-breadcrumb {
             text-decoration: none;
             font-size: 12.5px;
-            color: var(--text-light);
+            color: var(--text-muted);
             display: inline-flex;
             align-items: center;
             gap: 5px;
@@ -528,7 +557,7 @@ HTML_TEMPLATE = """
             justify-content: center;
             gap: 8px;
             padding: 10px 20px;
-            min-height: 42px;
+            min-height: 44px;
             border-radius: var(--radius-pill);
             font-size: 13px;
             font-weight: 600;
@@ -550,7 +579,7 @@ HTML_TEMPLATE = """
         }
         .btn-primary-action:hover { background: #1e293b; border-color: #1e293b; transform: translateY(-1px); }
 
-        /* Presets Bar (Restored: Single Full-Width Row) */
+        /* Presets Bar (Horizontally scrollable on mobile, compact full-width on desktop) */
         .presets-bar {
             background: #f8fafc;
             border: 1px solid var(--border);
@@ -563,6 +592,8 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: space-between;
             margin-bottom: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         .presets-title {
             font-size: 11px;
@@ -583,8 +614,24 @@ HTML_TEMPLATE = """
         @media (max-width: 900px) {
             .presets-grid-row { grid-template-columns: repeat(2, 1fr); }
         }
-        @media (max-width: 500px) {
-            .presets-grid-row { grid-template-columns: 1fr; }
+        @media (max-width: 640px) {
+            .presets-bar { padding: 12px 14px; margin-bottom: 18px; }
+            .presets-header { flex-direction: column; align-items: flex-start; gap: 2px; }
+            .presets-grid-row {
+                display: flex;
+                overflow-x: auto;
+                gap: 8px;
+                padding-bottom: 4px;
+                scrollbar-width: none;
+                -webkit-overflow-scrolling: touch;
+            }
+            .presets-grid-row::-webkit-scrollbar { display: none; }
+            .preset-chip-btn {
+                flex: 0 0 auto;
+                width: auto;
+                white-space: nowrap;
+                padding: 8px 14px;
+            }
         }
         .preset-chip-btn {
             background: #ffffff;
@@ -601,6 +648,7 @@ HTML_TEMPLATE = """
             align-items: center;
             gap: 8px;
             width: 100%;
+            min-height: 44px;
         }
         .preset-chip-btn:hover {
             border-color: #cbd5e1;
@@ -613,8 +661,8 @@ HTML_TEMPLATE = """
             color: #ffffff;
         }
         .preset-num-badge {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             background: #f1f5f9;
             font-size: 10px;
@@ -635,9 +683,6 @@ HTML_TEMPLATE = """
         }
         @media (max-width: 980px) {
             .workspace-grid { grid-template-columns: 1fr; }
-            .app-window { padding: 20px 20px 32px; border-radius: 18px; }
-            .app-nav { flex-direction: column; align-items: stretch; gap: 14px; }
-            .nav-links-center { justify-content: center; }
         }
 
         /* Column Headers & Dividers */
@@ -648,6 +693,8 @@ HTML_TEMPLATE = """
             padding-bottom: 12px;
             border-bottom: 1px solid var(--border);
             margin-bottom: 18px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         .col-title {
             font-size: 14.5px;
@@ -735,13 +782,17 @@ HTML_TEMPLATE = """
             color: var(--text-dark);
             font-family: 'Mulish', sans-serif;
             transition: all 0.15s;
-            height: 42px;
-            min-height: 42px;
+            height: 44px;
+            min-height: 44px;
         }
         .clean-input:focus {
             outline: none;
             border-color: var(--pill-dark);
             box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+        }
+        .clean-input:focus-visible, .select-search-input:focus-visible, .select-trigger:focus-visible, .btn-pill:focus-visible, .submit-btn:focus-visible, .mode-btn:focus-visible, .preset-chip-btn:focus-visible, .strategy-card:focus-visible {
+            outline: 2px solid var(--pill-dark);
+            outline-offset: 2px;
         }
 
         /* Searchable Custom Select Dropdowns */
@@ -767,8 +818,8 @@ HTML_TEMPLATE = """
             gap: 8px;
             user-select: none;
             transition: all 0.15s;
-            height: 42px;
-            min-height: 42px;
+            height: 44px;
+            min-height: 44px;
             min-width: 0;
             overflow: hidden;
         }
@@ -788,7 +839,7 @@ HTML_TEMPLATE = """
         }
         .select-trigger-arrow {
             font-size: 9px;
-            color: var(--text-light);
+            color: var(--text-muted);
             transition: transform 0.2s;
             flex-shrink: 0;
         }
@@ -824,6 +875,7 @@ HTML_TEMPLATE = """
             font-family: 'Mulish', sans-serif;
             background: #ffffff;
             outline: none;
+            min-height: 36px;
         }
         .select-options-list {
             overflow-y: auto;
@@ -841,6 +893,7 @@ HTML_TEMPLATE = """
             display: flex;
             align-items: center;
             justify-content: space-between;
+            min-height: 38px;
         }
         .select-option:hover { background: #f8fafc; }
         .select-option.selected { background: #f1f5f9; font-weight: 700; color: #0f172a; }
@@ -854,15 +907,15 @@ HTML_TEMPLATE = """
             background: #f1f5f9;
             padding: 4px;
             border-radius: var(--radius-pill);
-            min-height: 40px;
+            min-height: 44px;
         }
         .mode-btn {
             flex: 1;
             border: none;
             background: transparent;
-            padding: 7px 14px;
+            padding: 8px 12px;
             border-radius: var(--radius-pill);
-            font-size: 12px;
+            font-size: clamp(11px, 2.8vw, 12.5px);
             font-weight: 700;
             font-family: 'Outfit', sans-serif;
             color: var(--text-muted);
@@ -872,7 +925,8 @@ HTML_TEMPLATE = """
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 7px;
+            gap: 6px;
+            min-height: 36px;
         }
         .mode-btn.active {
             background: #ffffff;
@@ -891,8 +945,8 @@ HTML_TEMPLATE = """
             grid-template-columns: repeat(4, 1fr);
             gap: 10px;
         }
-        @media (max-width: 500px) {
-            .dim-grid { grid-template-columns: repeat(2, 1fr); }
+        @media (max-width: 640px) {
+            .dim-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
         }
         .dim-grid label {
             font-size: 10.5px;
@@ -933,19 +987,11 @@ HTML_TEMPLATE = """
             gap: 8px;
             font-family: 'Outfit', sans-serif;
             box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+            min-height: 46px;
         }
         .submit-btn:hover { background: #1e293b; transform: translateY(-1px); }
         .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-        /* Right Column: Recommended Commercial Terms Display */
-        .right-display-card {
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-card);
-            padding: 22px;
-            box-shadow: var(--shadow-card);
-        }
-        
         /* Placeholder / Ready State */
         .placeholder-box {
             text-align: center;
@@ -954,19 +1000,17 @@ HTML_TEMPLATE = """
         }
 
         /* Card Containers: Minimalist, Cohesive White Surfaces */
-        .left-display-card {
+        .left-display-card, .right-display-card {
             background: #ffffff;
             border: 1px solid var(--border);
             border-radius: var(--radius-card);
             padding: 24px;
             box-shadow: var(--shadow-card);
         }
-        .right-display-card {
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-card);
-            padding: 24px;
-            box-shadow: var(--shadow-card);
+        @media (max-width: 640px) {
+            .left-display-card, .right-display-card {
+                padding: 18px 14px;
+            }
         }
 
         /* Hero Metric Card: Minimalist High-Contrast Slate Capsule */
@@ -986,6 +1030,7 @@ HTML_TEMPLATE = """
             justify-content: center;
             gap: 8px;
             margin-bottom: 6px;
+            flex-wrap: wrap;
         }
         .hero-label {
             font-size: 11px;
@@ -1012,6 +1057,9 @@ HTML_TEMPLATE = """
             color: #ffffff;
             letter-spacing: -0.6px;
             font-family: 'Outfit', sans-serif;
+        }
+        @media (max-width: 480px) {
+            .hero-value { font-size: 32px; }
         }
         .hero-sub {
             font-size: 12.5px;
@@ -1069,6 +1117,7 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: space-between;
             gap: 14px;
+            min-height: 44px;
         }
         .strategy-card:hover {
             border-color: #cbd5e1;
@@ -1078,6 +1127,43 @@ HTML_TEMPLATE = """
             border-color: var(--pill-dark);
             background: #f8fafc;
             box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+        }
+        @media (max-width: 540px) {
+            .strategy-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 14px;
+            }
+            .strat-card-left {
+                width: 100%;
+            }
+            .strat-card-title-row {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .strat-meta-chips {
+                flex-wrap: wrap;
+                gap: 4px 6px;
+                margin-top: 4px;
+                font-size: 11px;
+            }
+            .strat-card-right {
+                width: 100%;
+                text-align: left;
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                padding-top: 8px;
+                border-top: 1px dashed var(--border);
+            }
+            .strat-price {
+                font-size: 18px;
+            }
+            .strat-price-unit {
+                font-size: 11px;
+                margin-top: 0;
+            }
         }
         .strat-card-left {
             display: flex;
@@ -1191,6 +1277,9 @@ HTML_TEMPLATE = """
             grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
+        @media (max-width: 500px) {
+            .actions-split { grid-template-columns: 1fr; }
+        }
         .btn-copy-action {
             width: 100%;
             background: var(--pill-dark);
@@ -1202,6 +1291,7 @@ HTML_TEMPLATE = """
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            min-height: 44px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -1560,66 +1650,62 @@ HTML_TEMPLATE = """
         </div>
 
         <!-- Right Column: Recommended Commercial Terms -->
-        <div class="workspace-col-right">
+        <div class="workspace-col-right right-display-card">
             <div class="col-header">
                 <span class="col-title">Recommended Commercial Terms</span>
                 <span class="col-badge">Optimal Recommendation</span>
             </div>
 
-            <div class="right-display-card">
-                <!-- Ready / Placeholder State -->
-                <div id="placeholder" class="placeholder-box">
-                    <svg class="ui-icon" style="width: 44px; height: 44px; stroke: var(--text-muted); margin-bottom: 12px;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    <h3 style="font-size: 16px; font-weight: 700; color: var(--text-dark);">Quotation Engine Ready</h3>
-                    <p style="font-size: 12.5px; margin-top: 6px; color: var(--text-muted);">Enter shipment parameters on the left or click a Quick Scenario Preset to calculate optimal sell rates and probability sensitivity.</p>
+            <!-- Ready / Placeholder State -->
+            <div id="placeholder" class="placeholder-box">
+                <svg class="ui-icon" style="width: 44px; height: 44px; stroke: var(--text-muted); margin-bottom: 12px;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <h3 style="font-size: 16px; font-weight: 700; color: var(--text-dark);">Quotation Engine Ready</h3>
+                <p style="font-size: 12.5px; margin-top: 6px; color: var(--text-muted);">Enter shipment parameters on the left or click a Quick Scenario Preset to calculate optimal sell rates and probability sensitivity.</p>
+            </div>
+
+            <!-- Results Panel -->
+            <div id="results" style="display: none;">
+                <!-- Hero Metric Card: Recommended Margin Range as PRIMARY BOLD HIGHLIGHT -->
+                <div class="hero-metric-card">
+                    <div class="hero-label-row">
+                        <span class="hero-label">Recommended Margin Range</span>
+                        <span class="hero-corridor-badge" id="res_corridor_badge">Pre-Approved Corridor</span>
+                    </div>
+                    <div class="hero-value" id="res_margin_pct">0.0% – 0.0%</div>
+                    <div class="hero-sub" id="res_hero_sub">Target Benchmark: 0.0% Markup | Quoted Sell Rate: ₹0 / kg</div>
                 </div>
 
-                <!-- Results Panel -->
-                <div id="results" style="display: none;">
-                    <!-- Hero Metric Card: Recommended Margin Range as PRIMARY BOLD HIGHLIGHT -->
-                    <div class="hero-metric-card">
-                        <div class="hero-label-row">
-                            <span class="hero-label">Recommended Margin Range</span>
-                            <span class="hero-corridor-badge" id="res_corridor_badge">Pre-Approved Corridor</span>
-                        </div>
-                        <div class="hero-value" id="res_margin_pct">0.0% – 0.0%</div>
-                        <div class="hero-sub" id="res_hero_sub">Target Benchmark: 0.0% Markup | Quoted Sell Rate: ₹0 / kg</div>
+                <!-- 3 Supporting Commercial Metric Tiles -->
+                <div class="metrics-grid">
+                    <div class="metric-tile">
+                        <div class="metric-title">Quoted Sell Price</div>
+                        <div class="metric-number" id="res_selling_price">₹0</div>
                     </div>
-
-                    <!-- 3 Supporting Commercial Metric Tiles -->
-                    <div class="metrics-grid">
-                        <div class="metric-tile">
-                            <div class="metric-title">Quoted Sell Price</div>
-                            <div class="metric-number" id="res_selling_price">₹0</div>
-                        </div>
-                        <div class="metric-tile">
-                            <div class="metric-title">Win Confidence</div>
-                            <div class="metric-number" id="res_win_prob" style="color: var(--text-dark);">High (88%)</div>
-                        </div>
-                        <div class="metric-tile">
-                            <div class="metric-title">Est. Gross Profit</div>
-                            <div class="metric-number" id="res_profit_amt" style="color: var(--text-dark);">₹0</div>
-                        </div>
+                    <div class="metric-tile">
+                        <div class="metric-title">Win Confidence</div>
+                        <div class="metric-number" id="res_win_prob" style="color: var(--text-dark);">High (88%)</div>
                     </div>
-
-                    <!-- Pricing Strategy Tiers -->
-                    <div class="section-label" style="margin-top: 18px; margin-bottom: 8px;">
-                        <span>Pricing Strategy Options</span>
+                    <div class="metric-tile">
+                        <div class="metric-title">Est. Gross Profit</div>
+                        <div class="metric-number" id="res_profit_amt" style="color: var(--text-dark);">₹0</div>
                     </div>
-                    <div id="strategic_tiers" class="strategic-tiers-container"></div>
+                </div>
 
-                    
+                <!-- Pricing Strategy Tiers -->
+                <div class="section-label" style="margin-top: 18px; margin-bottom: 8px;">
+                    <span>Pricing Strategy Options</span>
+                </div>
+                <div id="strategic_tiers" class="strategic-tiers-container"></div>
 
-                    <!-- Bottom Commercial Actions -->
-                    <div class="actions-split">
-                        <button type="button" class="btn-copy-action" onclick="copyQuoteSummary()">
-                            <svg class="ui-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                            Copy Quote Summary
-                        </button>
-                        <button type="button" class="btn-pill btn-white" onclick="resetFormForNewQuote()" style="width: 100%;">
-                            Create New Quote
-                        </button>
-                    </div>
+                <!-- Bottom Commercial Actions -->
+                <div class="actions-split">
+                    <button type="button" class="btn-copy-action" onclick="copyQuoteSummary()">
+                        <svg class="ui-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Copy Quote Summary
+                    </button>
+                    <button type="button" class="btn-pill btn-white" onclick="resetFormForNewQuote()" style="width: 100%;">
+                        Create New Quote
+                    </button>
                 </div>
             </div>
         </div>
@@ -2331,6 +2417,66 @@ HISTORY_TEMPLATE = """
             padding: 28px 36px 40px;
         }
 
+        @media (max-width: 768px) {
+            .app-nav {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            .nav-links-center {
+                justify-content: center;
+            }
+            .app-nav .header-actions {
+                justify-content: center;
+                width: 100%;
+            }
+            .app-nav .btn-pill {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body { padding: 12px 10px 24px; }
+            .app-window { padding: 16px 14px 24px; border-radius: 16px; }
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .page-title { font-size: 22px; }
+            .header-actions {
+                width: 100%;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            .header-actions .btn-pill {
+                flex: 1 1 auto;
+                justify-content: center;
+                padding: 10px 12px;
+                font-size: 12px;
+                text-align: center;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 10px !important;
+            }
+            .stat-card {
+                padding: 12px 14px !important;
+            }
+            .stat-val {
+                font-size: 20px !important;
+            }
+            .pagination-bar {
+                flex-direction: column;
+                gap: 12px;
+                align-items: center;
+                text-align: center;
+            }
+            .btn-text-full { display: none !important; }
+            .btn-text-mobile { display: inline !important; }
+        }
+
         .app-nav {
             display: flex;
             align-items: center;
@@ -2376,7 +2522,11 @@ HISTORY_TEMPLATE = """
             color: var(--text-muted);
             font-size: 13px;
             font-weight: 600;
-            padding: 7px 18px;
+            padding: 8px 18px;
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             border-radius: var(--radius-pill);
             transition: all 0.2s;
         }
@@ -2394,7 +2544,7 @@ HISTORY_TEMPLATE = """
         .back-breadcrumb {
             text-decoration: none;
             font-size: 12.5px;
-            color: var(--text-light);
+            color: var(--text-muted);
             display: inline-flex;
             align-items: center;
             gap: 5px;
@@ -2411,8 +2561,10 @@ HISTORY_TEMPLATE = """
         .btn-pill {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
-            padding: 9px 20px;
+            padding: 10px 20px;
+            min-height: 44px;
             border-radius: var(--radius-pill);
             font-size: 13px;
             font-weight: 600;
@@ -2440,7 +2592,7 @@ HISTORY_TEMPLATE = """
         .stat-label {
             font-size: 11px;
             font-weight: 700;
-            color: var(--text-light);
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 4px;
@@ -2457,15 +2609,20 @@ HISTORY_TEMPLATE = """
             background: #ffffff;
             overflow: hidden;
         }
-        .table-wrap { overflow-x: auto; max-height: 580px; }
+        .table-wrap {
+            overflow-x: auto;
+            max-height: 580px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
         table { width: 100%; min-width: 950px; border-collapse: collapse; font-size: 12.5px; }
         th {
             background: #f8fafc;
             text-align: left;
-            padding: 11px 16px;
+            padding: 12px 16px;
             font-size: 11px;
             font-weight: 700;
-            color: var(--text-light);
+            color: var(--text-muted);
             text-transform: uppercase;
             border-bottom: 1px solid var(--border);
             position: sticky;
@@ -2480,13 +2637,16 @@ HISTORY_TEMPLATE = """
         tr:hover { background: #fbfbfb; }
 
         .status-badge {
-            padding: 4px 10px;
+            padding: 6px 12px;
             border-radius: var(--radius-pill);
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             border: 1px solid transparent;
             cursor: pointer;
             outline: none;
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
         }
         .status-draft { background: #f1f5f9; color: var(--text-dark); border-color: var(--border); }
         .status-negotiating { background: #f8fafc; color: var(--text-dark); border-color: #cbd5e1; }
@@ -2494,6 +2654,11 @@ HISTORY_TEMPLATE = """
         .status-review { background: #f8fafc; color: var(--text-muted); border-color: var(--border); }
         .status-won { background: var(--pill-dark); color: #ffffff; border-color: var(--pill-dark); }
         .status-lost { background: #ffffff; color: var(--text-muted); border-color: var(--border); }
+
+        *:focus-visible {
+            outline: 2px solid var(--pill-dark);
+            outline-offset: 2px;
+        }
 
         .pagination-bar {
             display: flex;
@@ -2508,8 +2673,8 @@ HISTORY_TEMPLATE = """
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 32px;
-            height: 32px;
+            min-width: 36px;
+            height: 36px;
             border-radius: var(--radius-pill);
             border: 1px solid var(--border);
             background: #ffffff;
@@ -2555,7 +2720,8 @@ HISTORY_TEMPLATE = """
         <div class="header-actions">
             <a href="/" class="btn-pill btn-white">
                 <svg class="ui-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                New Margin Recommendation
+                <span class="btn-text-full">New Margin Recommendation</span>
+                <span class="btn-text-mobile" style="display: none;">New Quote</span>
             </a>
         </div>
     </nav>
@@ -3043,6 +3209,15 @@ def api_history_clear():
     return jsonify({"status": "success" if success else "error"})
 
 
+def sanitize_csv_field(val):
+    if val is None:
+        return ""
+    val_str = str(val)
+    if val_str and val_str[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + val_str
+    return val_str
+
+
 @app.route("/api/history/export")
 def api_history_export():
     records = get_all_history(HISTORY_DB_PATH)
@@ -3057,11 +3232,24 @@ def api_history_export():
 
     for r in records:
         writer.writerow([
-            r.get("id"), r.get("timestamp"), r.get("origin_port"), r.get("dest_port"),
-            r.get("airline_buy_inr"), r.get("selling_price_inr"), r.get("margin_range"), r.get("margin_pct"),
-            r.get("margin_amount_inr"), r.get("win_prob"), r.get("expected_profit_inr"),
-            r.get("gross_wt_kg"), r.get("chargeable_wt_kg"), r.get("commodity"),
-            r.get("client_type"), r.get("branch"), r.get("status"), r.get("model_version")
+            sanitize_csv_field(r.get("id")),
+            sanitize_csv_field(r.get("timestamp")),
+            sanitize_csv_field(r.get("origin_port")),
+            sanitize_csv_field(r.get("dest_port")),
+            sanitize_csv_field(r.get("airline_buy_inr")),
+            sanitize_csv_field(r.get("selling_price_inr")),
+            sanitize_csv_field(r.get("margin_range")),
+            sanitize_csv_field(r.get("margin_pct")),
+            sanitize_csv_field(r.get("margin_amount_inr")),
+            sanitize_csv_field(r.get("win_prob")),
+            sanitize_csv_field(r.get("expected_profit_inr")),
+            sanitize_csv_field(r.get("gross_wt_kg")),
+            sanitize_csv_field(r.get("chargeable_wt_kg")),
+            sanitize_csv_field(r.get("commodity")),
+            sanitize_csv_field(r.get("client_type")),
+            sanitize_csv_field(r.get("branch")),
+            sanitize_csv_field(r.get("status")),
+            sanitize_csv_field(r.get("model_version"))
         ])
 
     return Response(
