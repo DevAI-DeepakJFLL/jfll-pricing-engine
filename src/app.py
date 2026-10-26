@@ -1591,41 +1591,9 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
 
-                <!-- Quoted Carrier & Target Date Section -->
+                <!-- Customer Account & Quote Date Section -->
                 <div class="field-section">
-                    <div class="section-label">Quoted Carrier & Target Date</div>
-                    <div class="form-row">
-                        <div class="field-group">
-                            <label for="carrier_display_text">Quoted Airline / Carrier <span class="req">*</span></label>
-                            <input type="hidden" id="carrier" value="Any Airline">
-                            <div class="searchable-select" id="searchable_carrier">
-                                <div class="select-trigger" onclick="toggleDropdown('carrier')">
-                                    <span class="select-trigger-text" id="carrier_display_text">Any Airline (Market Default)</span>
-                                    <span class="select-trigger-arrow">▼</span>
-                                </div>
-                                <div class="select-dropdown" id="carrier_dropdown">
-                                    <div class="select-search-wrap">
-                                        <input type="text" class="select-search-input" id="carrier_search" placeholder="Search carrier..." oninput="filterDropdownOptions('carrier', this.value)">
-                                    </div>
-                                    <ul class="select-options-list" id="carrier_options_list">
-                                        {% for opt in carrier_options %}
-                                        <li class="select-option{% if opt.value == 'Any Airline' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="field-group">
-                            <label for="quote_date">Target Quote Date <span class="req">*</span></label>
-                            <input type="date" id="quote_date" class="clean-input" value="{{ default_quote_date }}" required>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Customer Account & Sales Desk Section -->
-                <div class="field-section">
-                    <div class="section-label">Customer Account & Sales Desk</div>
+                    <div class="section-label">Customer Account & Quote Date</div>
                     <div class="form-row">
                         <div class="field-group">
                             <label for="customer_company">Customer Company / Account</label>
@@ -1638,24 +1606,8 @@ HTML_TEMPLATE = """
                         </div>
 
                         <div class="field-group">
-                            <label for="sales_person_display_text">Sales Person / Desk</label>
-                            <input type="hidden" id="sales_person" value="Mohnish Arora">
-                            <div class="searchable-select" id="searchable_sales_person">
-                                <div class="select-trigger" onclick="toggleDropdown('sales_person')">
-                                    <span class="select-trigger-text" id="sales_person_display_text">Mohnish Arora</span>
-                                    <span class="select-trigger-arrow">▼</span>
-                                </div>
-                                <div class="select-dropdown" id="sales_person_dropdown">
-                                    <div class="select-search-wrap">
-                                        <input type="text" class="select-search-input" id="sales_person_search" placeholder="Search sales rep..." oninput="filterDropdownOptions('sales_person', this.value)">
-                                    </div>
-                                    <ul class="select-options-list" id="sales_person_options_list">
-                                        {% for opt in sales_person_options %}
-                                        <li class="select-option{% if opt.value == 'Mohnish Arora' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
+                            <label for="quote_date">Target Quote Date <span class="req">*</span></label>
+                            <input type="date" id="quote_date" class="clean-input" value="{{ default_quote_date }}" required>
                         </div>
                     </div>
                 </div>
@@ -1762,64 +1714,6 @@ HTML_TEMPLATE = """
                                     <ul class="select-options-list" id="commodity_options_list">
                                         {% for opt in commodity_options %}
                                         <li class="select-option{% if opt.value == 'General Cargo' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="field-group">
-                            <label>Payment Terms / Incoterms <span class="req">*</span></label>
-                            <input type="hidden" id="incoterms" value="FOB">
-                            <div class="searchable-select" id="custom_incoterms">
-                                <div class="select-trigger" onclick="toggleDropdown('incoterms')">
-                                    <span class="select-trigger-text" id="incoterms_display_text">FOB - Free on Board</span>
-                                    <span class="select-trigger-arrow">▼</span>
-                                </div>
-                                <div class="select-dropdown" id="incoterms_dropdown">
-                                    <ul class="select-options-list" id="incoterms_options_list">
-                                        {% for opt in incoterms_options %}
-                                        <li class="select-option{% if opt.value == 'FOB' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="field-group">
-                            <label>Booking Branch Office <span class="req">*</span></label>
-                            <input type="hidden" id="branch" value="Mumbai">
-                            <div class="searchable-select" id="custom_branch">
-                                <div class="select-trigger" onclick="toggleDropdown('branch')">
-                                    <span class="select-trigger-text" id="branch_display_text">Mumbai</span>
-                                    <span class="select-trigger-arrow">▼</span>
-                                </div>
-                                <div class="select-dropdown" id="branch_dropdown">
-                                    <ul class="select-options-list" id="branch_options_list">
-                                        {% for opt in branch_options %}
-                                        <li class="select-option{% if opt.value == 'Mumbai' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="field-group" style="grid-column: span 2;">
-                            <label>Business Vertical <span class="req">*</span></label>
-                            <input type="hidden" id="vertical" value="Air Export Forwarding">
-                            <div class="searchable-select" id="custom_vertical">
-                                <div class="select-trigger" onclick="toggleDropdown('vertical')">
-                                    <span class="select-trigger-text" id="vertical_display_text">Air Export Forwarding</span>
-                                    <span class="select-trigger-arrow">▼</span>
-                                </div>
-                                <div class="select-dropdown" id="vertical_dropdown">
-                                    <ul class="select-options-list" id="vertical_options_list">
-                                        {% for opt in vertical_options %}
-                                        <li class="select-option{% if opt.value == 'Air Export Forwarding' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
                                         {% endfor %}
                                     </ul>
                                 </div>
@@ -2174,7 +2068,7 @@ HTML_TEMPLATE = """
         });
     }
 
-    const ALL_DROPDOWN_IDS = ['origin', 'dest', 'client', 'vertical', 'commodity', 'incoterms', 'branch', 'frequency', 'revision'];
+    const ALL_DROPDOWN_IDS = ['origin', 'dest', 'client', 'commodity', 'frequency', 'revision'];
 
     ALL_DROPDOWN_IDS.forEach(fieldId => {
         const list = document.getElementById(`${fieldId}_options_list`);
@@ -2211,12 +2105,9 @@ HTML_TEMPLATE = """
         document.getElementById('dim_h').value = p.dim_h;
         document.getElementById('dim_pcs').value = p.dim_pcs;
         setCustomDropdownValue('client', p.client);
-        setCustomDropdownValue('vertical', p.vertical);
         setCustomDropdownValue('commodity', p.commodity);
-        setCustomDropdownValue('incoterms', p.incoterms);
         setCustomDropdownValue('frequency', p.frequency);
         setCustomDropdownValue('revision', p.revision ? String(p.revision) : '1');
-        setCustomDropdownValue('branch', p.branch);
         updateDimensions();
         runInference(false);
     }
@@ -2230,15 +2121,11 @@ HTML_TEMPLATE = """
         document.getElementById('dim_w').value = '';
         document.getElementById('dim_h').value = '';
         document.getElementById('dim_pcs').value = '1';
-        // revision input removed
 
         setSearchableValue('origin', 'Indira Gandhi International Airport');
         setSearchableValue('dest', 'Heathrow Apt/London');
         setCustomDropdownValue('client', 'Shipper / Consignee');
-        setCustomDropdownValue('vertical', 'Air Export Forwarding');
         setCustomDropdownValue('commodity', 'General Cargo');
-        setCustomDropdownValue('incoterms', 'FOB');
-        setCustomDropdownValue('branch', 'Mumbai');
         setCustomDropdownValue('frequency', '10');
         setCustomDropdownValue('revision', '1');
 
@@ -2290,24 +2177,27 @@ HTML_TEMPLATE = """
         }
 
         const payload = {
-            origin: document.getElementById('origin')?.value,
-            dest: document.getElementById('dest')?.value,
+            origin: document.getElementById('origin')?.value || 'Indira Gandhi International Airport',
+            dest: document.getElementById('dest')?.value || 'Heathrow Apt/London',
             buy: buyVal,
             gross_wt: weights.gross_wt,
             chargeable_wt: weights.chargeable_wt,
-            client: document.getElementById('client')?.value,
-            vertical: document.getElementById('vertical')?.value,
-            commodity: document.getElementById('commodity')?.value,
-            incoterms: document.getElementById('incoterms')?.value,
-            frequency: parseInt(document.getElementById('frequency')?.value, 10),
+            client: document.getElementById('client')?.value || 'Shipper / Consignee',
+            commodity: document.getElementById('commodity')?.value || 'General Cargo',
+            frequency: parseInt(document.getElementById('frequency')?.value, 10) || 10,
             revision: parseInt(document.getElementById('revision')?.value, 10) || 1,
-            branch: document.getElementById('branch')?.value,
+            customer_company: document.getElementById('customer_company')?.value || '',
+            quote_date: document.getElementById('quote_date')?.value || new Date().toISOString().slice(0, 10),
+            carrier: 'Any Airline',
+            branch: 'Mumbai',
+            vertical: 'Air Export Forwarding',
+            incoterms: 'FOB',
+            sales_person: 'Mohnish Arora',
             strategy: 'balanced',
             dim_l: parseFloat(document.getElementById('dim_l')?.value),
             dim_w: parseFloat(document.getElementById('dim_w')?.value),
             dim_h: parseFloat(document.getElementById('dim_h')?.value),
             dim_pcs: parseInt(document.getElementById('dim_pcs')?.value, 10),
-            quote_date: new Date().toISOString().slice(0, 10),
             is_preset: Boolean(isPreset)
         };
 
@@ -2571,7 +2461,8 @@ Airline Buy Cost: ₹${formatINR(buyVal)}
 Quoted Selling Price: ${sellPrice}
 Target Margin Range: ${marginPct}
 Gross Profit (if Won): ${profit}
-Terms: ${document.getElementById('incoterms')?.value || 'FOB'}`;
+Activity: ${document.getElementById('frequency_display_text')?.innerText || 'Active / Regular Customer'}
+Revision: ${document.getElementById('revision_display_text')?.innerText || 'Rev 1 — Initial Quote'}`;
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(summary).then(() => showToast('Quotation summary copied to clipboard!'));

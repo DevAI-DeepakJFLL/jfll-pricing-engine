@@ -174,31 +174,33 @@ class TestApiExpandedInputs(unittest.TestCase):
         self.assertEqual(res_unknown.status_code, 200)
 
     def test_get_root_renders_expanded_ui(self):
-        """Test 5: GET / renders HTML page with all new commercial inputs and approved Notion styling."""
+        """Test 5: GET / renders HTML page with active commercial inputs and approved Notion styling."""
         res = self.client.get("/")
         self.assertEqual(res.status_code, 200)
         html = res.get_data(as_text=True)
 
-        # 1. Carrier options present
-        self.assertIn("Qatar Airways", html)
-        self.assertIn("Emirates SkyCargo", html)
-        self.assertIn("Any Airline", html)
-        self.assertIn('id="carrier"', html)
-
-        # 2. Customer company input and datalist present
+        # 1. Active Customer company input and datalist present
         self.assertIn('id="customer_company"', html)
         self.assertIn('id="customer_accounts_list"', html)
         self.assertIn("UNIVERSAL CLEARING AND FORWARDING", html)
 
-        # 3. Dual buy inputs present (unit_buy and buy)
+        # 2. Dual buy inputs present (unit_buy and buy)
         self.assertIn('id="unit_buy"', html)
         self.assertIn('id="buy"', html)
 
-        # 4. Target Quote Date present
+        # 3. Target Quote Date present
         self.assertIn('id="quote_date"', html)
 
-        # 5. Sales person input/options present
-        self.assertIn('id="sales_person"', html)
+        # 4. Customer Activity and Quote Revision present
+        self.assertIn('id="frequency"', html)
+        self.assertIn('id="revision"', html)
+
+        # 5. Non-impacting fields removed from UI form
+        self.assertNotIn('id="carrier"', html)
+        self.assertNotIn('id="sales_person"', html)
+        self.assertNotIn('id="incoterms"', html)
+        self.assertNotIn('id="branch"', html)
+        self.assertNotIn('id="vertical"', html)
 
         # 6. Strict Notion monochrome design validation
         self.assertIn("Outfit", html)
