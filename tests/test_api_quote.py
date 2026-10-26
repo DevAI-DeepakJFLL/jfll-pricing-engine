@@ -206,6 +206,33 @@ class TestApiQuoteIntegration(unittest.TestCase):
         self.assertEqual(intel3["source"], "explicit")
         self.assertEqual(intel3["competitor_rate_per_kg"], 205.0)
 
+    def test_unit_rate_auto_scaling_safeguard(self):
+        """Test safeguard when user mistakenly submits unit rate in total buy field for heavy cargo."""
+        # 450 kg shipment with buy=300 (intending 300 INR/kg)
+        payload = {
+            "buy": 300.0,
+            "gross_wt": 420.0,
+            "chargeable_wt": 450.0,
+            "origin": "Chhatrapati Shivaji Maharaj International Airport",
+            "dest": "Dubai",
+            "client": "Subagent",
+            "commodity": "General Cargo",
+        }
+        res = self.client.post("/api/quote", data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        # Verify buy was scaled from 300 to 135,000 INR
+        self.assertEqual(data["buy"], 135000.0)
+        self.assertEqual(data["unit_buy"], 300.0)
+        # Margin should be commercially realistic (~5% to 7%), not > 100%
+        margin_pct = data["optimal"]["Margin_Percentage"]
+        self.assertGreaterEqual(margin_pct, 4.0)
+        self.assertLessEqual(margin_pct, 12.0)
+        # Selling price per kg should be around 310-330 INR/kg
+        rate_per_kg = data["optimal"]["Rate_Per_Kg"]
+        self.assertGreater(rate_per_kg, 300.0)
+        self.assertLess(rate_per_kg, 350.0)
+
 
 if __name__ == "__main__":
     unittest.main()

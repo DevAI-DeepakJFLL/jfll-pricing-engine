@@ -1859,6 +1859,30 @@ HTML_TEMPLATE = """
         }
     }
 
+    function onUnitBuyInput() {
+        const unitEl = document.getElementById('unit_buy');
+        const buyEl = document.getElementById('buy');
+        if (!unitEl || !buyEl) return;
+        const unitVal = parseFloat(unitEl.value);
+        const weights = updateDimensions();
+        const chWt = weights.chargeable_wt || 1;
+        if (!isNaN(unitVal) && unitVal > 0) {
+            buyEl.value = Math.round(unitVal * chWt);
+        }
+    }
+
+    function onTotalBuyInput() {
+        const unitEl = document.getElementById('unit_buy');
+        const buyEl = document.getElementById('buy');
+        if (!unitEl || !buyEl) return;
+        const buyVal = parseFloat(buyEl.value);
+        const weights = updateDimensions();
+        const chWt = weights.chargeable_wt || 1;
+        if (!isNaN(buyVal) && buyVal > 0 && chWt > 0) {
+            unitEl.value = (buyVal / chWt).toFixed(2);
+        }
+    }
+
     let currentWeightMode = 'dims';
 
     function setWeightMode(mode) {
@@ -1915,11 +1939,23 @@ HTML_TEMPLATE = """
         const chEl = document.getElementById('ch_wt_display');
         const denEl = document.getElementById('density_display');
         const directDenEl = document.getElementById('direct_density_display');
+        const summaryChEl = document.getElementById('summary_ch_wt_display');
 
         if (volEl) volEl.innerText = `Volumetric: ${vol_wt.toFixed(1)} kg`;
         if (chEl) chEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
         if (denEl) denEl.innerText = `Type: ${densityText}`;
         if (directDenEl) directDenEl.innerText = `Density Ratio: ${density.toFixed(4)} (${densityText})`;
+        if (summaryChEl) summaryChEl.innerText = `${ch_wt.toFixed(1)} kg`;
+
+        // Keep total buy synchronized when weights change, if user set unit_buy
+        const unitEl = document.getElementById('unit_buy');
+        const buyEl = document.getElementById('buy');
+        if (unitEl && buyEl && document.activeElement !== buyEl) {
+            const unitVal = parseFloat(unitEl.value);
+            if (!isNaN(unitVal) && unitVal > 0) {
+                buyEl.value = Math.round(unitVal * ch_wt);
+            }
+        }
 
         return { gross_wt: gross, chargeable_wt: ch_wt, density_ratio: density };
     }
@@ -2108,12 +2144,18 @@ HTML_TEMPLATE = """
         setCustomDropdownValue('commodity', p.commodity);
         setCustomDropdownValue('frequency', p.frequency);
         setCustomDropdownValue('revision', p.revision ? String(p.revision) : '1');
-        updateDimensions();
+        const weights = updateDimensions();
+        const unitEl = document.getElementById('unit_buy');
+        if (unitEl && weights.chargeable_wt > 0) {
+            unitEl.value = (parseFloat(p.buy) / weights.chargeable_wt).toFixed(2);
+        }
         runInference(false);
     }
 
     function resetFormForNewQuote() {
         document.getElementById('buy').value = '';
+        const unitEl = document.getElementById('unit_buy');
+        if (unitEl) unitEl.value = '';
         document.getElementById('gross_wt').value = '';
         const directCh = document.getElementById('direct_ch_wt');
         if (directCh) directCh.value = '';
@@ -2153,7 +2195,29 @@ HTML_TEMPLATE = """
         if (submitBtnTop) { submitBtnTop.disabled = true; }
 
         const weights = updateDimensions();
-        const buyVal = parseFloat(document.getElementById('buy')?.value);
+        const unitBuyEl = document.getElementById('unit_buy');
+        const buyEl = document.getElementById('buy');
+        let unitBuyVal = parseFloat(unitBuyEl?.value);
+        let buyVal = parseFloat(buyEl?.value);
+
+        if ((isNaN(buyVal) || buyVal <= 0) && !isNaN(unitBuyVal) && unitBuyVal > 0) {
+            buyVal = Math.round(unitBuyVal * (weights.chargeable_wt || 1));
+            if (buyEl) buyEl.value = buyVal;
+        }
+
+        // Smart Safeguard: Check if total buy was mistakenly entered as unit rate
+        if (!isNaN(buyVal) && buyVal > 0) {
+            const chWt = weights.chargeable_wt || 1;
+            const impliedRate = buyVal / chWt;
+            if (chWt >= 30 && impliedRate < 10.0 && buyVal >= 20.0) {
+                unitBuyVal = buyVal;
+                buyVal = Math.round(buyVal * chWt);
+                if (buyEl) buyEl.value = buyVal;
+                if (unitBuyEl) unitBuyEl.value = unitBuyVal.toFixed(2);
+                showToast(`Auto-scaled ₹${unitBuyVal}/kg to Total Buy ₹${formatINR(buyVal)} for ${chWt} kg`);
+            }
+        }
+
         if (isNaN(buyVal) || buyVal <= 0) {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
             if (submitBtnTop) { submitBtnTop.disabled = false; }
@@ -2180,6 +2244,7 @@ HTML_TEMPLATE = """
             origin: document.getElementById('origin')?.value || 'Indira Gandhi International Airport',
             dest: document.getElementById('dest')?.value || 'Heathrow Apt/London',
             buy: buyVal,
+            unit_buy: (!isNaN(unitBuyVal) && unitBuyVal > 0) ? unitBuyVal : null,
             gross_wt: weights.gross_wt,
             chargeable_wt: weights.chargeable_wt,
             client: document.getElementById('client')?.value || 'Shipper / Consignee',
@@ -3098,6 +3163,20 @@ def api_quote():
             unit_buy_rate = parsed_unit
         except (ValueError, TypeError):
             return jsonify({"status": "error", "message": "Invalid Airline Unit Buy Rate. Please provide a positive numeric rate (₹/kg)."}), 400
+
+    # Smart Safeguard: Detect when raw_buy was entered as unit rate instead of total buy
+    if buy_cost is not None and chargeable_wt >= 30.0:
+        implied_unit_rate = buy_cost / chargeable_wt
+        # In international air freight, rate < 10 INR/kg is physically impossible.
+        # If buy_cost is a realistic unit rate (e.g. >= 20 INR) and unit_buy_rate is either missing or equal to buy_cost:
+        if implied_unit_rate < 10.0 and buy_cost >= 20.0 and (unit_buy_rate is None or abs(unit_buy_rate - buy_cost) < 0.01):
+            logger.warning(
+                f"Auto-resolving unit buy rate entered into total buy: buy={buy_cost} INR for {chargeable_wt} kg "
+                f"(implied {implied_unit_rate:.2f} INR/kg). Auto-converting to unit rate {buy_cost} INR/kg "
+                f"-> Total Buy: {round(buy_cost * chargeable_wt, 2)} INR."
+            )
+            unit_buy_rate = buy_cost
+            buy_cost = round(buy_cost * chargeable_wt, 2)
 
     if buy_cost is None:
         if unit_buy_rate is not None:
