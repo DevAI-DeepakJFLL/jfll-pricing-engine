@@ -25,7 +25,7 @@ from typing import Dict
 import joblib
 import numpy as np
 import pandas as pd
-from flask import Flask, request, jsonify, render_template, render_template_string, Response
+from flask import Flask, request, jsonify, render_template, render_template_string, Response, stream_with_context
 
 # Ensure local directories are in python path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,13 +43,13 @@ from preprocess import (
     validate_shipment_physics,
     compute_volumetric_weight
 )
-from engine import MarginRecommendationEngine
 from security import verify_artifact_integrity, require_admin_auth
 from db import (
     init_history_db,
     log_recommendation,
     record_outcome,
     get_all_history,
+    iter_all_history,
     get_history_paginated,
     update_lead_status,
     clear_history_table,
@@ -99,58 +99,12 @@ init_history_db(HISTORY_DB_PATH)
 
 
 # ------------------------------------------------------------------------------
-# LOAD MODEL ARTIFACT ON STARTUP (§1.4, §5.6)
+# INITIALIZE PRICING ENGINE V3 (§1.4, §5.6)
 # ------------------------------------------------------------------------------
-_CANDIDATE_MODEL_PATHS = [
-    os.path.join(ENGINE_ROOT, "models", "freight_margin_recommender.joblib"),
-    os.path.join(BASE_DIR, "models", "freight_margin_recommender.joblib"),
-    os.path.join(os.getcwd(), "models", "freight_margin_recommender.joblib"),
-    os.path.join("/var/task", "models", "freight_margin_recommender.joblib"),
-]
-MODEL_PATH = next((p for p in _CANDIDATE_MODEL_PATHS if os.path.exists(p)), _CANDIDATE_MODEL_PATHS[0])
-engine = None
-MARGIN_TABLES = {}
-training_window = ["2026-01", "2026-09"]
-
-if os.path.exists(MODEL_PATH):
-    logger.info(f"Loading baseline model artifact from: {MODEL_PATH}")
-    try:
-        verify_artifact_integrity(MODEL_PATH)
-        model_bundle = joblib.load(MODEL_PATH)
-        import sklearn
-        runtime_sklearn = sklearn.__version__
-        model_sklearn = model_bundle.get("sklearn_version")
-        if model_sklearn and model_sklearn != runtime_sklearn and os.environ.get("ALLOW_SKLEARN_MISMATCH", "0") != "1":
-            logger.warning(f"sklearn version skew: model artifact trained with {model_sklearn}, current runtime is {runtime_sklearn}.")
-
-        engine = MarginRecommendationEngine(
-            benchmark_reg=model_bundle["benchmark_reg"],
-            win_classifier=model_bundle["calibrated_clf"],
-            encoder=model_bundle["encoder"],
-            feature_cols=model_bundle["feature_cols"],
-            cat_cols=model_bundle.get("native_cat_cols", model_bundle.get("cat_cols")),
-            lane_medians=model_bundle.get("lane_medians"),
-            global_median=model_bundle.get("global_median"),
-            port_frequencies=model_bundle.get("port_frequencies"),
-            cohort_table=model_bundle.get("cohort_table")
-        )
-        MARGIN_TABLES = model_bundle.get("margin_tables", {})
-        training_window = model_bundle.get("training_window", ["2026-01", "2026-09"])
-    except Exception as err:
-        logger.warning(f"Could not initialize baseline engine: {err}. PricingEngineV3 active.")
-else:
-    logger.info("Baseline model artifact not found; PricingEngineV3 active for all traffic.")
-
 try:
     from preprocess import get_air_cargo_season
 except ImportError:
     from src.preprocess import get_air_cargo_season
-try:
-    start_m = int(training_window[0].split("-")[1])
-    end_m = int(training_window[1].split("-")[1])
-    TRAIN_WINDOW_MONTHS = set(range(start_m, end_m + 1))
-except Exception:
-    TRAIN_WINDOW_MONTHS = set(range(1, 10))
 
 try:
     from engine_v3 import PricingEngineV3
@@ -320,13 +274,16 @@ REVISION_OPTIONS = [
     {"value": "3", "label": "Rev 3+ — Final BAFO (Floor Defense Mode)"},
 ]
 
-def _build_destinations_catalog(bundle, root_path):
-    port_freqs = bundle.get("port_frequencies", {})
-    if port_freqs:
-        model_dests = set(port_freqs.keys())
-    elif "cat_cols" in bundle and "Destination_Port" in bundle["cat_cols"]:
-        dest_idx = bundle["cat_cols"].index("Destination_Port")
-        model_dests = set(bundle["encoder"].categories_[dest_idx])
+def _build_destinations_catalog(bundle=None, root_path=ENGINE_ROOT):
+    if bundle and isinstance(bundle, dict):
+        port_freqs = bundle.get("port_frequencies", {})
+        if port_freqs:
+            model_dests = set(port_freqs.keys())
+        elif "cat_cols" in bundle and "Destination_Port" in bundle["cat_cols"]:
+            dest_idx = bundle["cat_cols"].index("Destination_Port")
+            model_dests = set(bundle["encoder"].categories_[dest_idx])
+        else:
+            model_dests = set(PORT_LABELS.keys())
     else:
         model_dests = set(PORT_LABELS.keys())
     
@@ -350,7 +307,7 @@ def _build_destinations_catalog(bundle, root_path):
         opts.append({"value": port, "label": label})
     return opts
 
-DESTINATION_OPTIONS = _build_destinations_catalog(model_bundle, ENGINE_ROOT)
+DESTINATION_OPTIONS = _build_destinations_catalog(None, ENGINE_ROOT)
 PORT_LABELS_JSON = json.dumps(PORT_LABELS).replace("</", "<\\/")
 
 CARRIER_OPTIONS = [
@@ -951,40 +908,46 @@ def sanitize_csv_field(val):
 @app.route("/api/history/export")
 @require_admin_auth
 def api_history_export():
-    records = get_all_history(HISTORY_DB_PATH)
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
-        "ID", "Timestamp", "Origin", "Destination", "Buy Cost INR",
-        "Selling Price INR", "Margin Range", "Margin Pct", "Margin Amount INR",
-        "Win Probability", "Expected Profit INR", "Gross Wt Kg",
-        "Chargeable Wt Kg", "Commodity", "Client Type", "Branch", "Status", "Model Version"
-    ])
-
-    for r in records:
+    def generate_csv_stream():
+        output = io.StringIO()
+        writer = csv.writer(output)
         writer.writerow([
-            sanitize_csv_field(r.get("id")),
-            sanitize_csv_field(r.get("timestamp")),
-            sanitize_csv_field(r.get("origin_port")),
-            sanitize_csv_field(r.get("dest_port")),
-            sanitize_csv_field(r.get("airline_buy_inr")),
-            sanitize_csv_field(r.get("selling_price_inr")),
-            sanitize_csv_field(r.get("margin_range")),
-            sanitize_csv_field(r.get("margin_pct")),
-            sanitize_csv_field(r.get("margin_amount_inr")),
-            sanitize_csv_field(r.get("win_prob")),
-            sanitize_csv_field(r.get("expected_profit_inr")),
-            sanitize_csv_field(r.get("gross_wt_kg")),
-            sanitize_csv_field(r.get("chargeable_wt_kg")),
-            sanitize_csv_field(r.get("commodity")),
-            sanitize_csv_field(r.get("client_type")),
-            sanitize_csv_field(r.get("branch")),
-            sanitize_csv_field(r.get("status")),
-            sanitize_csv_field(r.get("model_version"))
+            "ID", "Timestamp", "Origin", "Destination", "Buy Cost INR",
+            "Selling Price INR", "Margin Range", "Margin Pct", "Margin Amount INR",
+            "Win Probability", "Expected Profit INR", "Gross Wt Kg",
+            "Chargeable Wt Kg", "Commodity", "Client Type", "Branch", "Status", "Model Version"
         ])
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+
+        for r in iter_all_history(HISTORY_DB_PATH):
+            writer.writerow([
+                sanitize_csv_field(r.get("id")),
+                sanitize_csv_field(r.get("timestamp")),
+                sanitize_csv_field(r.get("origin_port")),
+                sanitize_csv_field(r.get("dest_port")),
+                sanitize_csv_field(r.get("airline_buy_inr")),
+                sanitize_csv_field(r.get("selling_price_inr")),
+                sanitize_csv_field(r.get("margin_range")),
+                sanitize_csv_field(r.get("margin_pct")),
+                sanitize_csv_field(r.get("margin_amount_inr")),
+                sanitize_csv_field(r.get("win_prob")),
+                sanitize_csv_field(r.get("expected_profit_inr")),
+                sanitize_csv_field(r.get("gross_wt_kg")),
+                sanitize_csv_field(r.get("chargeable_wt_kg")),
+                sanitize_csv_field(r.get("commodity")),
+                sanitize_csv_field(r.get("client_type")),
+                sanitize_csv_field(r.get("branch")),
+                sanitize_csv_field(r.get("status")),
+                sanitize_csv_field(r.get("model_version"))
+            ])
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
 
     return Response(
-        output.getvalue(),
+        stream_with_context(generate_csv_stream()),
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment;filename=air_export_pricing_history.csv"}
     )

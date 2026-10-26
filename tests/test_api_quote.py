@@ -263,6 +263,16 @@ class TestApiQuoteIntegration(unittest.TestCase):
         self.assertGreater(rate_per_kg, 300.0)
         self.assertLess(rate_per_kg, 350.0)
 
+    def test_api_history_export_stream(self):
+        """Verifies /api/history/export streams valid CSV headers and records."""
+        res = self.client.get("/api/history/export")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/csv", res.headers.get("Content-Type", ""))
+        self.assertIn("attachment;filename=air_export_pricing_history.csv", res.headers.get("Content-Disposition", ""))
+        lines = res.data.decode("utf-8").strip().splitlines()
+        self.assertGreaterEqual(len(lines), 1)
+        self.assertTrue(lines[0].startswith("ID,Timestamp,Origin,Destination"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -33,17 +33,10 @@ except BaseException as err:
 
 def handler(event, context):
     if _wsgi_handler is None:
-        import sys
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "error": "Lambda initialization failed",
-                "python_version": sys.version,
-                "executable": sys.executable,
-                "exception": _init_err,
-                "traceback": _init_tb,
-            }, indent=2)
+            "body": json.dumps({"error": "Service Unavailable: Application initialization failed."})
         }
     try:
         return _wsgi_handler(event, context)
@@ -54,7 +47,7 @@ def handler(event, context):
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
-            "body": f'{{"error": "Internal Server Error: {str(exc)}"}}'
+            "body": json.dumps({"error": "Internal Server Error"})
         }
 
 

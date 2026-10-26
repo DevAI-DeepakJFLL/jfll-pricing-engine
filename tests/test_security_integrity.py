@@ -79,5 +79,45 @@ class TestSecurityIntegrity(unittest.TestCase):
                 )
 
 
+    def test_require_admin_auth_constant_time(self):
+        """Verifies require_admin_auth validates API keys and rejects unauthorized requests."""
+        from flask import Flask
+
+        app = Flask("test_auth_app")
+
+        @app.route("/admin/test")
+        @require_admin_auth
+        def admin_test():
+            return {"status": "ok"}
+
+        client = app.test_client()
+
+        # When ADMIN_API_KEY is unset, permissive access
+        os.environ.pop("ADMIN_API_KEY", None)
+        resp = client.get("/admin/test")
+        self.assertEqual(resp.status_code, 200)
+
+        # When ADMIN_API_KEY is set
+        os.environ["ADMIN_API_KEY"] = "secret_pass_token_xyz_123"
+        try:
+            # Missing key -> 401
+            resp = client.get("/admin/test")
+            self.assertEqual(resp.status_code, 401)
+
+            # Incorrect key -> 401
+            resp = client.get("/admin/test", headers={"X-API-Key": "wrong_token"})
+            self.assertEqual(resp.status_code, 401)
+
+            # Correct key via X-API-Key -> 200
+            resp = client.get("/admin/test", headers={"X-API-Key": "secret_pass_token_xyz_123"})
+            self.assertEqual(resp.status_code, 200)
+
+            # Correct key via Authorization Bearer -> 200
+            resp = client.get("/admin/test", headers={"Authorization": "Bearer secret_pass_token_xyz_123"})
+            self.assertEqual(resp.status_code, 200)
+        finally:
+            os.environ.pop("ADMIN_API_KEY", None)
+
+
 if __name__ == "__main__":
     unittest.main()

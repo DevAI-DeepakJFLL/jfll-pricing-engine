@@ -386,15 +386,14 @@ def log_recommendation(
         return False
 
 
-def get_all_history(db_path: str) -> List[Dict[str, Any]]:
-    """Retrieve active recommendation history records (excluding soft-deleted rows)."""
+def iter_all_history(db_path: str):
+    """Stream active recommendation history records row by row (excluding soft-deleted rows)."""
     init_history_db(db_path)
-    records = []
-    with sqlite3.connect(db_path, timeout=5.0) as conn:
+    with sqlite3.connect(db_path, timeout=10.0) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM recommendation_history WHERE is_deleted = 0 ORDER BY id DESC")
-        for row in cursor.fetchall():
+        for row in cursor:
             rec = dict(row)
             rec["status"] = rec.get("status") or "Draft / Quoted"
             rec["status_class"] = get_status_class(rec["status"])
@@ -404,8 +403,12 @@ def get_all_history(db_path: str) -> List[Dict[str, Any]]:
                     rec["margin_range"] = f"{rec['min_margin_pct']:.1f}% – {rec['max_margin_pct']:.1f}%"
                 else:
                     rec["margin_range"] = f"{rec['margin_pct']:.1f}%"
-            records.append(rec)
-    return records
+            yield rec
+
+
+def get_all_history(db_path: str) -> List[Dict[str, Any]]:
+    """Retrieve active recommendation history records (excluding soft-deleted rows)."""
+    return list(iter_all_history(db_path))
 
 
 def get_history_stats(db_path: str, include_presets: bool = False) -> Dict[str, Any]:
@@ -504,15 +507,6 @@ def get_history_paginated(
         "end_idx": min(off + per_page, total),
         "stats": get_history_stats(db_path, include_presets=include_presets)
     }
-
-
-def get_history_paginated_fixed(
-    db_path: str,
-    page: int = 1,
-    per_page: int = 15,
-    include_presets: bool = True
-) -> Dict[str, Any]:
-    return get_history_paginated(db_path, page, per_page, include_presets)
 
 
 def update_lead_status(db_path: str, quote_id: int, new_status: str) -> bool:

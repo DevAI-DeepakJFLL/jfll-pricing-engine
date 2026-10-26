@@ -8,6 +8,7 @@ Includes:
 
 import os
 import json
+import hmac
 import hashlib
 import logging
 from functools import wraps
@@ -83,7 +84,7 @@ def require_admin_auth(f):
             or request.headers.get("Authorization", "").replace("Bearer ", "").strip()
             or request.args.get("api_key")
         )
-        if not provided_key or provided_key != active_key:
+        if not provided_key or not hmac.compare_digest(str(provided_key), str(active_key)):
             logger.warning(f"Unauthorized access attempt to admin endpoint {request.path} from IP {request.remote_addr}")
             return jsonify({"status": "error", "message": "Unauthorized: Valid X-API-Key required."}), 401
         return f(*args, **kwargs)

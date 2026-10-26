@@ -11,7 +11,8 @@ from src.db import (
     log_recommendation,
     get_history_stats,
     clear_history_table,
-    get_all_history
+    get_all_history,
+    iter_all_history
 )
 from src.constants import MODEL_VERSION
 
@@ -132,6 +133,28 @@ class TestDBAuditEnhancements(unittest.TestCase):
         self.assertEqual(r["margin_range"], "4.0% – 6.0%")
         self.assertEqual(r["min_margin_pct"], 4.0)
         self.assertEqual(r["max_margin_pct"], 6.0)
+
+    def test_iter_all_history_generator(self):
+        """Verifies iter_all_history yields rows as an iterator matching get_all_history."""
+        payload = {
+            "Customer_Company": "Sun Pharma",
+            "Total_Buy_INR": 200000,
+            "Gross_Weight_Kg": 400,
+            "Chargeable_Weight_Kg": 400
+        }
+        optimal = {
+            "Quoted_Sell_Price_INR": 215000.0,
+            "Margin_Percentage": 7.5,
+            "Margin_Amount_INR": 15000.0,
+            "Rate_Per_Kg": 537.5,
+        }
+        log_recommendation(self.test_db, payload, optimal)
+
+        streamed = list(iter_all_history(self.test_db))
+        fetched = get_all_history(self.test_db)
+        self.assertEqual(len(streamed), len(fetched))
+        self.assertEqual(streamed[0]["customer_name"], fetched[0]["customer_name"])
+        self.assertEqual(streamed[0]["selling_price_inr"], fetched[0]["selling_price_inr"])
 
 
 if __name__ == "__main__":
