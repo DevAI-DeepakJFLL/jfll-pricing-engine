@@ -1320,13 +1320,14 @@
 
             <!-- Results Panel -->
             <div id="results" style="display: none;">
-                <!-- Hero Metric Card: Recommended Margin Range as PRIMARY BOLD HIGHLIGHT -->
+                <!-- Hero Metric Card: Recommended Target Margin as PRIMARY BOLD HIGHLIGHT -->
                 <div class="hero-metric-card">
                     <div class="hero-label-row">
-                        <span class="hero-label">Recommended Margin Range</span>
+                        <span class="hero-label" id="res_hero_label">Recommended Target Margin</span>
                         <span class="hero-corridor-badge" id="res_corridor_badge">Pre-Approved Corridor</span>
                     </div>
-                    <div class="hero-value" id="res_margin_pct">0.0% – 0.0%</div>
+                    <div class="hero-value" id="res_margin_pct">0.0%</div>
+                    <div class="hero-sub" id="res_hero_sub" style="margin-top: 6px; font-size: 13px; color: #cbd5e1;">Quoted Rate: ₹0 / kg</div>
                 </div>
 
                 <!-- 3 Supporting Commercial Metric Tiles -->
@@ -1931,27 +1932,49 @@
         const marginAmt = strat.Margin_Amount_INR || 0;
         const perKgRate = Math.round(sellPrice / Math.max(1, currentChargeableWeight));
         const grossMarginPct = strat.Gross_Margin_Percentage !== undefined ? strat.Gross_Margin_Percentage : ((marginAmt / Math.max(1, sellPrice)) * 100);
+        const marginPerKg = strat.Margin_Per_Kg !== undefined ? strat.Margin_Per_Kg : (marginAmt / Math.max(1, currentChargeableWeight));
 
-        // Highlight Recommended Margin Range as PRIMARY BOLD HERO
-        let marginRangeText = `${strat.Margin_Percentage.toFixed(1)}%`;
+        // Highlight exact Target Margin as PRIMARY BOLD HERO
+        let heroLabel = 'Recommended Target Margin';
+        let marginText = `${strat.Margin_Percentage.toFixed(1)}%`;
         let badgeText = 'Pre-Approved Corridor';
+        let subText = `Quoted Rate: ₹${formatINR(perKgRate)} / kg`;
 
         if (selectedStrategyKey === 'floor') {
-            marginRangeText = `${strat.Margin_Percentage.toFixed(1)}%`;
-            badgeText = 'Lowest Safe Price (Floor)';
+            heroLabel = 'Lowest Safe Margin (Floor)';
+            marginText = `${strat.Margin_Percentage.toFixed(1)}%`;
+            badgeText = 'Tender Defense Floor';
+            subText = `Walk-Away Rate: ₹${formatINR(perKgRate)} / kg (+₹${formatINR(marginPerKg)}/kg markup)`;
         } else if (selectedStrategyKey === 'premium') {
-            marginRangeText = `${strat.Margin_Percentage.toFixed(1)}%`;
-            badgeText = 'Higher Profit Price (Premium)';
-        } else if (corr && corr.min_margin_pct !== undefined && corr.max_margin_pct !== undefined) {
-            marginRangeText = `${corr.min_margin_pct.toFixed(1)}% – ${corr.max_margin_pct.toFixed(1)}%`;
-            badgeText = 'Pre-Approved Negotiation Corridor';
+            heroLabel = 'Higher Profit Margin (Premium)';
+            marginText = `${strat.Margin_Percentage.toFixed(1)}%`;
+            badgeText = 'Spot / Express Capacity';
+            subText = `Spot Rate: ₹${formatINR(perKgRate)} / kg (+₹${formatINR(marginPerKg)}/kg markup)`;
+        } else {
+            heroLabel = 'Recommended Target Margin';
+            marginText = `${strat.Margin_Percentage.toFixed(1)}%`;
+            if (corr && corr.min_margin_pct !== undefined && corr.max_margin_pct !== undefined) {
+                const minRate = corr.min_rate_per_kg || Math.round((corr.min_sell_price_inr || 0) / Math.max(1, currentChargeableWeight));
+                const maxRate = corr.max_rate_per_kg || Math.round((corr.max_sell_price_inr || 0) / Math.max(1, currentChargeableWeight));
+                badgeText = `Corridor: ${corr.min_margin_pct.toFixed(1)}% – ${corr.max_margin_pct.toFixed(1)}%`;
+                subText = `Quoted Rate: ₹${formatINR(perKgRate)} / kg (Negotiation Band: ₹${formatINR(minRate)} – ₹${formatINR(maxRate)}/kg)`;
+            } else {
+                badgeText = 'Pre-Approved Corridor';
+                subText = `Quoted Rate: ₹${formatINR(perKgRate)} / kg`;
+            }
         }
 
+        const heroLabelEl = document.getElementById('res_hero_label');
+        if (heroLabelEl) heroLabelEl.innerText = heroLabel;
+
         const marginEl = document.getElementById('res_margin_pct');
-        if (marginEl) marginEl.innerText = marginRangeText;
+        if (marginEl) marginEl.innerText = marginText;
 
         const badgeEl = document.getElementById('res_corridor_badge');
         if (badgeEl) badgeEl.innerText = badgeText;
+
+        const subEl = document.getElementById('res_hero_sub');
+        if (subEl) subEl.innerText = subText;
 
         // Supporting metric 1: Selling Price
         const priceEl = document.getElementById('res_selling_price');
@@ -2004,6 +2027,7 @@
             const sellPrice = strat.Quoted_Sell_Price_INR || 0;
             const marginAmt = strat.Margin_Amount_INR || 0;
             const grossMarginPct = strat.Gross_Margin_Percentage !== undefined ? strat.Gross_Margin_Percentage : ((marginAmt / Math.max(1, sellPrice)) * 100);
+            const marginPerKg = strat.Margin_Per_Kg !== undefined ? strat.Margin_Per_Kg : (marginAmt / Math.max(1, currentChargeableWeight));
 
             card.innerHTML = `
                 <div class="strat-card-left">
@@ -2016,6 +2040,8 @@
                         <span>Target Markup: <strong>${strat.Margin_Percentage.toFixed(1)}%</strong></span>
                         <span>•</span>
                         <span>Gross Margin: <strong>${grossMarginPct.toFixed(1)}%</strong></span>
+                        <span>•</span>
+                        <span>Margin/kg: <strong>+₹${formatINR(marginPerKg)}/kg</strong></span>
                         <span>•</span>
                         <span>Profit: <strong>₹${formatINR(marginAmt)}</strong></span>
                     </div>
@@ -2125,7 +2151,7 @@ Route: ${originTxt} ➔ ${destTxt}
 ${chWt}
 Airline Buy Cost: ₹${formatINR(buyVal)}
 Quoted Selling Price: ${sellPrice}
-Target Margin Range: ${marginPct}
+Target Margin: ${marginPct}
 Gross Profit (if Won): ${profit}
 Activity: ${document.getElementById('frequency_display_text')?.innerText || 'Active / Regular Customer'}
 Revision: ${document.getElementById('revision_display_text')?.innerText || 'Rev 1 — Initial Quote'}`;

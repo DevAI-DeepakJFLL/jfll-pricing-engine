@@ -302,17 +302,49 @@ class PricingEngineV3:
         inq = dict(inquiry_dict)
 
         # 1. Base input parsing and entity normalization
-        raw_chg_wt = inq.get("Chargeable_Weight_Kg") if inq.get("Chargeable_Weight_Kg") is not None else inq.get("chargeable_wt")
+        raw_chg_wt = (
+            inq.get("Chargeable_Weight_Kg")
+            if inq.get("Chargeable_Weight_Kg") is not None
+            else (
+                inq.get("chargeable_wt")
+                if inq.get("chargeable_wt") is not None
+                else (
+                    inq.get("chargeable_weight")
+                    if inq.get("chargeable_weight") is not None
+                    else inq.get("direct_weight")
+                )
+            )
+        )
         chargeable_wt = float(raw_chg_wt or 1.0)
-        raw_gross_wt = inq.get("Gross_Weight_Kg") if inq.get("Gross_Weight_Kg") is not None else inq.get("gross_wt")
+        raw_gross_wt = (
+            inq.get("Gross_Weight_Kg")
+            if inq.get("Gross_Weight_Kg") is not None
+            else (inq.get("gross_wt") if inq.get("gross_wt") is not None else inq.get("gross_weight"))
+        )
         gross_wt = float(raw_gross_wt or chargeable_wt)
         density_ratio = float(inq.get("Cargo_Density_Ratio", chargeable_wt / max(1.0, gross_wt)))
 
-        raw_buy = inq.get("Total_Buy_INR") if inq.get("Total_Buy_INR") is not None else inq.get("buy")
+        raw_buy = (
+            inq.get("Total_Buy_INR")
+            if inq.get("Total_Buy_INR") is not None
+            else (
+                inq.get("buy")
+                if inq.get("buy") is not None
+                else inq.get("airline_buy_price")
+            )
+        )
         if raw_buy is not None and str(raw_buy).strip() != "":
             buy_cost = float(raw_buy)
         else:
-            raw_unit_buy = inq.get("Unit_Buy_INR") if inq.get("Unit_Buy_INR") is not None else inq.get("unit_buy")
+            raw_unit_buy = (
+                inq.get("Unit_Buy_INR")
+                if inq.get("Unit_Buy_INR") is not None
+                else (
+                    inq.get("unit_buy")
+                    if inq.get("unit_buy") is not None
+                    else inq.get("buy_rate")
+                )
+            )
             if raw_unit_buy is not None and str(raw_unit_buy).strip() != "":
                 buy_cost = float(raw_unit_buy) * chargeable_wt
             else:
@@ -516,16 +548,36 @@ class PricingEngineV3:
             m_bal = round(m_floor + min_step, 2)
             m_prem = round(m_bal + min_step, 2)
 
-        # Commercially calibrate Premium Margin on heavy cargo to avoid unquoteable outliers
-        if chargeable_wt >= 500.0:
-            prem_cap = round(max(m_bal + 1.5, m_bal * 1.75), 2)
+        # Commercially calibrate Premium Margin to air freight forwarder reality
+        # In air freight forwarding, deals are won or lost over minor margin differences.
+        # Subagents/co-loaders know net airline tariffs, so premium spread must be tightly bounded.
+        is_subagent_or_forwarder = any(
+            k in client_cat.lower()
+            for k in ["subagent", "forwarder", "agent", "coloader", "nvocc", "custom broker", "transporter"]
+        )
+        if is_subagent_or_forwarder:
+            if chargeable_wt >= 500.0:
+                prem_cap = round(m_bal + 2.0, 2)
+            elif chargeable_wt >= 300.0:
+                prem_cap = round(m_bal + 2.5, 2)
+            elif chargeable_wt >= 100.0:
+                prem_cap = round(m_bal + 3.5, 2)
+            else:
+                prem_cap = round(m_bal + 4.5, 2)
             m_prem = min(m_prem, prem_cap)
-        elif chargeable_wt >= 300.0:
-            prem_cap = round(max(m_bal + 2.5, m_bal * 2.0), 2)
-            m_prem = min(m_prem, prem_cap)
-        elif chargeable_wt >= 100.0:
-            prem_cap = round(max(m_bal + 3.5, m_bal * 2.2), 2)
-            m_prem = min(m_prem, prem_cap)
+        else:
+            if chargeable_wt >= 500.0:
+                prem_cap = round(min(m_bal + 3.0, max(m_bal + 1.5, m_bal * 1.35)), 2)
+                m_prem = min(m_prem, prem_cap)
+            elif chargeable_wt >= 300.0:
+                prem_cap = round(min(m_bal + 4.0, max(m_bal + 2.0, m_bal * 1.45)), 2)
+                m_prem = min(m_prem, prem_cap)
+            elif chargeable_wt >= 100.0:
+                prem_cap = round(min(m_bal + 5.5, max(m_bal + 2.5, m_bal * 1.60)), 2)
+                m_prem = min(m_prem, prem_cap)
+            else:
+                prem_cap = round(min(m_bal + 7.5, max(m_bal + 3.0, m_bal * 1.75)), 2)
+                m_prem = min(m_prem, prem_cap)
         if m_prem <= m_bal:
             m_prem = round(m_bal + min_step, 2)
 
@@ -600,16 +652,17 @@ class PricingEngineV3:
         current_target = tier_margins["balanced"]
 
         # D. Strategic Tier Bounding
-        # Negotiation corridor pre-approves discounting down to m_floor (Lowest Safe Price)
-        # ensuring competitive client counter-offers (e.g. 5.5% or 2.6%) fall inside the corridor:
-        # cost_floor_pct <= min_corridor_pct <= target_margin_pct <= max_corridor_pct <= effective_cap
-        min_corridor_pct = round(max(cost_floor_pct, min(m_floor, current_target - target_half_width)), 2)
+        # Negotiation corridor represents the tight operational latitude around the Target margin (Opening Offer)
+        # cost_floor_pct <= m_floor <= min_corridor_pct <= target_margin_pct <= max_corridor_pct <= m_prem
+        min_corridor_pct = round(max(m_floor, current_target - target_half_width), 2)
         if min_corridor_pct > current_target:
             min_corridor_pct = current_target
 
-        max_corridor_pct = round(min(m_prem, max(current_target + target_half_width, min_corridor_pct + 0.1)), 2)
+        max_corridor_pct = round(min(m_prem, current_target + target_half_width), 2)
         if max_corridor_pct < current_target:
             max_corridor_pct = current_target
+        if max_corridor_pct < min_corridor_pct:
+            max_corridor_pct = min_corridor_pct
 
         min_sell_price_inr = round(buy_cost * (1.0 + min_corridor_pct / 100.0), 2)
         max_sell_price_inr = round(buy_cost * (1.0 + max_corridor_pct / 100.0), 2)
