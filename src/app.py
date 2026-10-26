@@ -1591,32 +1591,23 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
 
-                <!-- Customer Account & Quote Date Section -->
+                <!-- Cargo Specifications & Airline Buy Cost -->
                 <div class="field-section">
-                    <div class="section-label">Customer Account & Quote Date</div>
+                    <div class="section-label">Cargo Specifications & Airline Buy Cost</div>
+
+                    <!-- Synchronized Dual Buy Rate Inputs (Unit Rate primary, Total Buy auto-calculated) -->
                     <div class="form-row">
                         <div class="field-group">
-                            <label for="customer_company">Customer Company / Account</label>
-                            <input type="text" id="customer_company" class="clean-input" list="customer_accounts_list" placeholder="Search customer (e.g. UNIVERSAL CLEARING)..." value="UNIVERSAL CLEARING AND FORWARDING" autocomplete="off">
-                            <datalist id="customer_accounts_list">
-                                {% for cust in top_customers %}
-                                <option value="{{ cust }}"></option>
-                                {% endfor %}
-                            </datalist>
+                            <label for="unit_buy">Unit Buy Rate (₹/kg) <span class="req">*</span></label>
+                            <input type="number" id="unit_buy" class="clean-input" value="277.78" min="0.1" step="any" placeholder="e.g. 250" oninput="onUnitBuyInput()" required>
                         </div>
-
                         <div class="field-group">
-                            <label for="quote_date">Target Quote Date <span class="req">*</span></label>
-                            <input type="date" id="quote_date" class="clean-input" value="{{ default_quote_date }}" required>
+                            <label for="buy">Total Airline Buy (₹ INR) <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">(Auto-calculated)</span></label>
+                            <input type="number" id="buy" class="clean-input" value="125000" min="1" step="any" placeholder="e.g. 125000" oninput="onTotalBuyInput()" required>
                         </div>
                     </div>
-                </div>
 
-                <!-- Item Details & Cargo Dimensions (Dual Buy Rate + Physical Specs) -->
-                <div class="field-section">
-                    <div class="section-label">Item Details & Cargo Specifications</div>
-
-                    <div class="weight-mode-toggle">
+                    <div class="weight-mode-toggle" style="margin-top: 4px;">
                         <button type="button" id="mode_btn_dims" class="mode-btn active" onclick="setWeightMode('dims')">
                             <svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                             <span>Calculate from Box Dimensions</span>
@@ -1627,38 +1618,28 @@ HTML_TEMPLATE = """
                         </button>
                     </div>
 
-                    <!-- Synchronized Dual Buy Rate Inputs -->
-                    <div class="form-row">
-                        <div class="field-group">
-                            <label for="unit_buy">Unit Buy Rate (₹/kg) <span class="req">*</span></label>
-                            <input type="number" id="unit_buy" class="clean-input" value="277.78" min="0.1" step="any" placeholder="e.g. 250" oninput="onUnitBuyInput()" required>
-                        </div>
-                        <div class="field-group">
-                            <label for="buy">Total Airline Buy (₹ INR) <span class="req">*</span></label>
-                            <input type="number" id="buy" class="clean-input" value="125000" min="1" step="any" placeholder="e.g. 125000" oninput="onTotalBuyInput()" required>
-                        </div>
-                    </div>
-
+                    <!-- Physical Gross Weight + Chargeable Weight Row (Single unified row without duplication) -->
                     <div class="form-row">
                         <div class="field-group">
                             <label for="gross_wt">Physical Gross Weight (kg) <span class="req">*</span></label>
                             <input type="number" id="gross_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" required>
                         </div>
+                        <!-- In Dims Mode: Show Calculated Chargeable Weight -->
                         <div class="field-group" id="chargeable_summary_col">
                             <label>Chargeable Weight (Calc)</label>
                             <div class="clean-input" style="background: #f8fafc; display: flex; align-items: center; font-weight: 700; color: var(--text-dark);" id="summary_ch_wt_display">
                                 450.0 kg
                             </div>
                         </div>
+                        <!-- In Direct Mode: Show Airline Chargeable Weight Input in the exact same spot -->
+                        <div class="field-group" id="direct_weight_container" style="display: none;">
+                            <label for="direct_ch_wt">Airline Chargeable Weight (kg) <span class="req">*</span></label>
+                            <input type="number" id="direct_ch_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 450">
+                        </div>
                     </div>
 
-                    <!-- Direct Chargeable Weight Mode Container -->
-                    <div class="field-group full" id="direct_weight_container" style="display: none; margin-bottom: 12px;">
-                        <label for="direct_ch_wt">Airline Chargeable Weight (kg) <span class="req">*</span></label>
-                        <input type="number" id="direct_ch_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 371.5">
-                        <div class="dim-info" style="margin-top: 6px;">
-                            <span id="direct_density_display">Density Ratio: 1.0000 (Dense Commercial Cargo)</span>
-                        </div>
+                    <div id="direct_density_tag" style="display: none; margin-top: -6px; margin-bottom: 12px;">
+                        <span id="direct_density_display" class="dim-info" style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: #f8fafc; font-size: 11.5px; color: var(--text-muted);">Density Ratio: 1.0000 (Dense Commercial Cargo)</span>
                     </div>
 
                     <!-- Box Dimensions Mode Container (4 Columns) -->
@@ -1680,10 +1661,25 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
 
-                <!-- Commercial Profile & Terms -->
+                <!-- Unified Customer & Commercial Terms Section -->
                 <div class="field-section">
-                    <div class="section-label">Commercial Profile & Terms</div>
+                    <div class="section-label">Customer & Commercial Terms</div>
+
+                    <!-- Hidden Target Quote Date (Defaults seamlessly to today) -->
+                    <input type="hidden" id="quote_date" value="{{ default_quote_date }}">
+
+                    <!-- Row 1: Customer Company / Account & Customer Category -->
                     <div class="form-row">
+                        <div class="field-group">
+                            <label for="customer_company">Customer Company / Account</label>
+                            <input type="text" id="customer_company" class="clean-input" list="customer_accounts_list" placeholder="Search customer (e.g. UNIVERSAL CLEARING)..." value="UNIVERSAL CLEARING AND FORWARDING" autocomplete="off">
+                            <datalist id="customer_accounts_list">
+                                {% for cust in top_customers %}
+                                <option value="{{ cust }}"></option>
+                                {% endfor %}
+                            </datalist>
+                        </div>
+
                         <div class="field-group">
                             <label>Customer Category <span class="req">*</span></label>
                             <input type="hidden" id="client" value="Shipper / Consignee">
@@ -1696,6 +1692,27 @@ HTML_TEMPLATE = """
                                     <ul class="select-options-list" id="client_options_list">
                                         {% for opt in client_options %}
                                         <li class="select-option{% if opt.value == 'Shipper / Consignee' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Customer Activity & Commodity Group -->
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label>Customer Activity <span class="req">*</span></label>
+                            <input type="hidden" id="frequency" value="10">
+                            <div class="searchable-select" id="custom_frequency">
+                                <div class="select-trigger" onclick="toggleDropdown('frequency')">
+                                    <span class="select-trigger-text" id="frequency_display_text">Active / Regular Customer</span>
+                                    <span class="select-trigger-arrow">▼</span>
+                                </div>
+                                <div class="select-dropdown" id="frequency_dropdown">
+                                    <ul class="select-options-list" id="frequency_options_list">
+                                        {% for opt in customer_activity_options %}
+                                        <li class="select-option{% if opt.value == '10' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
                                         {% endfor %}
                                     </ul>
                                 </div>
@@ -1721,26 +1738,9 @@ HTML_TEMPLATE = """
                         </div>
                     </div>
 
+                    <!-- Row 3: Quote Revision -->
                     <div class="form-row">
-                        <div class="field-group">
-                            <label>Customer Activity <span class="req">*</span></label>
-                            <input type="hidden" id="frequency" value="10">
-                            <div class="searchable-select" id="custom_frequency">
-                                <div class="select-trigger" onclick="toggleDropdown('frequency')">
-                                    <span class="select-trigger-text" id="frequency_display_text">Active / Regular Customer</span>
-                                    <span class="select-trigger-arrow">▼</span>
-                                </div>
-                                <div class="select-dropdown" id="frequency_dropdown">
-                                    <ul class="select-options-list" id="frequency_options_list">
-                                        {% for opt in customer_activity_options %}
-                                        <li class="select-option{% if opt.value == '10' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="field-group">
+                        <div class="field-group full">
                             <label>Quote Revision <span class="req">*</span></label>
                             <input type="hidden" id="revision" value="1">
                             <div class="searchable-select" id="custom_revision">
@@ -1758,8 +1758,6 @@ HTML_TEMPLATE = """
                             </div>
                         </div>
                     </div>
-
-
                 </div>
 
                 <button type="submit" id="submitBtn" class="submit-btn">
@@ -1891,12 +1889,16 @@ HTML_TEMPLATE = """
         const btnDirect = document.getElementById('mode_btn_direct');
         const dimsContainer = document.getElementById('dims_weight_container');
         const directContainer = document.getElementById('direct_weight_container');
+        const summaryCol = document.getElementById('chargeable_summary_col');
+        const directTag = document.getElementById('direct_density_tag');
 
         if (mode === 'direct') {
             if (btnDirect) btnDirect.className = 'mode-btn active';
             if (btnDims) btnDims.className = 'mode-btn';
             if (dimsContainer) dimsContainer.style.display = 'none';
+            if (summaryCol) summaryCol.style.display = 'none';
             if (directContainer) directContainer.style.display = 'block';
+            if (directTag) directTag.style.display = 'block';
 
             const directInput = document.getElementById('direct_ch_wt');
             if (directInput && (!directInput.value || parseFloat(directInput.value) <= 0)) {
@@ -1907,7 +1909,9 @@ HTML_TEMPLATE = """
             if (btnDims) btnDims.className = 'mode-btn active';
             if (btnDirect) btnDirect.className = 'mode-btn';
             if (dimsContainer) dimsContainer.style.display = 'block';
+            if (summaryCol) summaryCol.style.display = 'block';
             if (directContainer) directContainer.style.display = 'none';
+            if (directTag) directTag.style.display = 'none';
         }
         updateDimensions();
     }
@@ -2170,7 +2174,10 @@ HTML_TEMPLATE = """
         setCustomDropdownValue('commodity', 'General Cargo');
         setCustomDropdownValue('frequency', '10');
         setCustomDropdownValue('revision', '1');
+        const custCompEl = document.getElementById('customer_company');
+        if (custCompEl) custCompEl.value = '';
 
+        setWeightMode('dims');
         updateDimensions();
 
         const placeholder = document.getElementById('placeholder');
