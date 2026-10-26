@@ -297,13 +297,34 @@ class PricingEngineV3:
         inq = dict(inquiry_dict)
 
         # 1. Base input parsing and entity normalization
-        raw_buy = inq.get("Total_Buy_INR") if inq.get("Total_Buy_INR") is not None else inq.get("buy")
-        buy_cost = float(raw_buy or 0.0)
         raw_chg_wt = inq.get("Chargeable_Weight_Kg") if inq.get("Chargeable_Weight_Kg") is not None else inq.get("chargeable_wt")
         chargeable_wt = float(raw_chg_wt or 1.0)
         raw_gross_wt = inq.get("Gross_Weight_Kg") if inq.get("Gross_Weight_Kg") is not None else inq.get("gross_wt")
         gross_wt = float(raw_gross_wt or chargeable_wt)
         density_ratio = float(inq.get("Cargo_Density_Ratio", chargeable_wt / max(1.0, gross_wt)))
+
+        raw_buy = inq.get("Total_Buy_INR") if inq.get("Total_Buy_INR") is not None else inq.get("buy")
+        if raw_buy is not None and str(raw_buy).strip() != "":
+            buy_cost = float(raw_buy)
+        else:
+            raw_unit_buy = inq.get("Unit_Buy_INR") if inq.get("Unit_Buy_INR") is not None else inq.get("unit_buy")
+            if raw_unit_buy is not None and str(raw_unit_buy).strip() != "":
+                buy_cost = float(raw_unit_buy) * chargeable_wt
+            else:
+                buy_cost = 0.0
+
+        raw_carrier = str(
+            inq.get("Quoted Carrier")
+            or inq.get("carrier")
+            or inq.get("airline")
+            or "Any Airline"
+        ).strip()
+        raw_sales_person = str(
+            inq.get("Sales Person")
+            or inq.get("sales_person")
+            or inq.get("salesperson")
+            or ""
+        ).strip()
 
         raw_comm = str(inq.get("Commodity_Group") or inq.get("commodity") or "General Cargo")
         canonical_comm = classify_commodity(raw_comm)
@@ -680,6 +701,9 @@ class PricingEngineV3:
         # 12. Optimal Quote Card Assembly
         optimal_card = dict(strategic_cards[chosen_strategy])
         optimal_card.update({
+            "Quoted_Carrier": raw_carrier,
+            "Customer_Name": norm_cust,
+            "Sales_Person": raw_sales_person,
             "strategic_recommendations": strategic_cards,
             "negotiation_corridor": corridor_dict,
             "Cost_Floor_Price_INR": guard_bal.cost_floor_price_inr,
@@ -700,6 +724,9 @@ class PricingEngineV3:
             "status": "success",
             "model_version": MODEL_VERSION,
             "optimal": optimal_card,
+            "carrier": raw_carrier,
+            "customer_company": norm_cust,
+            "sales_person": raw_sales_person,
             "strategic_recommendations": strategic_cards,
             "negotiation_corridor": corridor_dict,
             "sensitivity": sensitivity_rows,

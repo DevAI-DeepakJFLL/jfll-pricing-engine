@@ -358,6 +358,123 @@ def _build_destinations_catalog(bundle, root_path):
 DESTINATION_OPTIONS = _build_destinations_catalog(model_bundle, ENGINE_ROOT)
 PORT_LABELS_JSON = json.dumps(PORT_LABELS).replace("</", "<\\/")
 
+CARRIER_OPTIONS = [
+    {"value": "Any Airline", "label": "Any Airline (Market Default)"},
+    {"value": "Qatar Airways", "label": "Qatar Airways"},
+    {"value": "Emirates SkyCargo", "label": "Emirates SkyCargo"},
+    {"value": "Air India", "label": "Air India"},
+    {"value": "Etihad Airways", "label": "Etihad Airways"},
+    {"value": "Ethiopian Airlines", "label": "Ethiopian Airlines"},
+    {"value": "Air France", "label": "Air France"},
+    {"value": "Singapore Airlines Ltd", "label": "Singapore Airlines Ltd"},
+    {"value": "IndiGo", "label": "IndiGo"},
+    {"value": "Turkish Airlines", "label": "Turkish Airlines"},
+    {"value": "Cathay Pacific", "label": "Cathay Pacific"},
+    {"value": "Lufthansa Cargo", "label": "Lufthansa Cargo"},
+    {"value": "Saudi Airlines Cargo", "label": "Saudi Airlines Cargo"},
+    {"value": "British Airways", "label": "British Airways"},
+    {"value": "SriLankan Airlines", "label": "SriLankan Airlines"},
+    {"value": "Gulf Air", "label": "Gulf Air"},
+    {"value": "Oman Air", "label": "Oman Air"},
+    {"value": "Kuwait Airways", "label": "Kuwait Airways"},
+    {"value": "EgyptAir", "label": "EgyptAir"},
+    {"value": "SpiceJet", "label": "SpiceJet"},
+    {"value": "Air Arabia", "label": "Air Arabia"},
+    {"value": "Other Carrier", "label": "Other Carrier / Charter"},
+]
+
+DEFAULT_TOP_CUSTOMERS = [
+    "UNIVERSAL CLEARING AND FORWARDING",
+    "TEMPCON EXPRESS PRIVATE LIMITED",
+    "TRIANGLE LOGISTICS",
+    "WW LOGISTICIANS PRIVATE LIMITED",
+    "SKL SHIPPING & LOGISTICS PVT LTD",
+    "FLOMIC GLOBAL LOGISTICS LIMITED",
+    "SADHI LOGISTICS PRIVATE LIMITED",
+    "MINAS LOGISTICS PRIVATE LIMITED",
+    "TRANSWORLD INTEGRATED LOGISTEK PVT. LTD.",
+    "M 5 CONTINENT LOGISTICS SOLUTION PRIVATE LIMITED",
+    "PARTEX AEROMARINE LOGISTICS PRIVATE LIMITED",
+    "A STAR SHIPPING AND LOGISTICS LLP",
+    "MOVEX SERVICES PVT LTD",
+    "VELOGIC INDIA PRIVATE LIMITED",
+    "NEKODA GLOBAL LOGISTICS INDIA PVT LTD",
+    "ROUND THE CLOCK LOGISTICS PVT LTD",
+    "MEO INTERNATIONAL LOGISTICS INDIA PRIVATE LIMITED",
+    "RUCHA ENTERPRISES",
+    "K&K SHIPPING SERVICES",
+    "AEGON SHIPPING INDIA PRIVATE LIMITED",
+    "EUROPA AIR AND SEA PRIVATE LIMITED",
+    "FAIRMACS SHIPPING AND TRANSPORT SERVICES PVT LTD .",
+    "LEOSTAR LOGISTICS PRIVATE LIMITED",
+    "HAIKO LOGISTICS INDIA PVT LTD",
+    "STRANS LOGISTICS PRIVATE LIMITED",
+    "TRANSWAYS LOGISTICS SOLUTIONS",
+    "HD WORLDWIDE LOGISTICS",
+    "RELIABLE TRAVELS AND CARGO PVT LTD",
+    "CARGO INTERNATIONAL (INDIA) PRIVATE LIMITED",
+    "UNION CARRGO",
+    "BLUE BELL LOGISTICS PRIVATE LIMITED",
+    "V.H. LOGISTICS",
+    "DTDC EXPRESS LIMITED",
+    "SPEDITION INDIA LOGISTICS PRIVATE LIMITED",
+    "PENTAGON INTERNATIONAL FREIGHT SOLUTION PVT LTD",
+    "CFKR STANDARD TEMPERATURE COURIER PRIVATE LIMITED",
+    "UNIFIED LOGISTICS INDIA PRIVATE LIMITED",
+    "EXCEL WORLDWIDE PRIVATE LIMITED",
+    "EXIGENT GLOBAL LOGISTICS PVT LTD",
+    "BNB FREIGHT SOLUTIONS",
+    "JETWAY CARGO",
+    "SRV GLOBAL FREIGHT PRIVATE LIMITED",
+    "MOVE FORWARD LOGISTICS & SERVICES",
+    "VRRDDHI FREIGHT PVT LTD",
+    "MS LOGISTICS PRIVATE LIMITED",
+    "GLOBALBRIDGE LOGISTICS PRIVATE LIMITED",
+    "FPS LOGISTICS PVT LTD",
+    "SISKO WORLDWIDE LOGISTICS INDIA PVT LTD",
+    "INDOLOG LOGISTICS PRIVATE LIMITED",
+    "RCS LOGISTICS PVT LTD",
+]
+
+def _build_top_customers_catalog(root_path: str):
+    csv_path = os.path.join(root_path, "data", "processed", "all_inquiries_2025_cleaned.csv")
+    if os.path.exists(csv_path):
+        try:
+            df = pd.read_csv(csv_path, usecols=["Customer Company"])
+            top = df["Customer Company"].dropna().value_counts().head(50).index.tolist()
+            if len(top) >= 10:
+                return top
+        except Exception as e:
+            logger.warning(f"Could not load customer accounts from CSV: {e}")
+    return DEFAULT_TOP_CUSTOMERS
+
+TOP_CUSTOMERS = _build_top_customers_catalog(ENGINE_ROOT)
+TOP_CUSTOMERS_JSON = json.dumps(TOP_CUSTOMERS).replace("</", "<\\/")
+
+SALES_PERSON_OPTIONS = [
+    {"value": "", "label": "Unassigned / General Sales Desk"},
+    {"value": "Mohnish Arora", "label": "Mohnish Arora"},
+    {"value": "Narendra Gupta", "label": "Narendra Gupta"},
+    {"value": "Edward Dsouza", "label": "Edward Dsouza"},
+    {"value": "SHIVAM BHARDWAJ", "label": "Shivam Bhardwaj"},
+    {"value": "Harvind Kumar", "label": "Harvind Kumar"},
+    {"value": "HETAL SHAH", "label": "Hetal Shah"},
+    {"value": "Parag Mehta", "label": "Parag Mehta"},
+    {"value": "Jayatheertha L G", "label": "Jayatheertha L G"},
+    {"value": "Priyanka Sardesai", "label": "Priyanka Sardesai"},
+    {"value": "Deepanshu Sangwan", "label": "Deepanshu Sangwan"},
+    {"value": "Gautam Arora", "label": "Gautam Arora"},
+    {"value": "Samuel Prabhu", "label": "Samuel Prabhu"},
+    {"value": "Tasneem Haji", "label": "Tasneem Haji"},
+    {"value": "PARVESH GUPTA", "label": "Parvesh Gupta"},
+    {"value": "Fasaludheen C A", "label": "Fasaludheen C A"},
+    {"value": "Dheeraj Chanigalla", "label": "Dheeraj Chanigalla"},
+    {"value": "Sweety Soni", "label": "Sweety Soni"},
+    {"value": "SHASHIKANT YADAV", "label": "Shashikant Yadav"},
+    {"value": "Joe Xavier", "label": "Joe Xavier"},
+    {"value": "Other Sales Desk", "label": "Other Sales Desk"},
+]
+
 
 # ------------------------------------------------------------------------------
 # HTML UI TEMPLATE (AUTHENTIC SIGNATURE STYLING RESTORED)
@@ -1468,7 +1585,76 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
 
-                <!-- Item Details & Cargo Dimensions (Restored 4-Column Box Input) -->
+                <!-- Quoted Carrier & Target Date Section -->
+                <div class="field-section">
+                    <div class="section-label">Quoted Carrier & Target Date</div>
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label for="carrier_display_text">Quoted Airline / Carrier <span class="req">*</span></label>
+                            <input type="hidden" id="carrier" value="Any Airline">
+                            <div class="searchable-select" id="searchable_carrier">
+                                <div class="select-trigger" onclick="toggleDropdown('carrier')">
+                                    <span class="select-trigger-text" id="carrier_display_text">Any Airline (Market Default)</span>
+                                    <span class="select-trigger-arrow">▼</span>
+                                </div>
+                                <div class="select-dropdown" id="carrier_dropdown">
+                                    <div class="select-search-wrap">
+                                        <input type="text" class="select-search-input" id="carrier_search" placeholder="Search carrier..." oninput="filterDropdownOptions('carrier', this.value)">
+                                    </div>
+                                    <ul class="select-options-list" id="carrier_options_list">
+                                        {% for opt in carrier_options %}
+                                        <li class="select-option{% if opt.value == 'Any Airline' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="quote_date">Target Quote Date <span class="req">*</span></label>
+                            <input type="date" id="quote_date" class="clean-input" value="{{ default_quote_date }}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Account & Sales Desk Section -->
+                <div class="field-section">
+                    <div class="section-label">Customer Account & Sales Desk</div>
+                    <div class="form-row">
+                        <div class="field-group">
+                            <label for="customer_company">Customer Company / Account</label>
+                            <input type="text" id="customer_company" class="clean-input" list="customer_accounts_list" placeholder="Search customer (e.g. UNIVERSAL CLEARING)..." value="UNIVERSAL CLEARING AND FORWARDING" autocomplete="off">
+                            <datalist id="customer_accounts_list">
+                                {% for cust in top_customers %}
+                                <option value="{{ cust }}"></option>
+                                {% endfor %}
+                            </datalist>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="sales_person_display_text">Sales Person / Desk</label>
+                            <input type="hidden" id="sales_person" value="Mohnish Arora">
+                            <div class="searchable-select" id="searchable_sales_person">
+                                <div class="select-trigger" onclick="toggleDropdown('sales_person')">
+                                    <span class="select-trigger-text" id="sales_person_display_text">Mohnish Arora</span>
+                                    <span class="select-trigger-arrow">▼</span>
+                                </div>
+                                <div class="select-dropdown" id="sales_person_dropdown">
+                                    <div class="select-search-wrap">
+                                        <input type="text" class="select-search-input" id="sales_person_search" placeholder="Search sales rep..." oninput="filterDropdownOptions('sales_person', this.value)">
+                                    </div>
+                                    <ul class="select-options-list" id="sales_person_options_list">
+                                        {% for opt in sales_person_options %}
+                                        <li class="select-option{% if opt.value == 'Mohnish Arora' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item Details & Cargo Dimensions (Dual Buy Rate + Physical Specs) -->
                 <div class="field-section">
                     <div class="section-label">Item Details & Cargo Specifications</div>
 
@@ -1483,19 +1669,33 @@ HTML_TEMPLATE = """
                         </button>
                     </div>
 
+                    <!-- Synchronized Dual Buy Rate Inputs -->
                     <div class="form-row">
                         <div class="field-group">
-                            <label for="buy">Airline Buy Cost (₹ INR) <span class="req">*</span></label>
-                            <input type="number" id="buy" class="clean-input" value="125000" min="100" step="any" placeholder="e.g. 125000" required>
+                            <label for="unit_buy">Unit Buy Rate (₹/kg) <span class="req">*</span></label>
+                            <input type="number" id="unit_buy" class="clean-input" value="277.78" min="0.1" step="any" placeholder="e.g. 250" oninput="onUnitBuyInput()" required>
                         </div>
+                        <div class="field-group">
+                            <label for="buy">Total Airline Buy (₹ INR) <span class="req">*</span></label>
+                            <input type="number" id="buy" class="clean-input" value="125000" min="1" step="any" placeholder="e.g. 125000" oninput="onTotalBuyInput()" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
                         <div class="field-group">
                             <label for="gross_wt">Physical Gross Weight (kg) <span class="req">*</span></label>
                             <input type="number" id="gross_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" required>
                         </div>
+                        <div class="field-group" id="chargeable_summary_col">
+                            <label>Chargeable Weight (Calc)</label>
+                            <div class="clean-input" style="background: #f8fafc; display: flex; align-items: center; font-weight: 700; color: var(--text-dark);" id="summary_ch_wt_display">
+                                450.0 kg
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Direct Chargeable Weight Mode Container -->
-                    <div class="field-group full" id="direct_weight_container" style="display: none;">
+                    <div class="field-group full" id="direct_weight_container" style="display: none; margin-bottom: 12px;">
                         <label for="direct_ch_wt">Airline Chargeable Weight (kg) <span class="req">*</span></label>
                         <input type="number" id="direct_ch_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 371.5">
                         <div class="dim-info" style="margin-top: 6px;">
@@ -1504,7 +1704,7 @@ HTML_TEMPLATE = """
                     </div>
 
                     <!-- Box Dimensions Mode Container (4 Columns) -->
-                    <div class="field-group full" id="dims_weight_container">
+                    <div class="field-group full" id="dims_weight_container" style="margin-bottom: 12px;">
                         <label>Box Dimensions (L × W × H in cm × Number of Pieces) <span class="req">*</span></label>
                         <div class="dim-box">
                             <div class="dim-grid">
@@ -2889,6 +3089,11 @@ def index():
         model_version=MODEL_VERSION,
         origin_options=ORIGIN_OPTIONS,
         dest_options=DESTINATION_OPTIONS,
+        carrier_options=CARRIER_OPTIONS,
+        top_customers=TOP_CUSTOMERS,
+        top_customers_json=TOP_CUSTOMERS_JSON,
+        sales_person_options=SALES_PERSON_OPTIONS,
+        default_quote_date=datetime.date.today().isoformat(),
         client_options=CLIENT_OPTIONS,
         vertical_options=VERTICAL_OPTIONS,
         commodity_options=COMMODITY_OPTIONS,
@@ -2903,15 +3108,7 @@ def index():
 def api_quote():
     data = request.get_json(force=True, silent=True) or {}
 
-    # Strict numeric validation (§5.2, §5.3)
-    raw_buy = data.get("buy")
-    try:
-        buy_cost = float(str(raw_buy).replace(",", "").strip())
-        if buy_cost <= 0 or not np.isfinite(buy_cost):
-            raise ValueError()
-    except (ValueError, TypeError):
-        return jsonify({"status": "error", "message": "Invalid Airline Buy Cost. Please provide a positive numeric value."}), 400
-
+    # Physical weights validation (§2.2, §5.2)
     raw_gross = data.get("gross_wt")
     try:
         gross_wt = float(str(raw_gross).replace(",", "").strip())
@@ -2954,6 +3151,40 @@ def api_quote():
 
     chargeable_wt = eff_chargeable
 
+    # Dual Buy Rate Resolution (unit_buy * chargeable_wt <-> total buy)
+    raw_buy = data.get("buy")
+    raw_unit_buy = data.get("unit_buy") or data.get("unit_buy_rate") or data.get("unit_freight_buy")
+
+    buy_cost = None
+    unit_buy_rate = None
+
+    if raw_buy is not None and str(raw_buy).strip() != "":
+        try:
+            parsed_buy = float(str(raw_buy).replace(",", "").strip())
+            if parsed_buy <= 0 or not np.isfinite(parsed_buy):
+                raise ValueError()
+            buy_cost = parsed_buy
+        except (ValueError, TypeError):
+            return jsonify({"status": "error", "message": "Invalid Airline Buy Cost. Please provide a positive numeric value."}), 400
+
+    if raw_unit_buy is not None and str(raw_unit_buy).strip() != "":
+        try:
+            parsed_unit = float(str(raw_unit_buy).replace(",", "").strip())
+            if parsed_unit <= 0 or not np.isfinite(parsed_unit):
+                raise ValueError()
+            unit_buy_rate = parsed_unit
+        except (ValueError, TypeError):
+            return jsonify({"status": "error", "message": "Invalid Airline Unit Buy Rate. Please provide a positive numeric rate (₹/kg)."}), 400
+
+    if buy_cost is None:
+        if unit_buy_rate is not None:
+            buy_cost = round(unit_buy_rate * chargeable_wt, 2)
+        else:
+            return jsonify({"status": "error", "message": "Invalid Airline Buy Cost. Please provide a positive numeric value for buy or unit_buy."}), 400
+
+    if unit_buy_rate is None and buy_cost is not None:
+        unit_buy_rate = round(buy_cost / max(0.1, chargeable_wt), 2)
+
     raw_freq = data.get("frequency", 10)
     try:
         frequency = int(raw_freq)
@@ -2981,6 +3212,41 @@ def api_quote():
     branch = str(data.get("branch") or "Mumbai").strip()
     pricing_strategy = str(data.get("strategy") or "balanced").strip().lower()
 
+    # Commercial Inputs: Carrier, Customer Account, Sales Person, Quote Date
+    carrier = str(
+        data.get("carrier")
+        or data.get("quoted_carrier")
+        or data.get("airline")
+        or data.get("Quoted Carrier")
+        or "Any Airline"
+    ).strip()
+
+    customer_company = str(
+        data.get("customer_company")
+        or data.get("customer_name")
+        or data.get("customer")
+        or data.get("Customer Company")
+        or ""
+    ).strip()
+
+    sales_person = str(
+        data.get("sales_person")
+        or data.get("salesperson")
+        or data.get("Sales Person")
+        or ""
+    ).strip()
+
+    quote_date_raw = data.get("quote_date")
+    if quote_date_raw and str(quote_date_raw).strip():
+        quote_date = str(quote_date_raw).strip()[:10]
+    else:
+        quote_date = datetime.date.today().isoformat()
+
+    try:
+        month = int(quote_date[5:7])
+    except (ValueError, IndexError):
+        month = datetime.date.today().month
+
     # Derived Geographic Hierarchies & Tiers
     origin_region = map_origin_region(origin)
     dest_region = map_dest_region(dest)
@@ -2991,6 +3257,7 @@ def api_quote():
 
     inquiry_payload = {
         "Total_Buy_INR": buy_cost,
+        "Unit_Buy_INR": unit_buy_rate,
         "Chargeable_Weight_Kg": chargeable_wt,
         "Gross_Weight_Kg": gross_wt,
         "Cargo_Density_Ratio": density_ratio,
@@ -3008,16 +3275,17 @@ def api_quote():
         "Booked by branch": branch,
         "Incoterms": incoterms,
         "quote_revision_count": revision,
-        "quote_date": data.get("quote_date"),
-        "customer_name": data.get("customer_name") or data.get("customer") or "",
+        "quote_date": quote_date,
+        "Quote_Month": month,
+        "Air_Cargo_Season": get_air_cargo_season(month),
+        "customer_name": customer_company,
+        "Customer_Company": customer_company,
+        "carrier": carrier,
+        "Quoted Carrier": carrier,
+        "sales_person": sales_person,
+        "Sales Person": sales_person,
         "inquiry_ref": data.get("inquiry_ref") or data.get("ref") or ""
     }
-
-    quote_date = str(data.get("quote_date") or datetime.date.today().isoformat())[:10]
-    try:
-        month = int(quote_date[5:7])
-    except (ValueError, IndexError):
-        month = 6
 
     is_spot_tender = bool(data.get("is_spot_tender") or str(data.get("pricing_mode", "")).lower() in ("spot_tender", "spot"))
     if is_spot_tender and not data.get("strategy"):
@@ -3066,7 +3334,8 @@ def api_quote():
     inquiry_payload.update({
         "quote_date": quote_date,
         "Air_Cargo_Season": get_air_cargo_season(month),
-        "Customer_Company": data.get("customer_name") or data.get("customer") or "",
+        "Customer_Company": customer_company,
+        "customer_name": customer_company,
         "Credit_Days": data.get("credit_days", 30),
         "Oversize": bool(data.get("oversize")),
         "Rate_Type": data.get("rate_type", ""),
@@ -3114,6 +3383,12 @@ def api_quote():
 
         return jsonify({
             "status": "success",
+            "carrier": carrier,
+            "customer_company": customer_company,
+            "sales_person": sales_person,
+            "quote_date": quote_date,
+            "unit_buy": unit_buy_rate,
+            "buy": buy_cost,
             "optimal": optimal_quote,
             "strategic_recommendations": strategic_recommendations,
             "negotiation_corridor": negotiation_corridor,

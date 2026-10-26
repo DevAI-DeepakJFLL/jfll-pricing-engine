@@ -226,7 +226,9 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
                 is_deleted INTEGER DEFAULT 0,
                 margin_range TEXT,
                 min_margin_pct REAL,
-                max_margin_pct REAL
+                max_margin_pct REAL,
+                carrier TEXT,
+                sales_person TEXT
             )
         """)
 
@@ -255,7 +257,9 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
             "is_deleted": "INTEGER DEFAULT 0",
             "margin_range": "TEXT",
             "min_margin_pct": "REAL",
-            "max_margin_pct": "REAL"
+            "max_margin_pct": "REAL",
+            "carrier": "TEXT",
+            "sales_person": "TEXT"
         }
 
 
@@ -331,6 +335,9 @@ def log_recommendation(
             max_m = round(margin_pct + 0.75, 2) if margin_pct > 0 else 0.0
             margin_range = f"{min_m:.1f}% – {max_m:.1f}%" if margin_pct > 0 else f"{margin_pct:.1f}%"
 
+        carrier = str(payload.get("Quoted Carrier") or payload.get("carrier") or payload.get("airline") or "Any Airline")
+        sales_person = str(payload.get("Sales Person") or payload.get("sales_person") or payload.get("salesperson") or "")
+
         with sqlite3.connect(db_path, timeout=5.0) as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -341,8 +348,8 @@ def log_recommendation(
                     status, model_version, customer_name, inquiry_ref,
                     chosen_strategy, is_preset, rate_per_kg, cost_floor_price_inr,
                     max_margin_cap, override_reason, user_id, is_deleted,
-                    margin_range, min_margin_pct, max_margin_pct
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                    margin_range, min_margin_pct, max_margin_pct, carrier, sales_person
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
             """, (
                 str(payload.get("Origin_Port", "")),
                 str(payload.get("Destination_Port", "")),
@@ -370,7 +377,9 @@ def log_recommendation(
                 user_id,
                 margin_range,
                 round(min_m, 2),
-                round(max_m, 2)
+                round(max_m, 2),
+                carrier,
+                sales_person
             ))
             conn.commit()
             return True
