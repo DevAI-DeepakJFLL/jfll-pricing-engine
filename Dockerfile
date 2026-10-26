@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy requirements and install python packages
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt boto3 gunicorn
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 # Create unprivileged application user (CWE-250)
 RUN groupadd -g 10001 appuser && \
