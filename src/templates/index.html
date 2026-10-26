@@ -296,6 +296,15 @@
             background: var(--pill-dark);
             color: #ffffff;
         }
+        .preset-chip-btn.active {
+            background: var(--pill-dark);
+            color: #ffffff;
+            border-color: var(--pill-dark);
+        }
+        .preset-chip-btn.active .preset-num-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
         .preset-num-badge {
             width: 20px;
             height: 20px;
@@ -1056,19 +1065,19 @@
             <span style="font-size: 11px; color: var(--text-light);">One-click high-volume inquiry scenarios</span>
         </div>
         <div class="presets-grid-row">
-            <button type="button" class="preset-chip-btn" onclick="applyPreset('pharma_uk')">
+            <button type="button" id="preset_btn_pharma_uk" class="preset-chip-btn" onclick="applyPreset('pharma_uk')">
                 <span class="preset-num-badge">1</span>
-                <span>Pharma Urgent (DEL → LHR)</span>
+                <span>Pharma Cold-Chain (DEL → LHR)</span>
             </button>
-            <button type="button" class="preset-chip-btn" onclick="applyPreset('perishable_uae')">
+            <button type="button" id="preset_btn_perishable_uae" class="preset-chip-btn" onclick="applyPreset('perishable_uae')">
                 <span class="preset-num-badge">2</span>
                 <span>Perishables (BOM → DXB)</span>
             </button>
-            <button type="button" class="preset-chip-btn" onclick="applyPreset('heavy_subagent')">
+            <button type="button" id="preset_btn_heavy_subagent" class="preset-chip-btn" onclick="applyPreset('heavy_subagent')">
                 <span class="preset-num-badge">3</span>
-                <span>Heavy Machinery (BOM → FRA)</span>
+                <span>Heavy Machinery / Subagent (BOM → FRA)</span>
             </button>
-            <button type="button" class="preset-chip-btn" onclick="applyPreset('courier_us')">
+            <button type="button" id="preset_btn_courier_us" class="preset-chip-btn" onclick="applyPreset('courier_us')">
                 <span class="preset-num-badge">4</span>
                 <span>Express Courier (BLR → JFK)</span>
             </button>
@@ -1566,7 +1575,8 @@
         pharma_uk: {
             origin: "Indira Gandhi International Airport",
             dest: "Heathrow Apt/London",
-            buy: "185000",
+            customer_company: "SUN PHARMA LABORATORIES",
+            buy: "176000",
             gross_wt: "320",
             dim_l: "100", dim_w: "80", dim_h: "100", dim_pcs: "2",
             client: "Shipper / Consignee",
@@ -1574,13 +1584,14 @@
             commodity: "Pharmaceuticals",
             incoterms: "CIF",
             frequency: "10",
-            revision: "0",
+            revision: "1",
             branch: "Delhi"
         },
         perishable_uae: {
             origin: "Chhatrapati Shivaji Maharaj International Airport",
             dest: "Dubai",
-            buy: "75000",
+            customer_company: "ALLANA SONS PRIVATE LIMITED",
+            buy: "78000",
             gross_wt: "1200",
             dim_l: "120", dim_w: "80", dim_h: "90", dim_pcs: "8",
             client: "Shipper / Consignee",
@@ -1594,6 +1605,7 @@
         heavy_subagent: {
             origin: "Chhatrapati Shivaji Maharaj International Airport",
             dest: "Frankfurt am Main",
+            customer_company: "UNIVERSAL CLEARING AND FORWARDING",
             buy: "320000",
             gross_wt: "2400",
             dim_l: "150", dim_w: "120", dim_h: "130", dim_pcs: "6",
@@ -1601,22 +1613,23 @@
             vertical: "Air Export Forwarding",
             commodity: "Engineering & Machinery",
             incoterms: "FOB",
-            frequency: "3",
+            frequency: "10",
             revision: "2",
             branch: "Mumbai"
         },
         courier_us: {
             origin: "Bangalore",
             dest: "John F. Kennedy Apt/New York",
-            buy: "45000",
+            customer_company: "BLR LOGISTICS OVERSEAS",
+            buy: "45500",
             gross_wt: "65",
             dim_l: "60", dim_w: "50", dim_h: "40", dim_pcs: "2",
             client: "Overseas Agent",
             vertical: "Courier",
             commodity: "Courier",
             incoterms: "FOB",
-            frequency: "10",
-            revision: "0",
+            frequency: "3",
+            revision: "1",
             branch: "Bangalore"
         }
     };
@@ -1731,12 +1744,18 @@
     });
 
     function applyPreset(key) {
+        document.querySelectorAll('.preset-chip-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.getElementById(`preset_btn_${key}`);
+        if (activeBtn) activeBtn.classList.add('active');
+
         const p = PRESET_DATA[key];
         if (!p) return;
         setDimUnit('cm');
         setWeightMode('dims');
         setSearchableValue('origin', p.origin);
         setSearchableValue('dest', p.dest);
+        const custEl = document.getElementById('customer_company');
+        if (custEl) custEl.value = p.customer_company || '';
         document.getElementById('buy').value = p.buy;
         document.getElementById('gross_wt').value = p.gross_wt;
         document.getElementById('dim_l').value = p.dim_l;
@@ -1756,6 +1775,7 @@
     }
 
     function resetFormForNewQuote() {
+        document.querySelectorAll('.preset-chip-btn').forEach(btn => btn.classList.remove('active'));
         setDimUnit('cm');
         document.getElementById('buy').value = '';
         const unitEl = document.getElementById('unit_buy');
