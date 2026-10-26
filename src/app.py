@@ -325,6 +325,12 @@ CUSTOMER_ACTIVITY_OPTIONS = [
     {"value": "1", "tier": "Spot / One-Off", "label": "New / Spot One-Off Inquiry", "sub": "1 quote • Single transaction"},
 ]
 
+REVISION_OPTIONS = [
+    {"value": "1", "label": "Rev 1 — Initial Quote (Standard Benchmark)"},
+    {"value": "2", "label": "Rev 2 — Counter-Offer (Concession to Beat Competitor)"},
+    {"value": "3", "label": "Rev 3+ — Final BAFO (Floor Defense Mode)"},
+]
+
 def _build_destinations_catalog(bundle, root_path):
     port_freqs = bundle.get("port_frequencies", {})
     if port_freqs:
@@ -1802,7 +1808,7 @@ HTML_TEMPLATE = """
                     </div>
 
                     <div class="form-row">
-                        <div class="field-group">
+                        <div class="field-group" style="grid-column: span 2;">
                             <label>Business Vertical <span class="req">*</span></label>
                             <input type="hidden" id="vertical" value="Air Export Forwarding">
                             <div class="searchable-select" id="custom_vertical">
@@ -1819,7 +1825,9 @@ HTML_TEMPLATE = """
                                 </div>
                             </div>
                         </div>
+                    </div>
 
+                    <div class="form-row">
                         <div class="field-group">
                             <label>Customer Activity <span class="req">*</span></label>
                             <input type="hidden" id="frequency" value="10">
@@ -1832,6 +1840,24 @@ HTML_TEMPLATE = """
                                     <ul class="select-options-list" id="frequency_options_list">
                                         {% for opt in customer_activity_options %}
                                         <li class="select-option{% if opt.value == '10' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label>Quote Revision <span class="req">*</span></label>
+                            <input type="hidden" id="revision" value="1">
+                            <div class="searchable-select" id="custom_revision">
+                                <div class="select-trigger" onclick="toggleDropdown('revision')">
+                                    <span class="select-trigger-text" id="revision_display_text">Rev 1 — Initial Quote (Standard Benchmark)</span>
+                                    <span class="select-trigger-arrow">▼</span>
+                                </div>
+                                <div class="select-dropdown" id="revision_dropdown">
+                                    <ul class="select-options-list" id="revision_options_list">
+                                        {% for opt in revision_options %}
+                                        <li class="select-option{% if opt.value == '1' %} selected{% endif %}" data-value="{{ opt.value }}">{{ opt.label }}</li>
                                         {% endfor %}
                                     </ul>
                                 </div>
@@ -2148,7 +2174,7 @@ HTML_TEMPLATE = """
         });
     }
 
-    const ALL_DROPDOWN_IDS = ['origin', 'dest', 'client', 'vertical', 'commodity', 'incoterms', 'branch', 'frequency'];
+    const ALL_DROPDOWN_IDS = ['origin', 'dest', 'client', 'vertical', 'commodity', 'incoterms', 'branch', 'frequency', 'revision'];
 
     ALL_DROPDOWN_IDS.forEach(fieldId => {
         const list = document.getElementById(`${fieldId}_options_list`);
@@ -2189,7 +2215,7 @@ HTML_TEMPLATE = """
         setCustomDropdownValue('commodity', p.commodity);
         setCustomDropdownValue('incoterms', p.incoterms);
         setCustomDropdownValue('frequency', p.frequency);
-        // revision input removed
+        setCustomDropdownValue('revision', p.revision ? String(p.revision) : '1');
         setCustomDropdownValue('branch', p.branch);
         updateDimensions();
         runInference(false);
@@ -2214,6 +2240,7 @@ HTML_TEMPLATE = """
         setCustomDropdownValue('incoterms', 'FOB');
         setCustomDropdownValue('branch', 'Mumbai');
         setCustomDropdownValue('frequency', '10');
+        setCustomDropdownValue('revision', '1');
 
         updateDimensions();
 
@@ -2273,7 +2300,7 @@ HTML_TEMPLATE = """
             commodity: document.getElementById('commodity')?.value,
             incoterms: document.getElementById('incoterms')?.value,
             frequency: parseInt(document.getElementById('frequency')?.value, 10),
-            revision: 1,
+            revision: parseInt(document.getElementById('revision')?.value, 10) || 1,
             branch: document.getElementById('branch')?.value,
             strategy: 'balanced',
             dim_l: parseFloat(document.getElementById('dim_l')?.value),
@@ -2345,14 +2372,14 @@ HTML_TEMPLATE = """
         let badgeText = 'Pre-Approved Corridor';
 
         if (selectedStrategyKey === 'floor') {
-            marginRangeText = `≥ ${strat.Margin_Percentage.toFixed(1)}%`;
-            badgeText = 'Floor Volume Capture';
+            marginRangeText = `${strat.Margin_Percentage.toFixed(1)}%`;
+            badgeText = 'Lowest Safe Price (Floor)';
         } else if (selectedStrategyKey === 'premium') {
-            marginRangeText = `≥ ${strat.Margin_Percentage.toFixed(1)}%`;
-            badgeText = 'Premium Max Yield';
+            marginRangeText = `${strat.Margin_Percentage.toFixed(1)}%`;
+            badgeText = 'Higher Profit Price (Premium)';
         } else if (corr && corr.min_margin_pct !== undefined && corr.max_margin_pct !== undefined) {
             marginRangeText = `${corr.min_margin_pct.toFixed(1)}% – ${corr.max_margin_pct.toFixed(1)}%`;
-            badgeText = 'Pre-Approved Corridor';
+            badgeText = 'Pre-Approved Negotiation Corridor';
         }
 
         const marginEl = document.getElementById('res_margin_pct');
@@ -2363,7 +2390,11 @@ HTML_TEMPLATE = """
 
         const heroSubEl = document.getElementById('res_hero_sub');
         if (heroSubEl) {
-            heroSubEl.innerText = `Target Benchmark: ${strat.Margin_Percentage.toFixed(1)}% Markup | Quoted Sell Rate: ₹${formatINR(perKgRate)} / kg (₹${formatINR(sellPrice)} Total)`;
+            let subText = `Target Benchmark: ${strat.Margin_Percentage.toFixed(1)}% Markup | Quoted Sell Rate: ₹${formatINR(perKgRate)} / kg (₹${formatINR(sellPrice)} Total)`;
+            if (corr && corr.revision_guidance && selectedStrategyKey === 'balanced') {
+                subText = `${corr.revision_guidance} • Quoted Sell Rate: ₹${formatINR(perKgRate)} / kg (₹${formatINR(sellPrice)} Total)`;
+            }
+            heroSubEl.innerText = subText;
         }
 
         // Supporting metric 1: Selling Price
@@ -3100,6 +3131,7 @@ def index():
         incoterms_options=INCOTERMS_OPTIONS,
         branch_options=BRANCH_OPTIONS,
         customer_activity_options=CUSTOMER_ACTIVITY_OPTIONS,
+        revision_options=REVISION_OPTIONS,
         port_labels_json=PORT_LABELS_JSON
     )
 

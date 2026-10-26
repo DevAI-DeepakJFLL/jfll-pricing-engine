@@ -38,7 +38,7 @@ try:
     from taxonomy import classify_commodity, map_destination_region
     from customer_normalizer import normalize_customer_name
     from features_pit import CustomerPITRegistry
-    from tiers import get_weight_tier
+    from tiers import get_weight_tier, map_account_tier
 except ImportError:
     from src.constants import MODEL_VERSION
     from src.quantile_model import MarginQuantileModel
@@ -47,7 +47,7 @@ except ImportError:
     from src.taxonomy import classify_commodity, map_destination_region
     from src.customer_normalizer import normalize_customer_name
     from src.features_pit import CustomerPITRegistry
-    from src.tiers import get_weight_tier
+    from src.tiers import get_weight_tier, map_account_tier
 
 
 _CANDIDATE_BUNDLE_PATHS = [
@@ -406,6 +406,35 @@ class PricingEngineV3:
             raw_p50 = max(raw_p10, raw_p50 * 0.90)
             raw_p10 = max(1.0, raw_p10 * 0.85)
 
+        # Logistics Customer Relationship Tier Adjustment (§2.3 Account Activity Yield)
+        raw_freq = (
+            inq.get("Customer_Inquiry_Frequency")
+            if inq.get("Customer_Inquiry_Frequency") is not None
+            else inq.get("frequency")
+        )
+        try:
+            freq_int = int(raw_freq) if raw_freq is not None and str(raw_freq).strip() != "" else 10
+        except (ValueError, TypeError):
+            freq_int = 10
+        account_tier = map_account_tier(freq_int)
+
+        # Relationship yield modifiers:
+        # Key Account: -1.00 pp volume discount (incentivizes high BSA fill rates)
+        # Regular: 0.00 pp baseline standard market pricing
+        # Occasional: +0.75 pp transactional handling buffer
+        # Spot / One-Off: +1.75 pp spot risk premium for credit and one-off carting overhead
+        ACTIVITY_MODIFIERS = {
+            "Key Account": -1.00,
+            "Regular": 0.00,
+            "Occasional": 0.75,
+            "Spot / One-Off": 1.75,
+        }
+        delta_activity = ACTIVITY_MODIFIERS.get(account_tier, 0.0)
+        if delta_activity != 0.0:
+            raw_p10 = max(0.5, raw_p10 + delta_activity)
+            raw_p50 = max(1.0, raw_p50 + delta_activity)
+            raw_p90 = max(2.0, raw_p90 + delta_activity)
+
         # 4. Decoupled Commercial Guardrails Application (Task 8)
         guard_floor = apply_commercial_guardrails(
             raw_margin_pct=raw_p10,
@@ -477,6 +506,19 @@ class PricingEngineV3:
             m_bal = round(m_floor + min_step, 2)
             m_prem = round(m_bal + min_step, 2)
 
+        # Commercially calibrate Premium Margin on heavy cargo to avoid unquoteable outliers
+        if chargeable_wt >= 500.0:
+            prem_cap = round(max(m_bal + 1.5, m_bal * 1.75), 2)
+            m_prem = min(m_prem, prem_cap)
+        elif chargeable_wt >= 300.0:
+            prem_cap = round(max(m_bal + 2.5, m_bal * 2.0), 2)
+            m_prem = min(m_prem, prem_cap)
+        elif chargeable_wt >= 100.0:
+            prem_cap = round(max(m_bal + 3.5, m_bal * 2.2), 2)
+            m_prem = min(m_prem, prem_cap)
+        if m_prem <= m_bal:
+            m_prem = round(m_bal + min_step, 2)
+
         tier_margins = {
             "floor": m_floor,
             "balanced": m_bal,
@@ -527,13 +569,53 @@ class PricingEngineV3:
         if max_corridor_pct < min_corridor_pct:
             max_corridor_pct = min_corridor_pct
 
+        # Freight Forwarding Revision Concession Ladder (§5.4 Multi-Round Negotiation)
+        raw_rev = (
+            inq.get("quote_revision_count")
+            if inq.get("quote_revision_count") is not None
+            else inq.get("revision")
+        )
+        try:
+            revision_num = int(raw_rev) if raw_rev is not None and str(raw_rev).strip() != "" else 1
+        except (ValueError, TypeError):
+            revision_num = 1
+        revision_num = max(1, min(10, revision_num))
+
+        rev_concession_pct = 0.0
+        rev_guidance = None
+        if revision_num == 2:
+            # Rev 2 Counter-Offer: concede ~45% of corridor half-width towards the negotiation floor
+            rev_concession_pct = round(0.45 * target_half_width, 2)
+            m_bal_revised = max(m_floor, round(m_bal - rev_concession_pct, 2))
+            tier_margins["balanced"] = m_bal_revised
+            rev_guidance = (
+                f"Rev 2 Counter-Offer: Conceded -{rev_concession_pct:.2f}% (to {m_bal_revised:.2f}%) "
+                f"to beat competing forwarder counter-offers."
+            )
+        elif revision_num >= 3:
+            # Rev 3+ BAFO / Tender Defense: target pins directly to the pre-approved floor
+            rev_concession_pct = round(m_bal - m_floor, 2)
+            tier_margins["balanced"] = m_floor
+            rev_guidance = (
+                f"Rev {revision_num} BAFO: Pinned target to floor ({m_floor:.2f}%) "
+                f"to protect booking conversion against competing co-loaders."
+            )
+
         min_sell_price_inr = round(buy_cost * (1.0 + min_corridor_pct / 100.0), 2)
         max_sell_price_inr = round(buy_cost * (1.0 + max_corridor_pct / 100.0), 2)
-        target_sell_price_inr = round(buy_cost * (1.0 + m_bal / 100.0), 2)
+        target_sell_price_inr = round(buy_cost * (1.0 + tier_margins["balanced"] / 100.0), 2)
+
+        guidance_text = (
+            f"Pre-approved negotiation corridor: {min_corridor_pct:.2f}% to "
+            f"{max_corridor_pct:.2f}% (Target: {tier_margins['balanced']:.2f}%, 90% confidence coverage). "
+            f"Sell rate latitude: ₹{min_sell_price_inr / chargeable_wt:.2f}/kg to ₹{max_sell_price_inr / chargeable_wt:.2f}/kg."
+        )
+        if rev_guidance:
+            guidance_text += f" | {rev_guidance}"
 
         corridor_dict = {
             "min_margin_pct": min_corridor_pct,
-            "target_margin_pct": m_bal,
+            "target_margin_pct": tier_margins["balanced"],
             "max_margin_pct": max_corridor_pct,
             "min_sell_price_inr": min_sell_price_inr,
             "target_sell_price_inr": target_sell_price_inr,
@@ -547,11 +629,12 @@ class PricingEngineV3:
             "band_width_pct": round(max_corridor_pct - min_corridor_pct, 2),
             "confidence_coverage": "90%",
             "conformal_half_width_pct": round(target_half_width, 2),
-            "guidance": (
-                f"Pre-approved negotiation corridor: {min_corridor_pct:.2f}% to "
-                f"{max_corridor_pct:.2f}% (Target: {m_bal:.2f}%, 90% confidence coverage). "
-                f"Sell rate latitude: ₹{min_sell_price_inr / chargeable_wt:.2f}/kg to ₹{max_sell_price_inr / chargeable_wt:.2f}/kg."
-            ),
+            "revision_number": revision_num,
+            "revision_concession_pct": rev_concession_pct,
+            "revision_guidance": rev_guidance,
+            "account_activity_tier": account_tier,
+            "account_activity_delta_pct": delta_activity,
+            "guidance": guidance_text,
         }
 
         # 7. Active Calibrated Win Probability Model (Issue M7)
@@ -710,6 +793,10 @@ class PricingEngineV3:
             "Quoted_Carrier": raw_carrier,
             "Customer_Name": norm_cust,
             "Sales_Person": raw_sales_person,
+            "Account_Activity_Tier": account_tier,
+            "Quote_Revision_Count": revision_num,
+            "Revision_Concession_Pct": rev_concession_pct,
+            "Revision_Guidance": rev_guidance,
             "strategic_recommendations": strategic_cards,
             "negotiation_corridor": corridor_dict,
             "Cost_Floor_Price_INR": guard_bal.cost_floor_price_inr,
