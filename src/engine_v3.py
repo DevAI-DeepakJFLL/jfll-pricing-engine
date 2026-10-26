@@ -286,7 +286,7 @@ class PricingEngineV3:
     def recommend_quote(
         self,
         inquiry_dict: Dict[str, Any],
-        pricing_strategy: str = "balanced",
+        pricing_strategy: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generates unified quote recommendation satisfying production REST API contract.
@@ -342,14 +342,20 @@ class PricingEngineV3:
         weight_tier = str(inq.get("Weight_Tier") or get_weight_tier(chargeable_wt))
         quote_date = str(inq.get("quote_date") or datetime.date.today().isoformat())[:10]
 
-        raw_cust = str(inq.get("customer_name") or inq.get("Customer_Company") or inq.get("customer") or "")
+        raw_cust = str(
+            inq.get("customer_name")
+            or inq.get("Customer_Company")
+            or inq.get("customer_company")
+            or inq.get("customer")
+            or ""
+        )
         norm_cust = normalize_customer_name(raw_cust)
 
         is_spot_tender = bool(
             inq.get("is_spot_tender")
             or str(inq.get("pricing_mode", "")).lower() in ("spot_tender", "spot")
         )
-        chosen_strategy = str(pricing_strategy or "balanced").strip().lower()
+        chosen_strategy = str(pricing_strategy or inq.get("strategy") or "balanced").strip().lower()
         if is_spot_tender and not inq.get("strategy"):
             chosen_strategy = "floor"
         if chosen_strategy not in ("floor", "balanced", "premium"):
