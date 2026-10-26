@@ -9,3 +9,42 @@ __pycache__
 .coverage
 htmlcov
 .DS_Store
+
+# Confidential Business Data & Spreadsheets (CWE-200 / CWE-312)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/*.xlsx
+data/*.xls
+data/*.xlsm
+data/*.csv
+data/*.tsv
+data/*.parquet
+data/*.feather
+*.xlsx
+*.xls
+*.xlsm
+
+# Databases & Runtime State
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+data/*.db
+data/*.sqlite*
+
+# Secrets & Environment Files
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+client_secret*.json
+
+# Logs & Scratch
+*.log
+scratch/
+audit-screenshots/
