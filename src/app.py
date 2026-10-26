@@ -1056,6 +1056,35 @@ HTML_TEMPLATE = """
             color: var(--text-dark);
             box-shadow: 0 2px 6px rgba(0,0,0,0.06);
         }
+        .dim-unit-toggle {
+            display: inline-flex;
+            background: #e2e8f0;
+            padding: 2px;
+            border-radius: var(--radius-pill);
+            gap: 2px;
+            align-items: center;
+        }
+        .dim-unit-btn {
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            padding: 2px 8px;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            line-height: 16px;
+        }
+        .dim-unit-btn:hover {
+            color: var(--text-dark);
+        }
+        .dim-unit-btn.active {
+            background: #ffffff;
+            color: var(--text-dark);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        }
         .dim-box {
             background: #f8fafc;
             border: 1px solid var(--border);
@@ -1629,16 +1658,24 @@ HTML_TEMPLATE = """
 
                     <!-- Box Dimensions Mode Container (Calculates Airline Chargeable Weight) -->
                     <div class="field-group full" id="dims_weight_container" style="margin-top: 10px; margin-bottom: 12px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <label style="margin: 0;">Box Dimensions (L × W × H in cm × Number of Pieces) <span class="req">*</span></label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <label style="margin: 0;">Box Dimensions (L × W × H × Pcs) <span class="req">*</span></label>
+                                <div class="dim-unit-toggle" id="dim_unit_toggle" role="group" aria-label="Dimension Unit">
+                                    <button type="button" class="dim-unit-btn active" id="unit_btn_cm" onclick="setDimUnit('cm')">cm</button>
+                                    <button type="button" class="dim-unit-btn" id="unit_btn_mm" onclick="setDimUnit('mm')">mm</button>
+                                    <button type="button" class="dim-unit-btn" id="unit_btn_in" onclick="setDimUnit('in')">in</button>
+                                    <button type="button" class="dim-unit-btn" id="unit_btn_m" onclick="setDimUnit('m')">m</button>
+                                </div>
+                            </div>
                             <span id="dims_ch_wt_badge" style="font-size: 12.5px; font-weight: 700; color: var(--text-dark); background: #e2e8f0; padding: 3px 10px; border-radius: 5px;">Chargeable: 432.0 kg</span>
                         </div>
                         <div class="dim-box">
                             <div class="dim-grid">
-                                <div><label>Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="120" min="1" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label>Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="80" min="1" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label>Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="90" min="1" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label>Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="3" min="1" step="1" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_l_label">Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="120" min="0.01" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_w_label">Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="80" min="0.01" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_h_label">Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="90" min="0.01" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_pcs_label">Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="3" min="1" step="1" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
                             </div>
                             <div class="dim-info" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
                                 <span id="vol_wt_display">Volumetric: 432.0 kg (Formula: L × W × H × Pcs ÷ 6000)</span>
@@ -1869,6 +1906,56 @@ HTML_TEMPLATE = """
     }
 
     let currentWeightMode = 'dims';
+    let currentDimUnit = 'cm';
+    const UNIT_FACTORS_TO_CM = {
+        cm: 1.0,
+        mm: 0.1,
+        in: 2.54,
+        m: 100.0
+    };
+
+    function setDimUnit(newUnit) {
+        if (!UNIT_FACTORS_TO_CM[newUnit]) return;
+        if (newUnit === currentDimUnit) return;
+
+        const prevUnit = currentDimUnit;
+        currentDimUnit = newUnit;
+
+        // Update toggle button active styling
+        ['cm', 'mm', 'in', 'm'].forEach(u => {
+            const btn = document.getElementById(`unit_btn_${u}`);
+            if (btn) {
+                btn.className = (u === newUnit) ? 'dim-unit-btn active' : 'dim-unit-btn';
+            }
+        });
+
+        // Update dimension input labels
+        const unitLabels = { cm: 'cm', mm: 'mm', in: 'in', m: 'm' };
+        const labelText = unitLabels[newUnit] || newUnit;
+        const lLabel = document.getElementById('dim_l_label');
+        const wLabel = document.getElementById('dim_w_label');
+        const hLabel = document.getElementById('dim_h_label');
+        if (lLabel) lLabel.innerText = `Length (${labelText})`;
+        if (wLabel) wLabel.innerText = `Width (${labelText})`;
+        if (hLabel) hLabel.innerText = `Height (${labelText})`;
+
+        // Convert existing input values from prevUnit to newUnit
+        const factorToCm = UNIT_FACTORS_TO_CM[prevUnit];
+        const factorFromCm = 1.0 / UNIT_FACTORS_TO_CM[newUnit];
+
+        ['dim_l', 'dim_w', 'dim_h'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.value && !isNaN(parseFloat(el.value))) {
+                const valInCm = parseFloat(el.value) * factorToCm;
+                const converted = valInCm * factorFromCm;
+                el.value = (newUnit === 'mm' || newUnit === 'cm')
+                    ? Math.round(converted * 10) / 10
+                    : Math.round(converted * 100) / 100;
+            }
+        });
+
+        updateDimensions();
+    }
 
     function setWeightMode(mode) {
         currentWeightMode = mode;
@@ -1906,12 +1993,24 @@ HTML_TEMPLATE = """
             ch_wt = (rawDirect && rawDirect > 0) ? rawDirect : 100;
             vol_wt = ch_wt;
         } else {
-            const l = Math.max(1, parseFloat(document.getElementById('dim_l')?.value) || 1);
-            const w = Math.max(1, parseFloat(document.getElementById('dim_w')?.value) || 1);
-            const h = Math.max(1, parseFloat(document.getElementById('dim_h')?.value) || 1);
+            const lRaw = parseFloat(document.getElementById('dim_l')?.value);
+            const wRaw = parseFloat(document.getElementById('dim_w')?.value);
+            const hRaw = parseFloat(document.getElementById('dim_h')?.value);
             const pcs = Math.max(1, parseFloat(document.getElementById('dim_pcs')?.value) || 1);
-            vol_wt = Math.round(((l * w * h * pcs) / 6000.0) * 10) / 10;
-            ch_wt = vol_wt;
+
+            const factor = UNIT_FACTORS_TO_CM[currentDimUnit] || 1.0;
+            const lCm = (!isNaN(lRaw) && lRaw > 0) ? (lRaw * factor) : 0;
+            const wCm = (!isNaN(wRaw) && wRaw > 0) ? (wRaw * factor) : 0;
+            const hCm = (!isNaN(hRaw) && hRaw > 0) ? (hRaw * factor) : 0;
+
+            if (lCm > 0 && wCm > 0 && hCm > 0) {
+                vol_wt = Math.round(((lCm * wCm * hCm * pcs) / 6000.0) * 10) / 10;
+                // Standard IATA air cargo: 0.5 kg ceiling increment
+                ch_wt = Math.max(0.5, Math.ceil(vol_wt * 2.0) / 2.0);
+            } else {
+                vol_wt = 0;
+                ch_wt = 0;
+            }
         }
 
         // Keep hidden gross_wt in sync with airline chargeable weight
@@ -1924,7 +2023,15 @@ HTML_TEMPLATE = """
         const badgeEl = document.getElementById('dims_ch_wt_badge');
         const summaryChEl = document.getElementById('summary_ch_wt_display');
 
-        if (volEl) volEl.innerText = `Volumetric: ${vol_wt.toFixed(1)} kg (Formula: L × W × H × Pcs ÷ 6000)`;
+        const formulaMap = {
+            cm: 'Formula: L × W × H × Pcs ÷ 6000',
+            mm: 'Formula: L × W × H × Pcs ÷ 6,000,000',
+            in: 'Formula: L × W × H × Pcs ÷ 366',
+            m: 'Formula: L × W × H × Pcs × 166.67'
+        };
+        const formulaNote = formulaMap[currentDimUnit] || 'Formula: L × W × H × Pcs ÷ 6000';
+
+        if (volEl) volEl.innerText = `Volumetric: ${vol_wt.toFixed(1)} kg (${formulaNote})`;
         if (chEl) chEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
         if (badgeEl) badgeEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
         if (summaryChEl) summaryChEl.innerText = `${ch_wt.toFixed(1)} kg`;
@@ -1934,7 +2041,7 @@ HTML_TEMPLATE = """
         const buyEl = document.getElementById('buy');
         if (unitEl && buyEl && document.activeElement !== buyEl) {
             const unitVal = parseFloat(unitEl.value);
-            if (!isNaN(unitVal) && unitVal > 0) {
+            if (!isNaN(unitVal) && unitVal > 0 && ch_wt > 0) {
                 buyEl.value = Math.round(unitVal * ch_wt);
             }
         }
@@ -2113,6 +2220,7 @@ HTML_TEMPLATE = """
     function applyPreset(key) {
         const p = PRESET_DATA[key];
         if (!p) return;
+        setDimUnit('cm');
         setWeightMode('dims');
         setSearchableValue('origin', p.origin);
         setSearchableValue('dest', p.dest);
@@ -2135,6 +2243,7 @@ HTML_TEMPLATE = """
     }
 
     function resetFormForNewQuote() {
+        setDimUnit('cm');
         document.getElementById('buy').value = '';
         const unitEl = document.getElementById('unit_buy');
         if (unitEl) unitEl.value = '';
@@ -2248,10 +2357,10 @@ HTML_TEMPLATE = """
             incoterms: 'FOB',
             sales_person: 'Mohnish Arora',
             strategy: 'balanced',
-            dim_l: parseFloat(document.getElementById('dim_l')?.value),
-            dim_w: parseFloat(document.getElementById('dim_w')?.value),
-            dim_h: parseFloat(document.getElementById('dim_h')?.value),
-            dim_pcs: parseInt(document.getElementById('dim_pcs')?.value, 10),
+            dim_l: !isNaN(parseFloat(document.getElementById('dim_l')?.value)) ? (parseFloat(document.getElementById('dim_l')?.value) * (UNIT_FACTORS_TO_CM[currentDimUnit] || 1.0)) : null,
+            dim_w: !isNaN(parseFloat(document.getElementById('dim_w')?.value)) ? (parseFloat(document.getElementById('dim_w')?.value) * (UNIT_FACTORS_TO_CM[currentDimUnit] || 1.0)) : null,
+            dim_h: !isNaN(parseFloat(document.getElementById('dim_h')?.value)) ? (parseFloat(document.getElementById('dim_h')?.value) * (UNIT_FACTORS_TO_CM[currentDimUnit] || 1.0)) : null,
+            dim_pcs: parseInt(document.getElementById('dim_pcs')?.value, 10) || 1,
             is_preset: Boolean(isPreset)
         };
 
@@ -3088,6 +3197,24 @@ def api_quote():
     # Weights validation (§2.2, §5.2) - Supports direct Airline Chargeable Weight as primary
     raw_chargeable = data.get("chargeable_wt") or data.get("chargeable_weight") or data.get("Chargeable_Weight_Kg")
     raw_gross = data.get("gross_wt") or data.get("gross_weight") or data.get("Gross_Weight_Kg")
+
+    # If weights not directly passed, derive from dimensions if available
+    if raw_chargeable is None and raw_gross is None:
+        if any(k in data for k in ["dim_l", "dim_w", "dim_h"]) or ("dimensions" in data and isinstance(data["dimensions"], list)):
+            try:
+                if "dimensions" in data and isinstance(data["dimensions"], list):
+                    vol_calc = compute_volumetric_weight(data["dimensions"])
+                else:
+                    l_val = float(data.get("dim_l", 0))
+                    w_val = float(data.get("dim_w", 0))
+                    h_val = float(data.get("dim_h", 0))
+                    pcs_val = int(data.get("dim_pcs", 1))
+                    vol_calc = (l_val * w_val * h_val * pcs_val) / 6000.0 if (l_val > 0 and w_val > 0 and h_val > 0) else 0.0
+                if vol_calc > 0:
+                    raw_chargeable = max(0.5, np.ceil(vol_calc * 2.0) / 2.0)
+                    raw_gross = raw_chargeable
+            except (ValueError, TypeError):
+                pass
 
     if raw_chargeable is None and raw_gross is None:
         return jsonify({"status": "error", "message": "Invalid Gross Weight. Please provide a positive weight in kg."}), 400
