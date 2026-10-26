@@ -80,7 +80,7 @@ class TestLabelPurityAndPortMapping(unittest.TestCase):
 
         self.assertEqual(map_dest_region("Tashkent"), "Asia-Pacific")
         self.assertEqual(map_dest_region("Kansai Int Apt"), "Asia-Pacific")
-        self.assertEqual(map_dest_region("Kabul"), "Asia-Pacific")
+        self.assertEqual(map_dest_region("Kabul"), "Indian Subcontinent")
 
 
 if __name__ == "__main__":

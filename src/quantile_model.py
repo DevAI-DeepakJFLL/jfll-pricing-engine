@@ -124,11 +124,14 @@ class MarginQuantileModel:
                 }
                 self.feature_cols = [c for c in df.columns if c not in EXCLUDE_COLS]
                 self.categorical_cols = [
-                    c for c in self.feature_cols if df[c].dtype == "object" or df[c].dtype.name == "category"
+                    c for c in self.feature_cols
+                    if c in CATEGORICAL_COLS or pd.api.types.is_string_dtype(df[c]) or df[c].dtype == "object" or df[c].dtype.name == "category"
                 ]
 
         cols = self.feature_cols or list(FEATURE_COLS)
-        cats = self.categorical_cols or list(CATEGORICAL_COLS)
+        cats = self.categorical_cols if self.categorical_cols is not None else list(CATEGORICAL_COLS)
+        if is_fit:
+            self.categorical_cols = list(cats)
 
         # Ensure all required features exist in df with robust fallbacks
         for col in cols:
@@ -316,6 +319,20 @@ class MarginQuantileModel:
         """
         _, p50, _ = self.predict_quantiles(X)
         return p50
+
+    def unseen_categorical_report(self, X: pd.DataFrame) -> Dict[str, str]:
+        """
+        Reports any out-of-vocabulary categorical inputs not seen during training.
+        """
+        out = {}
+        if self.encoder is None or not self.categorical_cols:
+            return out
+        for col, cats in zip(self.categorical_cols, self.encoder.categories_):
+            if col in X.columns:
+                val = str(X[col].iloc[0])
+                if val not in set(cats):
+                    out[col] = val
+        return out
 
     def save(self, path: str) -> None:
         """Serializes trained model bundle to disk."""

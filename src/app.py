@@ -35,10 +35,13 @@ sys.path.insert(0, ENGINE_ROOT)
 
 from constants import MODEL_VERSION
 from tiers import get_weight_tier, map_account_tier, check_weight_break_arbitrage
+try:
+    from taxonomy import map_destination_region
+except ImportError:
+    from src.taxonomy import map_destination_region
 from preprocess import (
     normalize_port_name,
     map_origin_region,
-    map_dest_region,
     clean_incoterms,
     validate_shipment_physics,
     compute_volumetric_weight
@@ -660,7 +663,7 @@ def api_quote():
 
     # Derived Geographic Hierarchies & Tiers
     origin_region = map_origin_region(origin)
-    dest_region = map_dest_region(dest)
+    dest_region = map_destination_region(dest)
     regional_lane = f"{origin_region} -> {dest_region}"
 
     tier = get_weight_tier(chargeable_wt)

@@ -372,7 +372,7 @@ class PricingEngineV3:
         raw_dest = str(inq.get("Destination_Port") or inq.get("dest") or inq.get("Destination_Region") or "")
         dest_region = map_destination_region(raw_dest) if raw_dest else str(inq.get("Destination_Region") or "Europe")
 
-        regional_lane = str(inq.get("Regional_Lane") or f"{origin_region} -> {dest_region}")
+        regional_lane = f"{origin_region} -> {dest_region}"
         client_cat = str(inq.get("Company_Group") or inq.get("client") or "Subagent")
         incoterms = str(inq.get("Incoterms") or inq.get("incoterms") or "FOB")
 
@@ -802,6 +802,12 @@ class PricingEngineV3:
                 "recommended margin is anchored to regional corridor benchmarks."
             )
         confidence = "Low" if warnings else "High"
+
+        if hasattr(self.model, "unseen_categorical_report"):
+            unseen = self.model.unseen_categorical_report(feat_df)
+            if unseen:
+                warnings.append(f"Out-of-vocabulary inputs treated as missing: {unseen}. Price is extrapolated.")
+                confidence = "Low"
 
         # 11. Feature Signals Context
         signals = {

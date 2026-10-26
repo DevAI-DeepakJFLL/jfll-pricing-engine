@@ -28,6 +28,11 @@ import pandas as pd
 # Support both module and standalone execution
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tiers import map_account_tier, get_weight_tier
+try:
+    from taxonomy import map_destination_region
+except ImportError:
+    from src.taxonomy import map_destination_region
+import warnings
 
 
 # ------------------------------------------------------------------------------
@@ -409,27 +414,13 @@ DEST_ASIA_PACIFIC_KEYWORDS = [
 
 
 def map_dest_region(dest: str) -> str:
-    """Classify destination airport name or code into major commercial freight corridors."""
-    d = str(dest).lower().strip()
-    for k in DEST_MIDDLE_EAST_KEYWORDS:
-        if k in d:
-            return "Middle East"
-    for k in DEST_EUROPE_KEYWORDS:
-        if k in d:
-            return "Europe"
-    for k in DEST_NORTH_AMERICA_KEYWORDS:
-        if k in d:
-            return "North America"
-    for k in DEST_LATIN_AMERICA_KEYWORDS:
-        if k in d:
-            return "Latin America"
-    for k in DEST_AFRICA_KEYWORDS:
-        if k in d:
-            return "Africa"
-    for k in DEST_ASIA_PACIFIC_KEYWORDS:
-        if k in d:
-            return "Asia-Pacific"
-    return "Other Destination"
+    """Deprecated: Use taxonomy.map_destination_region instead."""
+    warnings.warn(
+        "preprocess.map_dest_region is deprecated. Use taxonomy.map_destination_region instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return map_destination_region(dest)
 
 
 def clean_incoterms(term: Any) -> str:
@@ -572,7 +563,7 @@ def clean_and_standardize_dataset(
 
     # 4. Expanded Destination Mapping & Geographic Corridors (P-6)
     print("[*] Applying expanded destination mapping...")
-    df["Destination_Region"] = df["Destination_Port"].apply(map_dest_region)
+    df["Destination_Region"] = df["Destination_Port"].apply(map_destination_region)
     df["Origin_Region"] = df["Origin_Port"].apply(map_origin_region)
     df["Regional_Lane"] = df["Origin_Region"] + " -> " + df["Destination_Region"]
     df["Trade_Lane"] = df["Origin_Port"] + " -> " + df["Destination_Port"]

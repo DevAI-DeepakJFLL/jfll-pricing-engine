@@ -570,7 +570,7 @@ EXACT_PORT_MAP: Dict[str, str] = {
     "MAASTRICHT": "Europe",
     "MST": "Europe",
     "GENOVA": "Europe",
-    "GOA": "Europe",
+    "GENOA": "Europe",
     "LUQA": "Europe",
     "MLA": "Europe",
     "MALTA": "Europe",
@@ -1025,6 +1025,8 @@ EXACT_PORT_MAP: Dict[str, str] = {
     "MBJ": "Latin America",
     "SAN PEDRO SULA": "Latin America",
     "SAP": "Latin America",
+    "SAN SALVADOR": "Latin America",
+    "SAL": "Latin America",
     "SAPIRANGA": "Latin America",
     "PIARCO INTERNATIONAL AIRPORT": "Latin America",
     "POS": "Latin America",
@@ -1186,6 +1188,8 @@ EXACT_PORT_MAP: Dict[str, str] = {
     "SWF": "North America",
     "BINGHAMTON": "North America",
     "BGM": "North America",
+    "ATLANTA": "North America",
+    "ATL": "North America",
     "DAYTON": "North America",
     "DAY": "North America",
 }
@@ -1226,7 +1230,7 @@ REGION_PATTERNS = [
         r"LUXEMBOURG|LHR|FRA|CDG|AMS|MAD|BCN|MUC|FCO|IST|"
         r"SHEREMETYEVO|WARSZAWA|OTOPENI|HANNOVER|KOLN|BONN|TBILISI|BORDEAUX|SEVILLA|DRESDEN|"
         r"NUREMBERG|NURNBERG|BILBAO|BASEL|KATOWICE|RIGA|TALLINN|CALDEN|BOLOGNA|SARAJEVO|VALENCIA|"
-        r"NANTES|VENICE|VENEZIA|ANTALYA|MAASTRICHT|GENOVA|LUQA|MALTA|BAKU|TOULOUSE|MINSK|LARNACA|"
+        r"NANTES|VENICE|VENEZIA|ANTALYA|MAASTRICHT|GENOVA|GENOA|LUQA|MALTA|BAKU|TOULOUSE|MINSK|LARNACA|"
         r"IZMIR|PRISTINA|LILLE|ANKARA|BELFAST|GLASGOW|KRAKOW|FLORENCE|FIRENZE|STAVANGER|BREMEN|"
         r"GRAZ|EDINBURGH|NAPLES|NAPOLI|NOVOSIBIRSK|MALMO|BILLUND|ABERDEEN|LEIPZIG|STRASBOURG|"
         r"ALICANTE|THESSALONIKI|CAGLIARI|LINZ|TENERIFE|SVO|WAW|OTP|HAJ|CGN|LED|KSF|TBS"
@@ -1295,6 +1299,23 @@ REGION_PATTERNS = [
     )),
 ]
 
+_AMBIGUOUS_COUNTRY_SUFFIXES = {"GEORGIA"}
+_IATA_ONLY = re.compile(r"^[A-Za-z]{3}$")
+_ISOLATED_PUNCT = set("()[]/\\-–—,:")
+
+
+def _is_isolated_token(text: str, start: int, end: int) -> bool:
+    """Checks if a matched token is bounded by punctuation or string boundaries."""
+    prefix = text[:start].rstrip()
+    char_before = prefix[-1] if prefix else ""
+    suffix = text[end:].lstrip()
+    char_after = suffix[0] if suffix else ""
+    if char_before in _ISOLATED_PUNCT or char_after in _ISOLATED_PUNCT:
+        return True
+    if not char_before and not char_after:
+        return True
+    return False
+
 
 def map_destination_region(port_name: str, country_name: str = "") -> str:
     """
@@ -1326,13 +1347,20 @@ def map_destination_region(port_name: str, country_name: str = "") -> str:
 
     # 2. Port string containing explicit country reference after comma (e.g. 'Armenia, Colombia')
     if "," in port_clean:
-        sub_country = port_clean.split(",")[-1].strip()
-        if sub_country in COUNTRY_TO_REGION:
-            return COUNTRY_TO_REGION[sub_country]
-        sub_upper = sub_country.upper()
-        for c_known, region in COUNTRY_TO_REGION.items():
-            if sub_upper == c_known.upper():
-                return region
+        prefix, sub_country = port_clean.rsplit(",", 1)
+        sub_country_clean = sub_country.strip()
+        sub_upper = sub_country_clean.upper()
+        if sub_upper in _AMBIGUOUS_COUNTRY_SUFFIXES:
+            # e.g. "Atlanta, Georgia" is a US state, not the country Georgia.
+            # Strip the state suffix and resolve by city.
+            port_clean = prefix.strip()
+            port_upper = port_clean.upper()
+        else:
+            if sub_country_clean in COUNTRY_TO_REGION:
+                return COUNTRY_TO_REGION[sub_country_clean]
+            for c_known, region in COUNTRY_TO_REGION.items():
+                if sub_upper == c_known.upper():
+                    return region
 
     # 3. Disambiguation for 'Armenia' with Colombia vs Europe context
     if "ARMENIA" in port_upper and "COLOMBIA" in port_upper:
@@ -1354,8 +1382,21 @@ def map_destination_region(port_name: str, country_name: str = "") -> str:
             return region
 
     # 6. Regional Word-Boundary Patterns
+    best_region = None
+    best_match_len = 0
     for region_name, pattern in REGION_PATTERNS:
-        if pattern.search(port_clean):
-            return region_name
+        for m in pattern.finditer(port_clean):
+            token = m.group(0)
+            if _IATA_ONLY.match(token):
+                # Bare 3-letter alpha tokens only match if whole input is the 3-letter code or isolated
+                if not (_IATA_ONLY.match(port_clean) or _is_isolated_token(port_clean, m.start(), m.end())):
+                    continue
+            token_len = len(token)
+            if token_len > best_match_len:
+                best_match_len = token_len
+                best_region = region_name
+
+    if best_region:
+        return best_region
 
     return "Other Destination"
