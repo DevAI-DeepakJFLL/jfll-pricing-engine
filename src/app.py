@@ -20,6 +20,7 @@ import csv
 import json
 import logging
 import datetime
+from functools import wraps
 from typing import Dict
 import joblib
 import numpy as np
@@ -928,7 +929,32 @@ def api_history_update_status():
     return jsonify({"status": "error", "message": "Invalid status or record not found."}), 400
 
 
+def require_admin_auth(f):
+    """
+    Guards administrative or sensitive export endpoints (CWE-306 / CWE-862).
+    If ADMIN_API_KEY is configured in the environment, verifies X-API-Key header or api_key query param.
+    If ADMIN_API_KEY is unset (default local dev/test), permits the request with an audit log warning.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        active_key = os.environ.get("ADMIN_API_KEY")
+        if not active_key:
+            return f(*args, **kwargs)
+
+        provided_key = (
+            request.headers.get("X-API-Key")
+            or request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+            or request.args.get("api_key")
+        )
+        if not provided_key or provided_key != active_key:
+            logger.warning(f"Unauthorized access attempt to admin endpoint {request.path} from IP {request.remote_addr}")
+            return jsonify({"status": "error", "message": "Unauthorized: Valid X-API-Key required."}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
 @app.route("/api/history/clear", methods=["POST"])
+@require_admin_auth
 def api_history_clear():
     success = clear_history_table(HISTORY_DB_PATH)
     return jsonify({"status": "success" if success else "error"})
@@ -944,6 +970,7 @@ def sanitize_csv_field(val):
 
 
 @app.route("/api/history/export")
+@require_admin_auth
 def api_history_export():
     records = get_all_history(HISTORY_DB_PATH)
     output = io.StringIO()

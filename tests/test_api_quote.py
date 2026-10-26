@@ -5,6 +5,7 @@ Verifies server-side physical validation, HTTP 400 responses, revision defaults,
 and markup vs gross margin calculations.
 """
 
+import os
 import unittest
 import json
 from src.app import app
@@ -91,6 +92,35 @@ class TestApiQuoteIntegration(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
         self.assertEqual(data["status"], "success")
+
+    def test_api_admin_auth_guard(self):
+        """Verifies CWE-306/CWE-862 authentication enforcement on clear & export endpoints."""
+        test_key = "secure-audit-key-888"
+        os.environ["ADMIN_API_KEY"] = test_key
+        try:
+            # 1. Clear endpoint without key -> 401
+            res_clear_unauth = self.client.post("/api/history/clear")
+            self.assertEqual(res_clear_unauth.status_code, 401)
+            self.assertIn("Unauthorized", res_clear_unauth.get_json().get("message", ""))
+
+            # 2. Clear endpoint with wrong key -> 401
+            res_clear_wrong = self.client.post("/api/history/clear", headers={"X-API-Key": "wrong-key"})
+            self.assertEqual(res_clear_wrong.status_code, 401)
+
+            # 3. Clear endpoint with valid key -> 200
+            res_clear_auth = self.client.post("/api/history/clear", headers={"X-API-Key": test_key})
+            self.assertEqual(res_clear_auth.status_code, 200)
+
+            # 4. Export endpoint without key -> 401
+            res_export_unauth = self.client.get("/api/history/export")
+            self.assertEqual(res_export_unauth.status_code, 401)
+
+            # 5. Export endpoint with valid query param -> 200 CSV
+            res_export_auth = self.client.get(f"/api/history/export?api_key={test_key}")
+            self.assertEqual(res_export_auth.status_code, 200)
+            self.assertEqual(res_export_auth.mimetype, "text/csv")
+        finally:
+            os.environ.pop("ADMIN_API_KEY", None)
 
     def test_api_history_outcome(self):
         # First generate a quote to have an entry in history
