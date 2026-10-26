@@ -60,6 +60,7 @@ from db import (
 app = Flask(__name__)
 # Limit incoming JSON payload to 1MB to prevent memory exhaustion DoS
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pricing_web")

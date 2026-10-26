@@ -1327,7 +1327,6 @@
                         <span class="hero-corridor-badge" id="res_corridor_badge">Pre-Approved Corridor</span>
                     </div>
                     <div class="hero-value" id="res_margin_pct">0.0% – 0.0%</div>
-                    <div class="hero-sub" id="res_hero_sub">Target Benchmark: 0.0% Markup | Quoted Sell Rate: ₹0 / kg</div>
                 </div>
 
                 <!-- 3 Supporting Commercial Metric Tiles -->
@@ -1953,15 +1952,6 @@
 
         const badgeEl = document.getElementById('res_corridor_badge');
         if (badgeEl) badgeEl.innerText = badgeText;
-
-        const heroSubEl = document.getElementById('res_hero_sub');
-        if (heroSubEl) {
-            let subText = `Target Benchmark: ${strat.Margin_Percentage.toFixed(1)}% Markup | Quoted Sell Rate: ₹${formatINR(perKgRate)} / kg (₹${formatINR(sellPrice)} Total)`;
-            if (corr && corr.revision_guidance && selectedStrategyKey === 'balanced') {
-                subText = `${corr.revision_guidance} • Quoted Sell Rate: ₹${formatINR(perKgRate)} / kg (₹${formatINR(sellPrice)} Total)`;
-            }
-            heroSubEl.innerText = subText;
-        }
 
         // Supporting metric 1: Selling Price
         const priceEl = document.getElementById('res_selling_price');
