@@ -53,6 +53,7 @@ jobs:
             tests/test_policy_guardrails.py \
             tests/test_preprocess_validation.py \
             tests/test_scenarios_t1_t15.py \
+            tests/test_security_integrity.py \
             tests/test_strategy_tiers.py \
             tests/test_taxonomy.py \
             tests/test_tiers.py
@@ -84,7 +85,7 @@ jobs:
         run: |
           echo "Uploading trained ML models and datasets to S3 bucket: $S3_DATA_BUCKET"
           aws s3 sync models/ "s3://${S3_DATA_BUCKET}/models/" --delete
-          aws s3 sync data/processed/ "s3://${S3_DATA_BUCKET}/data/processed/" --delete
+          aws s3 sync data/processed/ "s3://${S3_DATA_BUCKET}/data/processed/"
 
       - name: Build Lambda Deployment Package
         run: |
