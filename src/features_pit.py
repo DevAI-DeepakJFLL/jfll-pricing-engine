@@ -375,7 +375,28 @@ class CustomerPITRegistry:
         current_t = pd.to_datetime(quote_date)
         resolved_lane = regional_lane if regional_lane is not None else lane
 
-        cust_list = self._customers.get(str(customer_id), [])
+        cust_key_str = str(customer_id)
+        cust_list = self._customers.get(cust_key_str)
+        if not cust_list:
+            # Fallback 1: Resolve canonical slug if raw company name was queried
+            try:
+                from src.customer_normalizer import get_canonical_customer_id
+            except ImportError:
+                try:
+                    from customer_normalizer import get_canonical_customer_id
+                except ImportError:
+                    get_canonical_customer_id = None
+            if get_canonical_customer_id is not None:
+                canonical_id = get_canonical_customer_id(cust_key_str)
+                cust_list = self._customers.get(canonical_id)
+
+        if not cust_list and cust_key_str.startswith("CUST_"):
+            # Fallback 2: Check raw/normalized company name without CUST_ prefix
+            stripped = cust_key_str[5:].replace("_", " ")
+            cust_list = self._customers.get(stripped)
+
+        if not cust_list:
+            cust_list = []
 
         # Default outputs
         won_count_180d = 0
@@ -465,21 +486,23 @@ class CustomerPITRegistry:
         margin_col = schema["margin"]
         sell_col = schema["sell"]
 
-        for _, row in df.iterrows():
-            quote_date = row[date_src]
-            customer_id = row[cust_key]
-            lane_val = row[lane_key] if lane_key and lane_key in row else None
-            is_won_val = row[won_col] if won_col and won_col in row else 0
-            margin_val = row[margin_col] if margin_col and margin_col in row else None
-            sell_val = row[sell_col] if sell_col and sell_col in row else 0.0
+        date_vals = df[date_src].values
+        cust_vals = df[cust_key].values
+        lane_vals = df[lane_key].values if lane_key and lane_key in df.columns else [None] * len(df)
+        won_vals = df[won_col].values if won_col and won_col in df.columns else [0] * len(df)
+        margin_vals = df[margin_col].values if margin_col and margin_col in df.columns else [np.nan] * len(df)
+        sell_vals = df[sell_col].values if sell_col and sell_col in df.columns else [0.0] * len(df)
 
+        for qd, cid, lval, wval, mval, sval in zip(
+            date_vals, cust_vals, lane_vals, won_vals, margin_vals, sell_vals
+        ):
             self.update(
-                quote_date=quote_date,
-                customer_id=customer_id,
-                is_won=is_won_val,
-                margin=margin_val,
-                sell_inr=sell_val,
-                regional_lane=lane_val,
+                quote_date=qd,
+                customer_id=cid,
+                is_won=wval,
+                margin=mval,
+                sell_inr=sval,
+                regional_lane=lval,
             )
         return self
 

@@ -4,9 +4,15 @@ Unit tests for point-in-time rolling customer and lane feature engineering
 with zero lookahead leakage and real-time registry consistency.
 """
 
+import os
+import sys
 import unittest
 import numpy as np
 import pandas as pd
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from src.features_pit import compute_point_in_time_features, CustomerPITRegistry
 
