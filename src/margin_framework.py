@@ -6,7 +6,6 @@ Level 1 (structure): weight slab x destination region sets the margin BAND [P25,
 Level 2 (weights):   signals in [-1, +1] move the quote position inside the band.
 Level 3 (gates):     cost floor, cohort-aware cap, approval flags. Gates are NOT weights.
 """
-from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 import math
 import re
@@ -14,12 +13,12 @@ import numpy as np
 import pandas as pd
 try:
     from constants import (compute_cost_floor_price, get_category_commodity_max_margin,
-                           COMMODITY_RISK_BUFFERS, CLIENT_CATEGORY_MAX_MARGIN_CAPS, get_client_category_max_margin)
+                           COMMODITY_RISK_BUFFERS, get_client_category_max_margin)
     from tiers import get_weight_tier, map_account_tier
     from preprocess import map_origin_region, map_dest_region
 except ImportError:
     from src.constants import (compute_cost_floor_price, get_category_commodity_max_margin,
-                               COMMODITY_RISK_BUFFERS, CLIENT_CATEGORY_MAX_MARGIN_CAPS, get_client_category_max_margin)
+                               COMMODITY_RISK_BUFFERS, get_client_category_max_margin)
     from src.tiers import get_weight_tier, map_account_tier
     from src.preprocess import map_origin_region, map_dest_region
 

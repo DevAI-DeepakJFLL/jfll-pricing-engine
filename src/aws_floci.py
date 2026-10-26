@@ -12,7 +12,7 @@ import os
 import logging
 import json
 import urllib.request
-from typing import Optional, Dict, Any
+from typing import Optional
 
 try:
     import boto3

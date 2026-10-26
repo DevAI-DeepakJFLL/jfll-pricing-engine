@@ -44,14 +44,13 @@ import pandas as pd
 
 # Support module and standalone execution
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from tiers import WEIGHT_TIER_BINS, WEIGHT_TIER_LABELS, map_account_tier, get_weight_tier
+from tiers import map_account_tier, get_weight_tier
 from preprocess import (
     normalize_port_name,
     map_origin_region,
     map_dest_region,
     is_valid_indian_origin,
     map_commodity_group,
-    clean_incoterms,
     get_air_cargo_season,
     compute_cyclical_month,
 )

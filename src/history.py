@@ -4,7 +4,6 @@ Point-in-time customer history and relationship metrics.
 Computes metrics strictly from earlier quotes within a rolling 365-day window.
 """
 
-from typing import Optional
 import numpy as np
 import pandas as pd
 

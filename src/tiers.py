@@ -5,11 +5,6 @@ Single source of truth for Weight-Tier, Weight-Break Arbitrage, and Account-Tier
 
 from typing import List, Optional, Dict, Any
 
-try:
-    from history import add_customer_history
-except ImportError:
-    from src.history import add_customer_history
-
 WEIGHT_TIER_BINS: List[float] = [0.0, 45.0, 100.0, 300.0, 500.0, 1000.0, float("inf")]
 WEIGHT_TIER_LABELS: List[str] = ["<45kg", "45-100kg", "100-300kg", "300-500kg", "500-1000kg", ">1000kg"]
 

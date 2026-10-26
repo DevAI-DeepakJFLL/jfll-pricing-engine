@@ -20,7 +20,7 @@ import os
 import sys
 import argparse
 import datetime
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 import joblib
 import numpy as np
 import pandas as pd
@@ -45,8 +45,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from constants import (
     MIN_BENCHMARK_MARGIN,
     MAX_BENCHMARK_MARGIN,
-    MIN_CANDIDATE_MARGIN,
-    MAX_CANDIDATE_MARGIN,
     MODEL_VERSION
 )
 

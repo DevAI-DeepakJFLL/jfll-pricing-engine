@@ -33,13 +33,8 @@ from constants import (
     MIN_CANDIDATE_MARGIN,
     MAX_CANDIDATE_MARGIN,
     STRATEGY_THRESHOLDS,
-    MODEL_VERSION,
     compute_cost_floor_price,
-    get_commodity_max_margin,
-    get_client_category_max_margin,
-    get_category_commodity_max_margin,
-    COMMODITY_MAX_MARGIN_CAPS,
-    CLIENT_CATEGORY_MAX_MARGIN_CAPS
+    get_category_commodity_max_margin
 )
 from preprocess import get_air_cargo_season, compute_cyclical_month, map_origin_region, map_dest_region
 from tiers import get_weight_tier, map_account_tier

@@ -20,7 +20,7 @@ import csv
 import json
 import logging
 import datetime
-from typing import Dict, Any, Optional
+from typing import Dict
 import joblib
 import numpy as np
 import pandas as pd
@@ -32,38 +32,27 @@ ENGINE_ROOT = os.path.dirname(BASE_DIR)
 sys.path.insert(0, BASE_DIR)
 sys.path.insert(0, ENGINE_ROOT)
 
-from constants import (
-    MODEL_VERSION,
-    MIN_BENCHMARK_MARGIN,
-    MAX_BENCHMARK_MARGIN,
-    MIN_CANDIDATE_MARGIN,
-    MAX_CANDIDATE_MARGIN,
-    STRATEGY_THRESHOLDS
-)
+from constants import MODEL_VERSION
 from tiers import get_weight_tier, map_account_tier, check_weight_break_arbitrage
 from preprocess import (
     normalize_port_name,
     map_origin_region,
     map_dest_region,
     clean_incoterms,
-    map_commodity_group,
     validate_shipment_physics,
     compute_volumetric_weight
 )
-from engine import MarginRecommendationEngine, EngineConfig, RetentionGuardrailConfig
+from engine import MarginRecommendationEngine
 from db import (
     init_history_db,
     log_recommendation,
     record_outcome,
     get_all_history,
-    get_history_stats,
     get_history_paginated,
     update_lead_status,
     clear_history_table,
     get_recent_competitor_rate_benchmark,
-    LEAD_STATUSES,
-    VALID_STATUS_CODES,
-    get_status_class
+    LEAD_STATUSES
 )
 
 app = Flask(__name__)
@@ -145,10 +134,8 @@ engine = MarginRecommendationEngine(
     cohort_table=model_bundle.get("cohort_table")
 )
 try:
-    import margin_framework as mf
     from preprocess import get_air_cargo_season
 except ImportError:
-    from src import margin_framework as mf
     from src.preprocess import get_air_cargo_season
 
 MARGIN_TABLES = model_bundle.get("margin_tables")

@@ -183,10 +183,6 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
     with sqlite3.connect(abs_path) as conn:
         cursor = conn.cursor()
 
-        # Check existing user_version PRAGMA
-        cursor.execute("PRAGMA user_version")
-        ver_row = cursor.fetchone()
-        version = ver_row[0] if ver_row else 0
 
         # Base table creation with full schema
         cursor.execute(f"""

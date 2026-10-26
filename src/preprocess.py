@@ -27,7 +27,7 @@ import pandas as pd
 
 # Support both module and standalone execution
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from tiers import WEIGHT_TIER_BINS, WEIGHT_TIER_LABELS, map_account_tier, get_weight_tier
+from tiers import map_account_tier, get_weight_tier
 
 
 # ------------------------------------------------------------------------------
