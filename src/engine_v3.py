@@ -57,12 +57,19 @@ _CANDIDATE_BUNDLE_PATHS = [
     os.path.join("/var/task", "models", "engine_v3_bundle.joblib"),
 ]
 DEFAULT_BUNDLE_PATH = next((p for p in _CANDIDATE_BUNDLE_PATHS if os.path.exists(p)), _CANDIDATE_BUNDLE_PATHS[0])
-DEFAULT_DATA_PATH = os.path.join(
+_2025_DATA_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data",
+    "processed",
+    "won_deals_2025_train_70_pit.csv",
+)
+_LEGACY_DATA_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "data",
     "processed",
     "won_deals_margin_v3.csv",
 )
+DEFAULT_DATA_PATH = _2025_DATA_PATH if os.path.exists(_2025_DATA_PATH) else _LEGACY_DATA_PATH
 
 TIER_METADATA = {
     "floor": {
@@ -126,7 +133,18 @@ class PricingEngineV3:
         if not os.path.exists(path):
             raise FileNotFoundError(f"Training data not found at: {path}")
 
-        df = pd.read_csv(path)
+        df = pd.read_csv(path, low_memory=False)
+
+        # Ensure canonical features are present with robust fallbacks
+        if "Cargo_Density_Ratio" not in df.columns:
+            df["Cargo_Density_Ratio"] = 1.0
+        if "Incoterms" not in df.columns:
+            df["Incoterms"] = "FOB"
+
+        # Chronological sort
+        sort_cols = [c for c in ["quote_date", "Year_Month"] if c in df.columns]
+        if sort_cols:
+            df = df.sort_values(sort_cols).reset_index(drop=True)
 
         # Temporal Split: train on pre-July 2026, calibrate on July 2026 (or 80/20 temporal split)
         if "Year_Month" in df.columns and (df["Year_Month"] == "2026-07").any():
@@ -167,26 +185,33 @@ class PricingEngineV3:
         )
 
         # 3. Populate CustomerPITRegistry from historical transactions
-        self.pit_registry = CustomerPITRegistry()
-        sort_cols = ["quote_date"] if "quote_date" in df.columns else ["Year_Month"]
-        df_sorted = df.sort_values(sort_cols)
-        for _, row in df_sorted.iterrows():
-            q_date = row.get("quote_date") or row.get("Year_Month")
-            cust_name = row.get("Customer_Company") or row.get("customer_name") or row.get("customer_id")
-            if pd.isna(cust_name) or str(cust_name).strip() == "":
-                continue
-            canonical_cust = normalize_customer_name(str(cust_name))
-            m_pct = row.get("Margin_Percentage")
-            sell_inr = row.get("Total_Sell_INR") or row.get("sell_inr") or 0.0
-            r_lane = row.get("Regional_Lane")
-            self.pit_registry.update(
-                quote_date=q_date,
-                customer_id=canonical_cust,
-                is_won=row.get("is_won", 1),
-                margin=m_pct,
-                sell_inr=sell_inr,
-                regional_lane=r_lane,
-            )
+        registry_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "models",
+            "customer_pit_registry_2025.joblib",
+        )
+        if os.path.exists(registry_path):
+            self.pit_registry = joblib.load(registry_path)
+        else:
+            self.pit_registry = CustomerPITRegistry()
+            df_sorted = df.sort_values(sort_cols) if sort_cols else df
+            for _, row in df_sorted.iterrows():
+                q_date = row.get("quote_date") or row.get("Year_Month")
+                cust_name = row.get("Customer_Company") or row.get("customer_name") or row.get("customer_id")
+                if pd.isna(cust_name) or str(cust_name).strip() == "":
+                    continue
+                canonical_cust = normalize_customer_name(str(cust_name))
+                m_pct = row.get("Margin_Percentage")
+                sell_inr = row.get("Total_Sell_INR") or row.get("sell_inr") or 0.0
+                r_lane = row.get("Regional_Lane")
+                self.pit_registry.update(
+                    quote_date=q_date,
+                    customer_id=canonical_cust,
+                    is_won=row.get("is_won", 1),
+                    margin=m_pct,
+                    sell_inr=sell_inr,
+                    regional_lane=r_lane,
+                )
 
         # 4. Compute slab history quantiles for empirical History_Percentile lookup
         self.slab_quantiles = {}
@@ -442,11 +467,11 @@ class PricingEngineV3:
         if str(weight_tier) in (">1000kg", "500-1000kg") or chargeable_wt >= 500.0:
             delta_slab = 0.15      # ±15% relative latitude on heavy cargo
             delta_min = 0.75       # minimum ±0.75 pp negotiation buffer
-            delta_max = 1.85       # capped at ±1.85 pp to prevent wide corridor leakage
+            delta_max = 1.80       # capped at ±1.80 pp to enforce heavy cargo corridor bound (<= 1.8 pp)
         elif str(weight_tier) in ("100-300kg", "300-500kg", "45-100kg") or chargeable_wt >= 45.0:
             delta_slab = 0.20      # ±20% relative latitude on mid-weight cargo
             delta_min = 0.75
-            delta_max = 2.75
+            delta_max = 2.75       # capped at ±2.75 pp (<= 3.5 pp)
         else:
             delta_slab = 0.25      # ±25% relative latitude on courier/small shipments (<45kg)
             delta_min = 1.00
