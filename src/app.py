@@ -44,6 +44,7 @@ from preprocess import (
     compute_volumetric_weight
 )
 from engine import MarginRecommendationEngine
+from security import verify_artifact_integrity, require_admin_auth
 from db import (
     init_history_db,
     log_recommendation,
@@ -113,6 +114,7 @@ training_window = ["2026-01", "2026-09"]
 if os.path.exists(MODEL_PATH):
     logger.info(f"Loading baseline model artifact from: {MODEL_PATH}")
     try:
+        verify_artifact_integrity(MODEL_PATH)
         model_bundle = joblib.load(MODEL_PATH)
         import sklearn
         runtime_sklearn = sklearn.__version__
@@ -927,30 +929,6 @@ def api_history_update_status():
     if success:
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Invalid status or record not found."}), 400
-
-
-def require_admin_auth(f):
-    """
-    Guards administrative or sensitive export endpoints (CWE-306 / CWE-862).
-    If ADMIN_API_KEY is configured in the environment, verifies X-API-Key header or api_key query param.
-    If ADMIN_API_KEY is unset (default local dev/test), permits the request with an audit log warning.
-    """
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        active_key = os.environ.get("ADMIN_API_KEY")
-        if not active_key:
-            return f(*args, **kwargs)
-
-        provided_key = (
-            request.headers.get("X-API-Key")
-            or request.headers.get("Authorization", "").replace("Bearer ", "").strip()
-            or request.args.get("api_key")
-        )
-        if not provided_key or provided_key != active_key:
-            logger.warning(f"Unauthorized access attempt to admin endpoint {request.path} from IP {request.remote_addr}")
-            return jsonify({"status": "error", "message": "Unauthorized: Valid X-API-Key required."}), 401
-        return f(*args, **kwargs)
-    return decorated
 
 
 @app.route("/api/history/clear", methods=["POST"])

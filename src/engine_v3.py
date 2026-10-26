@@ -40,6 +40,7 @@ try:
     from features_pit import CustomerPITRegistry
     from tiers import get_weight_tier, map_account_tier
     from preprocess import map_origin_region
+    from security import verify_artifact_integrity
 except ImportError:
     from src.constants import MODEL_VERSION
     from src.quantile_model import MarginQuantileModel
@@ -50,6 +51,7 @@ except ImportError:
     from src.features_pit import CustomerPITRegistry
     from src.tiers import get_weight_tier, map_account_tier
     from src.preprocess import map_origin_region
+    from src.security import verify_artifact_integrity
 
 
 _CANDIDATE_BUNDLE_PATHS = [
@@ -255,10 +257,11 @@ class PricingEngineV3:
         joblib.dump(bundle, target)
 
     def load(self, path: Optional[str] = None) -> "PricingEngineV3":
-        """Deserializes trained model bundle from disk."""
+        """Deserializes trained model bundle from disk with cryptographic integrity verification (CWE-502)."""
         target = path or self.bundle_path
         if not os.path.exists(target):
             raise FileNotFoundError(f"Bundle not found at: {target}")
+        verify_artifact_integrity(target)
         bundle = joblib.load(target)
         self.model = bundle["model"]
         self.calibrator = bundle["calibrator"]
