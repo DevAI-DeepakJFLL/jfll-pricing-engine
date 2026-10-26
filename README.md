@@ -82,7 +82,7 @@ air_export_pricing_engine/
 │   ├── engine.py                             # Decision engine, cohort lookup & strategic tiers
 │   ├── history.py                            # Customer historical deal aggregation
 │   ├── db.py                                 # SQLite audit history, soft-delete & preset isolation
-│   ├── aws_floci.py                          # AWS S3 & SSM cloud emulator connector
+│   ├── aws_client.py                         # AWS S3 & SSM cloud connector
 │   └── app.py                                # Flask web app, REST API & leads dashboard
 │
 ├── tests/
@@ -104,12 +104,12 @@ air_export_pricing_engine/
 │   ├── test_margin_framework.py              # Conformal corridor ordering & coverage guarantees
 │   ├── test_db_audit.py                      # SQLite migrations, soft delete & preset isolation
 │   ├── test_api_quote.py                     # Web API integration & HTTP 400 validation
-│   ├── test_aws_floci.py                     # Floci S3 & SSM connector tests
-│   ├── test_floci_e2e_smoke.py               # Live E2E smoke tests
+│   ├── test_aws_client.py                    # AWS S3 & SSM connector tests
+│   ├── test_e2e_smoke.py                     # Live E2E smoke tests
 │   └── test_scenarios_t1_t15.py              # 15 realistic end-to-end air-export scenarios
 │
 ├── scripts/
-│   ├── deploy_floci.py                       # Cloud resource provisioning & container deployment
+│   ├── deploy_aws.py                         # Cloud resource provisioning & S3/SSM deployment
 │   ├── monitor_market_drift.py               # Offline Market & Concept Drift Watchdog
 │   ├── verify_vocab_alignment.py             # UI vs. model encoder vocabulary alignment gate
 │   ├── test_runner.py                        # Standalone regression test runner
@@ -119,7 +119,7 @@ air_export_pricing_engine/
 ├── requirements.txt                          # Locked dependencies
 ├── run.sh                                    # Unified project CLI runner
 ├── Dockerfile                                # Production container definition
-├── docker-compose.floci.yml                  # Floci container orchestration
+├── docker-compose.yml                        # Docker container orchestration
 └── README.md                                 # Complete project documentation
 ```
 
@@ -139,7 +139,7 @@ All tasks are managed through `./run.sh`:
 # 3. Train Two-Stage Machine Learning model and build conformal tables
 ./run.sh train
 
-# 4. Run full unit and scenario test suite (103/103 passing)
+# 4. Run full unit and scenario test suite
 ./run.sh test
 
 # 5. Run Offline Market & Concept Drift Watchdog
@@ -148,17 +148,16 @@ All tasks are managed through `./run.sh`:
 # 6. Launch Web Application & Quoting API (Local Dev)
 ./run.sh serve
 
-# 7. Provision & Deploy to Local Cloud Emulator (Floci AWS)
-./run.sh floci-provision  # Uploads model to Floci S3 & configures Floci SSM
-./run.sh floci-deploy     # Builds Docker container and launches on http://localhost:5055
-./run.sh floci-test       # Runs live E2E smoke tests against the Floci container
-./run.sh floci-down       # Stops the deployed container
+# 7. Provision & Deploy via Docker / AWS
+./run.sh aws-provision   # Uploads model to AWS S3 & configures AWS SSM
+./run.sh docker-deploy   # Builds Docker container and launches on http://localhost:5050
+./run.sh docker-test     # Runs live E2E smoke tests against the running container
+./run.sh docker-down     # Stops the deployed container
 ```
 
 The web application will be available at:
 - **Local Dev Server:** `http://127.0.0.1:5050`
-- **Floci Container Server:** `http://localhost:5055`
-- **Floci AWS Console UI:** `http://localhost:4500`
+- **Docker Container Server:** `http://localhost:5050`
 
 ---
 

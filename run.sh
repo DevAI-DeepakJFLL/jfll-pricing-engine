@@ -51,26 +51,25 @@ case "$1" in
         "$PYTHON" scripts/test_runner.py
         "$PYTHON" src/app.py
         ;;
-    floci-provision)
-        echo "[*] Provisioning S3 & SSM cloud resources in Floci..."
-        "$PYTHON" scripts/deploy_floci.py
+    aws-provision)
+        echo "[*] Provisioning S3 & SSM cloud resources in AWS..."
+        "$PYTHON" scripts/deploy_aws.py
         ;;
-    floci-deploy)
-        echo "[*] Deploying pricing engine to Floci cloud container..."
-        "$PYTHON" scripts/deploy_floci.py
-        docker compose -f docker-compose.floci.yml up -d --build
-        echo "[SUCCESS] Container running on http://localhost:5055 (connected to Floci on :4566)"
+    docker-deploy)
+        echo "[*] Deploying pricing engine via Docker Compose..."
+        docker compose up -d --build
+        echo "[SUCCESS] Container running on http://localhost:5050"
         ;;
-    floci-test)
-        echo "[*] Executing live E2E smoke tests against Floci container..."
-        "$PYTHON" -m unittest tests/test_floci_e2e_smoke.py
+    docker-test)
+        echo "[*] Executing live E2E smoke tests..."
+        "$PYTHON" -m unittest tests/test_e2e_smoke.py
         ;;
-    floci-down)
-        echo "[*] Stopping Floci pricing engine container..."
-        docker compose -f docker-compose.floci.yml down
+    docker-down)
+        echo "[*] Stopping pricing engine container..."
+        docker compose down
         ;;
     *)
-        echo "Usage: ./run.sh {verify|preprocess|train|test|serve|drift|pipeline|floci-provision|floci-deploy|floci-test|floci-down}"
+        echo "Usage: ./run.sh {verify|preprocess|train|test|serve|drift|pipeline|aws-provision|docker-deploy|docker-test|docker-down}"
         echo "Defaulting to starting the web app..."
         "$PYTHON" src/app.py
         ;;

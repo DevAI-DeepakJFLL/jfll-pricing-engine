@@ -1,6 +1,6 @@
 # ==============================================================================
 # Production Dockerfile for Air Export Pricing Recommendation Engine
-# Integrated with Floci AWS Emulator (S3, SSM) and AWS Production
+# Production deployment for AWS (S3, SSM) and standalone container runtimes
 # ==============================================================================
 FROM python:3.11-slim
 

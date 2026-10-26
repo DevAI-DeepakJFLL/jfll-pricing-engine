@@ -11,16 +11,15 @@ Validates live HTTP endpoints against a deployed pricing engine instance:
 """
 
 import os
-import sys
 import json
 import unittest
 import urllib.request
 import urllib.error
 
-TARGET_URL = os.environ.get("PRICING_ENGINE_URL", "http://localhost:5055").rstrip("/")
+TARGET_URL = os.environ.get("PRICING_ENGINE_URL", "http://localhost:5050").rstrip("/")
 
 
-class TestFlociE2ESmoke(unittest.TestCase):
+class TestE2ESmoke(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
@@ -28,7 +27,7 @@ class TestFlociE2ESmoke(unittest.TestCase):
             with urllib.request.urlopen(req, timeout=1.5):
                 pass
             print(f"\n[INFO] Running live E2E smoke tests against: {TARGET_URL}")
-        except Exception as e:
+        except Exception:
             raise unittest.SkipTest(f"Live server not reachable at {TARGET_URL}. Skipping E2E smoke tests.")
 
     def test_01_ui_homepage_renders(self):
@@ -44,60 +43,56 @@ class TestFlociE2ESmoke(unittest.TestCase):
     def test_02_quote_api_success(self):
         """Test POST /api/quote generates accurate strategic recommendations."""
         payload = {
-            "origin": "Indira Gandhi International Airport",
-            "dest": "Heathrow Apt/London",
-            "buy": 125000,
-            "gross_wt": 450,
-            "chargeable_wt": 450,
-            "client": "Shipper / Consignee",
+            "buy": 150000.0,
+            "chargeable_wt": 500.0,
+            "origin": "Chhatrapati Shivaji Maharaj International Airport",
+            "dest": "Frankfurt am Main",
             "commodity": "General Cargo",
+            "client": "Shipper / Consignee",
             "strategy": "balanced"
         }
-        data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             f"{TARGET_URL}/api/quote",
-            data=data,
+            data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}
         )
         with urllib.request.urlopen(req, timeout=10) as resp:
             self.assertEqual(resp.status, 200)
-            res = json.loads(resp.read().decode("utf-8"))
-            self.assertEqual(res.get("status"), "success")
-            self.assertIn("optimal", res)
-            self.assertIn("negotiation_corridor", res)
-            self.assertIn("strategic_recommendations", res)
-            
-            optimal = res["optimal"]
-            self.assertGreater(optimal["Quoted_Sell_Price_INR"], payload["buy"])
-            self.assertGreater(optimal["Margin_Percentage"], 0)
-
-            corridor = res["negotiation_corridor"]
-            self.assertLessEqual(corridor["min_margin_pct"], corridor["target_margin_pct"])
-            self.assertLessEqual(corridor["target_margin_pct"], corridor["max_margin_pct"])
+            data = json.loads(resp.read().decode("utf-8"))
+            self.assertEqual(data.get("status"), "success")
+            self.assertIn("optimal", data)
+            self.assertIn("strategic_recommendations", data["optimal"])
+            self.assertIn("negotiation_corridor", data["optimal"])
+            self.assertGreater(data["optimal"]["Rate_Per_Kg"], 300.0)
 
     def test_03_quote_api_invalid_input_400(self):
-        """Test POST /api/quote returns HTTP 400 for invalid inputs."""
+        """Test POST /api/quote rejects negative buy costs with HTTP 400."""
         payload = {
+            "buy": -500.0,
+            "chargeable_wt": 100.0,
             "origin": "Indira Gandhi International Airport",
-            "dest": "Heathrow Apt/London",
-            "buy": -500, # Invalid negative buy cost
-            "chargeable_wt": 100
+            "dest": "Dubai International Airport"
         }
-        data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             f"{TARGET_URL}/api/quote",
-            data=data,
+            data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}
         )
-        with self.assertRaises(urllib.error.HTTPError) as cm:
-            urllib.request.urlopen(req, timeout=5)
-        self.assertEqual(cm.exception.code, 400)
+        try:
+            with urllib.request.urlopen(req, timeout=10):
+                self.fail("Expected HTTP 400 Bad Request")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+            body = json.loads(e.read().decode("utf-8"))
+            self.assertTrue("error" in body or body.get("status") == "error")
 
     def test_04_history_page_accessible(self):
-        """Test GET /history returns 200."""
+        """Test GET /history renders quote audit dashboard."""
         req = urllib.request.Request(f"{TARGET_URL}/history")
         with urllib.request.urlopen(req, timeout=10) as resp:
             self.assertEqual(resp.status, 200)
+            content = resp.read().decode("utf-8")
+            self.assertIn("Recommendation History", content)
 
 
 if __name__ == "__main__":

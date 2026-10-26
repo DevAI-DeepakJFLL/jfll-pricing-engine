@@ -1,17 +1,15 @@
 """
 ================================================================================
-AWS & Floci Cloud Integration Module
+AWS Cloud Integration Module
 ================================================================================
 Provides client initialization, model synchronization with Amazon S3, and
 parameter management via SSM Parameter Store for the Air Export Pricing Engine.
-Supports Floci local emulation (endpoint: http://localhost:4566) and production AWS.
+Supports production AWS (IAM execution roles, real S3/SSM endpoints).
 ================================================================================
 """
 
 import os
 import logging
-import json
-import urllib.request
 from typing import Optional
 
 try:
@@ -22,56 +20,41 @@ except ImportError:
     BOTO3_AVAILABLE = False
     ClientError = Exception
 
-logger = logging.getLogger("aws_floci")
+logger = logging.getLogger("aws_client")
 
-DEFAULT_FLOCI_ENDPOINT = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
-DEFAULT_REGION = os.environ.get("AWS_REGION", "us-east-1")
+DEFAULT_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 DEFAULT_BUCKET = os.environ.get("S3_BUCKET_NAME", "air-export-pricing-models")
-
-
-def is_floci_healthy(endpoint_url: Optional[str] = None, timeout: float = 2.0) -> bool:
-    """Checks if Floci or LocalStack is responsive."""
-    endpoint = endpoint_url or DEFAULT_FLOCI_ENDPOINT
-    health_url = f"{endpoint.rstrip('/')}/_localstack/health"
-    if not (health_url.startswith("http://") or health_url.startswith("https://")):
-        logger.warning(f"Invalid health URL scheme: {health_url}")
-        return False
-    try:
-        req = urllib.request.Request(health_url, headers={"User-Agent": "pricing-engine-health"})
-        with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec B310
-            if response.status == 200:
-                data = json.loads(response.read().decode())
-                return "services" in data or "version" in data
-    except Exception as e:
-        logger.debug(f"Floci health check at {health_url} failed: {e}")
-    return False
 
 
 def get_boto3_client(service_name: str, endpoint_url: Optional[str] = None):
     """
-    Constructs a boto3 client pointing to the Floci endpoint (or AWS if unset).
+    Constructs a boto3 client pointing to standard AWS endpoints or optional custom URL.
+    Uses native AWS IAM roles if explicit credentials are not provided.
     """
     if not BOTO3_AVAILABLE:
-        raise RuntimeError("boto3 is not installed. Please install boto3 to use AWS/Floci features.")
+        raise RuntimeError("boto3 is not installed. Please install boto3 to use AWS features.")
 
-    endpoint = endpoint_url or os.environ.get("AWS_ENDPOINT_URL", DEFAULT_FLOCI_ENDPOINT)
+    endpoint = endpoint_url or os.environ.get("AWS_ENDPOINT_URL")
     region = os.environ.get("AWS_REGION", DEFAULT_REGION)
-    access_key = os.environ.get("AWS_ACCESS_KEY_ID", "test")
-    secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "test")
+    access_key = os.environ.get("AWS_ACCESS_KEY_ID")
+    secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
 
-    return boto3.client(
-        service_name,
-        endpoint_url=endpoint,
-        region_name=region,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key
-    )
+    client_kwargs = {
+        "region_name": region,
+    }
+    if endpoint:
+        client_kwargs["endpoint_url"] = endpoint
+    if access_key and secret_key:
+        client_kwargs["aws_access_key_id"] = access_key
+        client_kwargs["aws_secret_access_key"] = secret_key
+
+    return boto3.client(service_name, **client_kwargs)
 
 
 def sync_model_from_s3(
     bucket: str = DEFAULT_BUCKET,
-    s3_key: str = "v2.4/freight_margin_recommender.joblib",
-    local_dest: str = "models/freight_margin_recommender.joblib",
+    s3_key: str = "v3.0/engine_v3_bundle.joblib",
+    local_dest: str = "models/engine_v3_bundle.joblib",
     endpoint_url: Optional[str] = None
 ) -> bool:
     """
@@ -93,11 +76,11 @@ def sync_model_from_s3(
 def upload_model_to_s3(
     local_path: str,
     bucket: str = DEFAULT_BUCKET,
-    s3_key: str = "v2.4/freight_margin_recommender.joblib",
+    s3_key: str = "v3.0/engine_v3_bundle.joblib",
     endpoint_url: Optional[str] = None
 ) -> bool:
     """
-    Uploads local model artifact to S3 bucket in Floci or AWS.
+    Uploads local model artifact to S3 bucket in AWS.
     Creates bucket if it does not exist.
     """
     try:
@@ -130,7 +113,7 @@ def get_ssm_parameter(param_name: str, default: Optional[str] = None, endpoint_u
 
 
 def set_ssm_parameter(param_name: str, value: str, param_type: str = "String", endpoint_url: Optional[str] = None) -> bool:
-    """Sets SSM parameter in Floci/AWS."""
+    """Sets SSM parameter in AWS Parameter Store."""
     try:
         ssm = get_boto3_client("ssm", endpoint_url=endpoint_url)
         ssm.put_parameter(Name=param_name, Value=value, Type=param_type, Overwrite=True)

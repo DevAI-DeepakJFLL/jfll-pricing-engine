@@ -37,7 +37,7 @@ jobs:
           python -m unittest \
             tests/test_api_quote.py \
             tests/test_api_v3_quote.py \
-            tests/test_aws_floci.py \
+            tests/test_aws_client.py \
             tests/test_benchmark_integrity.py \
             tests/test_cohort_lookup.py \
             tests/test_conformal_calibration.py \
