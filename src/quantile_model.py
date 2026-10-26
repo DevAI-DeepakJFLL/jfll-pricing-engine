@@ -21,6 +21,7 @@ from sklearn.preprocessing import OrdinalEncoder
 # Canonical feature definitions adhering to clean V3 data pipeline
 FEATURE_COLS: List[str] = [
     "Total_Buy_INR",
+    "Unit_Buy_INR",
     "Chargeable_Weight_Kg",
     "Cargo_Density_Ratio",
     "Weight_Tier",
@@ -99,21 +100,37 @@ class MarginQuantileModel:
         self._is_matrix_mode = False
         df = X.copy()
 
+        # Derive Unit_Buy_INR dynamically if omitted
+        if "Unit_Buy_INR" not in df.columns:
+            if "Total_Buy_INR" in df.columns and "Chargeable_Weight_Kg" in df.columns:
+                df["Unit_Buy_INR"] = df["Total_Buy_INR"] / df["Chargeable_Weight_Kg"].clip(lower=0.1)
+            elif "Airline_Freight_Rate_INR" in df.columns:
+                df["Unit_Buy_INR"] = df["Airline_Freight_Rate_INR"]
+            else:
+                df["Unit_Buy_INR"] = 250.0
+
         # Use canonical features if available, otherwise available subset
         if is_fit:
             if all(col in df.columns for col in FEATURE_COLS):
                 self.feature_cols = list(FEATURE_COLS)
                 self.categorical_cols = list(CATEGORICAL_COLS)
             else:
-                self.feature_cols = [c for c in df.columns if c not in ["Margin_Percentage", "is_won"]]
+                EXCLUDE_COLS = {
+                    "Inquiry Number", "Quotation Number", "Inquiry Status", "Quote Status",
+                    "is_won", "Margin_Percentage", "Margin_Amount_INR", "Total_Sell_INR",
+                    "Sales Person", "Quoted Carrier", "Commodity Type", "customer_id",
+                    "quote_date", "Year_Month", "Month_Name", "Booked by branch",
+                    "Customer_Company"
+                }
+                self.feature_cols = [c for c in df.columns if c not in EXCLUDE_COLS]
                 self.categorical_cols = [
                     c for c in self.feature_cols if df[c].dtype == "object" or df[c].dtype.name == "category"
                 ]
 
-        cols = self.feature_cols or [c for c in df.columns if c not in ["Margin_Percentage", "is_won"]]
-        cats = self.categorical_cols or []
+        cols = self.feature_cols or list(FEATURE_COLS)
+        cats = self.categorical_cols or list(CATEGORICAL_COLS)
 
-        # Ensure all required features exist in df with fallbacks
+        # Ensure all required features exist in df with robust fallbacks
         for col in cols:
             if col not in df.columns:
                 if col in cats:
@@ -145,13 +162,16 @@ class MarginQuantileModel:
         X_mat, cat_mask = self._prepare_features(X, is_fit=True)
         y_arr = np.asarray(y, dtype=float)
 
-        # Monotonic decreasing constraint: -1 on buy cost and weight (cols 0 and 1)
+        # Monotonic decreasing constraints: -1 on buy cost, unit buy rate, and weight
         n_features = X_mat.shape[1]
         monotonic_cst = [0] * n_features
         if not self._is_matrix_mode and self.feature_cols:
             if "Total_Buy_INR" in self.feature_cols:
                 buy_idx = self.feature_cols.index("Total_Buy_INR")
                 monotonic_cst[buy_idx] = -1
+            if "Unit_Buy_INR" in self.feature_cols:
+                unit_idx = self.feature_cols.index("Unit_Buy_INR")
+                monotonic_cst[unit_idx] = -1
             if "Chargeable_Weight_Kg" in self.feature_cols:
                 wt_idx = self.feature_cols.index("Chargeable_Weight_Kg")
                 monotonic_cst[wt_idx] = -1

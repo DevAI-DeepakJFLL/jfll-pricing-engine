@@ -369,8 +369,10 @@ class PricingEngineV3:
         )
 
         # 3. Model Feature Vector and Quantile Prediction (Stage 1A)
+        unit_rate = buy_cost / max(1.0, chargeable_wt)
         feat_df = pd.DataFrame([{
             "Total_Buy_INR": buy_cost,
+            "Unit_Buy_INR": unit_rate,
             "Chargeable_Weight_Kg": chargeable_wt,
             "Cargo_Density_Ratio": density_ratio,
             "Weight_Tier": weight_tier,
@@ -392,14 +394,17 @@ class PricingEngineV3:
         raw_p90 = float(p90_arr[0])
 
         # Sublinear cost pass-through elasticity adjustment (beta = 0.58 => margin % elasticity = -0.42)
-        unit_rate = buy_cost / max(1.0, chargeable_wt)
-        ref_rate = self.slab_ref_rates.get(str(weight_tier), 282.0)
-        if ref_rate > 0 and unit_rate > 0:
-            rate_ratio = max(0.2, min(5.0, unit_rate / ref_rate))
-            pass_through_factor = rate_ratio ** (-0.42)
-            raw_p10 = max(0.5, raw_p10 * pass_through_factor)
-            raw_p50 = max(1.0, raw_p50 * pass_through_factor)
-            raw_p90 = max(2.0, raw_p90 * pass_through_factor)
+        # Note: When model is trained with Unit_Buy_INR and monotonic decreasing constraints,
+        # unit rate elasticity is natively learned by the quantile trees. The external factor
+        # is only applied if Unit_Buy_INR is absent from model features, preventing double-counting.
+        if "Unit_Buy_INR" not in getattr(self.model, "feature_cols", []):
+            ref_rate = self.slab_ref_rates.get(str(weight_tier), 282.0)
+            if ref_rate > 0 and unit_rate > 0:
+                rate_ratio = max(0.2, min(5.0, unit_rate / ref_rate))
+                pass_through_factor = rate_ratio ** (-0.42)
+                raw_p10 = max(0.5, raw_p10 * pass_through_factor)
+                raw_p50 = max(1.0, raw_p50 * pass_through_factor)
+                raw_p90 = max(2.0, raw_p90 * pass_through_factor)
 
         if is_spot_tender:
             # Spot tender pricing defense: discount quantile levels to protect conversion
@@ -555,20 +560,6 @@ class PricingEngineV3:
         # C. Calibrated Half-Width around Balanced Target Margin
         target_half_width = float(np.clip(m_bal * delta_slab * dispersion_ratio, delta_min, delta_max))
 
-        # D. Strategic Tier Bounding
-        # Negotiation corridor must remain within pre-approved strategic boundaries:
-        # cost_floor_pct <= m_floor <= min_corridor_pct <= m_bal <= max_corridor_pct <= m_prem <= effective_cap
-        min_corridor_pct = round(max(m_floor, m_bal - target_half_width), 2)
-        max_corridor_pct = round(min(m_prem, m_bal + target_half_width), 2)
-
-        # Enforce strict bounds consistency across edge cases
-        if min_corridor_pct > m_bal:
-            min_corridor_pct = m_bal
-        if max_corridor_pct < m_bal:
-            max_corridor_pct = m_bal
-        if max_corridor_pct < min_corridor_pct:
-            max_corridor_pct = min_corridor_pct
-
         # Freight Forwarding Revision Concession Ladder (§5.4 Multi-Round Negotiation)
         raw_rev = (
             inq.get("quote_revision_count")
@@ -600,6 +591,20 @@ class PricingEngineV3:
                 f"Rev {revision_num} BAFO: Pinned target to floor ({m_floor:.2f}%) "
                 f"to protect booking conversion against competing co-loaders."
             )
+
+        current_target = tier_margins["balanced"]
+
+        # D. Strategic Tier Bounding
+        # Negotiation corridor pre-approves discounting down to m_floor (Lowest Safe Price)
+        # ensuring competitive client counter-offers (e.g. 5.5% or 2.6%) fall inside the corridor:
+        # cost_floor_pct <= min_corridor_pct <= target_margin_pct <= max_corridor_pct <= effective_cap
+        min_corridor_pct = round(max(cost_floor_pct, min(m_floor, current_target - target_half_width)), 2)
+        if min_corridor_pct > current_target:
+            min_corridor_pct = current_target
+
+        max_corridor_pct = round(min(m_prem, max(current_target + target_half_width, min_corridor_pct + 0.1)), 2)
+        if max_corridor_pct < current_target:
+            max_corridor_pct = current_target
 
         min_sell_price_inr = round(buy_cost * (1.0 + min_corridor_pct / 100.0), 2)
         max_sell_price_inr = round(buy_cost * (1.0 + max_corridor_pct / 100.0), 2)

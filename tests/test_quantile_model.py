@@ -52,6 +52,8 @@ class TestQuantileModel(unittest.TestCase):
                 if missing_pit and "Inquiry Number" in bench_df.columns:
                     pit_ref = pd.read_csv(DATA_PATH, usecols=["Inquiry Number"] + PIT_FEATURE_COLS)
                     bench_df = bench_df.merge(pit_ref, on="Inquiry Number", how="left")
+            if "Unit_Buy_INR" not in bench_df.columns and "Total_Buy_INR" in bench_df.columns:
+                bench_df["Unit_Buy_INR"] = bench_df["Total_Buy_INR"] / bench_df["Chargeable_Weight_Kg"].clip(lower=0.1)
             cls.bench_df = bench_df
         else:
             cls.bench_df = None
@@ -114,6 +116,17 @@ class TestQuantileModel(unittest.TestCase):
             wt_violations,
             0,
             f"Violations detected where higher Chargeable_Weight_Kg increased margin: {wt_violations}",
+        )
+
+        # 3. Monotonicity on Unit_Buy_INR: increasing freight rate per kg must not increase margin
+        high_unit_sample = sample.copy()
+        high_unit_sample["Unit_Buy_INR"] = high_unit_sample["Unit_Buy_INR"] + 100.0
+        high_unit_preds = self.model.predict(high_unit_sample)
+        unit_violations = (high_unit_preds > base_preds + 1e-5).sum()
+        self.assertEqual(
+            unit_violations,
+            0,
+            f"Violations detected where higher Unit_Buy_INR increased margin: {unit_violations}",
         )
 
     def test_serialization_deserialization_roundtrip(self):
