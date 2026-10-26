@@ -22,11 +22,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt boto3 gunicorn
 
-# Copy application modules, models, and data
-COPY src /app/src
-COPY models /app/models
-COPY data /app/data
-COPY scripts /app/scripts
+# Create unprivileged application user (CWE-250)
+RUN groupadd -g 10001 appuser && \
+    useradd -u 10001 -g appuser -m -d /app -s /bin/bash appuser
+
+# Copy application modules, models, and data with proper ownership
+COPY --chown=appuser:appuser src /app/src
+COPY --chown=appuser:appuser models /app/models
+COPY --chown=appuser:appuser data /app/data
+COPY --chown=appuser:appuser scripts /app/scripts
+
+# Set runtime user
+USER appuser
 
 # Default ports and healthcheck
 EXPOSE 5050
