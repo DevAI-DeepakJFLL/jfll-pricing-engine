@@ -1618,33 +1618,21 @@ HTML_TEMPLATE = """
                         </button>
                     </div>
 
-                    <!-- Physical Gross Weight + Chargeable Weight Row (Single unified row without duplication) -->
-                    <div class="form-row">
-                        <div class="field-group">
-                            <label for="gross_wt">Physical Gross Weight (kg) <span class="req">*</span></label>
-                            <input type="number" id="gross_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" required>
-                        </div>
-                        <!-- In Dims Mode: Show Calculated Chargeable Weight -->
-                        <div class="field-group" id="chargeable_summary_col">
-                            <label>Chargeable Weight (Calc)</label>
-                            <div class="clean-input" style="background: #f8fafc; display: flex; align-items: center; font-weight: 700; color: var(--text-dark);" id="summary_ch_wt_display">
-                                450.0 kg
-                            </div>
-                        </div>
-                        <!-- In Direct Mode: Show Airline Chargeable Weight Input in the exact same spot -->
-                        <div class="field-group" id="direct_weight_container" style="display: none;">
-                            <label for="direct_ch_wt">Airline Chargeable Weight (kg) <span class="req">*</span></label>
-                            <input type="number" id="direct_ch_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 450">
-                        </div>
+                    <!-- Hidden Physical Gross Weight (Preserves backwards compatibility for scripts/tests) -->
+                    <input type="hidden" id="gross_wt" value="450">
+
+                    <!-- Direct Chargeable Weight Mode Container (Single primary weight input) -->
+                    <div class="field-group full" id="direct_weight_container" style="display: none; margin-top: 10px; margin-bottom: 12px;">
+                        <label for="direct_ch_wt">Airline Chargeable Weight (kg) <span class="req">*</span></label>
+                        <input type="number" id="direct_ch_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 450">
                     </div>
 
-                    <div id="direct_density_tag" style="display: none; margin-top: -6px; margin-bottom: 12px;">
-                        <span id="direct_density_display" class="dim-info" style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: #f8fafc; font-size: 11.5px; color: var(--text-muted);">Density Ratio: 1.0000 (Dense Commercial Cargo)</span>
-                    </div>
-
-                    <!-- Box Dimensions Mode Container (4 Columns) -->
-                    <div class="field-group full" id="dims_weight_container" style="margin-bottom: 12px;">
-                        <label>Box Dimensions (L × W × H in cm × Number of Pieces) <span class="req">*</span></label>
+                    <!-- Box Dimensions Mode Container (Calculates Airline Chargeable Weight) -->
+                    <div class="field-group full" id="dims_weight_container" style="margin-top: 10px; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="margin: 0;">Box Dimensions (L × W × H in cm × Number of Pieces) <span class="req">*</span></label>
+                            <span id="dims_ch_wt_badge" style="font-size: 12.5px; font-weight: 700; color: var(--text-dark); background: #e2e8f0; padding: 3px 10px; border-radius: 5px;">Chargeable: 432.0 kg</span>
+                        </div>
                         <div class="dim-box">
                             <div class="dim-grid">
                                 <div><label>Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="120" min="1" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
@@ -1652,10 +1640,9 @@ HTML_TEMPLATE = """
                                 <div><label>Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="90" min="1" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
                                 <div><label>Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="3" min="1" step="1" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
                             </div>
-                            <div class="dim-info">
-                                <span id="vol_wt_display">Volumetric: 432.0 kg</span>
-                                <span id="ch_wt_display">Chargeable: 450.0 kg</span>
-                                <span id="density_display">Type: Dense Commercial Cargo</span>
+                            <div class="dim-info" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                                <span id="vol_wt_display">Volumetric: 432.0 kg (Formula: L × W × H × Pcs ÷ 6000)</span>
+                                <span id="ch_wt_display" style="font-weight: 700; color: var(--text-dark);">Chargeable: 432.0 kg</span>
                             </div>
                         </div>
                     </div>
@@ -1889,66 +1876,57 @@ HTML_TEMPLATE = """
         const btnDirect = document.getElementById('mode_btn_direct');
         const dimsContainer = document.getElementById('dims_weight_container');
         const directContainer = document.getElementById('direct_weight_container');
-        const summaryCol = document.getElementById('chargeable_summary_col');
-        const directTag = document.getElementById('direct_density_tag');
 
         if (mode === 'direct') {
             if (btnDirect) btnDirect.className = 'mode-btn active';
             if (btnDims) btnDims.className = 'mode-btn';
             if (dimsContainer) dimsContainer.style.display = 'none';
-            if (summaryCol) summaryCol.style.display = 'none';
             if (directContainer) directContainer.style.display = 'block';
-            if (directTag) directTag.style.display = 'block';
 
             const directInput = document.getElementById('direct_ch_wt');
             if (directInput && (!directInput.value || parseFloat(directInput.value) <= 0)) {
-                const gross = parseFloat(document.getElementById('gross_wt')?.value) || 0;
-                directInput.value = gross > 0 ? gross : 100;
+                const currentCh = parseFloat(document.getElementById('gross_wt')?.value) || 100;
+                directInput.value = currentCh;
             }
         } else {
             if (btnDims) btnDims.className = 'mode-btn active';
             if (btnDirect) btnDirect.className = 'mode-btn';
             if (dimsContainer) dimsContainer.style.display = 'block';
-            if (summaryCol) summaryCol.style.display = 'block';
             if (directContainer) directContainer.style.display = 'none';
-            if (directTag) directTag.style.display = 'none';
         }
         updateDimensions();
     }
 
     function updateDimensions() {
-        const gross = Math.max(0.1, parseFloat(document.getElementById('gross_wt')?.value) || 1);
-        let ch_wt = gross;
-        let vol_wt = gross;
+        let ch_wt = 0;
+        let vol_wt = 0;
 
         if (currentWeightMode === 'direct') {
             const rawDirect = parseFloat(document.getElementById('direct_ch_wt')?.value);
-            ch_wt = (rawDirect && rawDirect > 0) ? rawDirect : gross;
+            ch_wt = (rawDirect && rawDirect > 0) ? rawDirect : 100;
+            vol_wt = ch_wt;
         } else {
             const l = Math.max(1, parseFloat(document.getElementById('dim_l')?.value) || 1);
             const w = Math.max(1, parseFloat(document.getElementById('dim_w')?.value) || 1);
             const h = Math.max(1, parseFloat(document.getElementById('dim_h')?.value) || 1);
             const pcs = Math.max(1, parseFloat(document.getElementById('dim_pcs')?.value) || 1);
-            vol_wt = (l * w * h * pcs) / 6000.0;
-            ch_wt = Math.max(gross, vol_wt);
+            vol_wt = Math.round(((l * w * h * pcs) / 6000.0) * 10) / 10;
+            ch_wt = vol_wt;
         }
 
-        const density = gross / Math.max(0.1, ch_wt);
-
-        let densityText = "Dense Commercial Cargo";
-        if (density < 0.75) densityText = "Volumetric Light Cargo";
-        else if (density > 1.25) densityText = "Heavy Dense Cargo";
+        // Keep hidden gross_wt in sync with airline chargeable weight
+        const gross = ch_wt;
+        const grossEl = document.getElementById('gross_wt');
+        if (grossEl) grossEl.value = gross;
 
         const volEl = document.getElementById('vol_wt_display');
         const chEl = document.getElementById('ch_wt_display');
-        const denEl = document.getElementById('density_display');
-        const directDenEl = document.getElementById('direct_density_display');
+        const badgeEl = document.getElementById('dims_ch_wt_badge');
         const summaryChEl = document.getElementById('summary_ch_wt_display');
 
-        if (volEl) volEl.innerText = `Volumetric: ${vol_wt.toFixed(1)} kg`;
+        if (volEl) volEl.innerText = `Volumetric: ${vol_wt.toFixed(1)} kg (Formula: L × W × H × Pcs ÷ 6000)`;
         if (chEl) chEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
-        if (denEl) denEl.innerText = `Type: ${densityText}`;
-        if (directDenEl) directDenEl.innerText = `Density Ratio: ${density.toFixed(4)} (${densityText})`;
+        if (badgeEl) badgeEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
         if (summaryChEl) summaryChEl.innerText = `${ch_wt.toFixed(1)} kg`;
 
         // Keep total buy synchronized when weights change, if user set unit_buy
@@ -1961,7 +1939,7 @@ HTML_TEMPLATE = """
             }
         }
 
-        return { gross_wt: gross, chargeable_wt: ch_wt, density_ratio: density };
+        return { gross_wt: gross, chargeable_wt: ch_wt, density_ratio: 1.0 };
     }
 
     const PRESET_DATA = {
@@ -2236,14 +2214,18 @@ HTML_TEMPLATE = """
             return;
         }
 
-        if (isNaN(weights.gross_wt) || weights.gross_wt <= 0) {
+        if (isNaN(weights.chargeable_wt) || weights.chargeable_wt <= 0) {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
             if (submitBtnTop) { submitBtnTop.disabled = false; }
             if (errorAlert) {
                 errorAlert.style.display = 'block';
-                errorAlert.innerText = 'Please enter a valid physical gross weight greater than 0 kg.';
+                errorAlert.innerText = 'Please enter a valid Airline Chargeable Weight greater than 0 kg.';
             }
-            document.getElementById('gross_wt')?.focus();
+            if (currentWeightMode === 'direct') {
+                document.getElementById('direct_ch_wt')?.focus();
+            } else {
+                document.getElementById('dim_l')?.focus();
+            }
             return;
         }
 
@@ -3103,22 +3085,35 @@ def index():
 def api_quote():
     data = request.get_json(force=True, silent=True) or {}
 
-    # Physical weights validation (§2.2, §5.2)
-    raw_gross = data.get("gross_wt")
+    # Weights validation (§2.2, §5.2) - Supports direct Airline Chargeable Weight as primary
+    raw_chargeable = data.get("chargeable_wt") or data.get("chargeable_weight") or data.get("Chargeable_Weight_Kg")
+    raw_gross = data.get("gross_wt") or data.get("gross_weight") or data.get("Gross_Weight_Kg")
+
+    if raw_chargeable is None and raw_gross is None:
+        return jsonify({"status": "error", "message": "Invalid Gross Weight. Please provide a positive weight in kg."}), 400
+
     try:
-        gross_wt = float(str(raw_gross).replace(",", "").strip())
-        if gross_wt <= 0 or not np.isfinite(gross_wt):
+        if raw_chargeable is not None and str(raw_chargeable).strip() != "":
+            chargeable_wt = float(str(raw_chargeable).replace(",", "").strip())
+        elif raw_gross is not None and str(raw_gross).strip() != "":
+            chargeable_wt = float(str(raw_gross).replace(",", "").strip())
+        else:
+            raise ValueError()
+
+        if chargeable_wt <= 0 or not np.isfinite(chargeable_wt):
             raise ValueError()
     except (ValueError, TypeError):
         return jsonify({"status": "error", "message": "Invalid Gross Weight. Please provide a positive weight in kg."}), 400
 
-    raw_chargeable = data.get("chargeable_wt")
     try:
-        chargeable_wt = float(str(raw_chargeable).replace(",", "").strip()) if raw_chargeable else gross_wt
-        if chargeable_wt <= 0 or not np.isfinite(chargeable_wt):
-            chargeable_wt = gross_wt
+        if raw_gross is not None and str(raw_gross).strip() != "":
+            gross_wt = float(str(raw_gross).replace(",", "").strip())
+            if gross_wt <= 0 or not np.isfinite(gross_wt):
+                gross_wt = chargeable_wt
+        else:
+            gross_wt = chargeable_wt
     except (ValueError, TypeError):
-        chargeable_wt = gross_wt
+        gross_wt = chargeable_wt
 
     # Volumetric dimensions handling (§2.2, §5.2)
     dimensions = None
