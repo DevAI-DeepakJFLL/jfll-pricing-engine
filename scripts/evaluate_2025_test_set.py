@@ -51,7 +51,7 @@ from taxonomy import classify_commodity
 DEFAULT_TEST_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "won_deals_2025_test_30_pit.csv")
 DEFAULT_BUNDLE_PATH = os.path.join(PROJECT_ROOT, "models", "engine_v3_bundle.joblib")
 DEFAULT_REPORT_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "EVALUATION_REPORT_2025_TEST_SET.md")
-CALLER_ARTIFACT_PATH = "/Users/deepak/.gemini/antigravity-cli/brain/57545377-b65f-4021-bfd7-df91f9448593/EVALUATION_REPORT_2025_TEST_SET.md"
+CALLER_ARTIFACT_PATH = os.environ.get("CALLER_ARTIFACT_PATH", "")
 
 
 def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, quantile: float) -> float:
@@ -697,9 +697,9 @@ def run_evaluation(
         f.write(report_content)
     print(f"    Report saved to: {output_report_path} ({os.path.getsize(output_report_path):,} bytes)")
 
-    # Copy to artifacts directories
-    targets = list(artifact_paths or [])
-    if CALLER_ARTIFACT_PATH not in targets:
+    # Copy to artifacts directories if configured
+    targets = [p for p in (artifact_paths or []) if p]
+    if CALLER_ARTIFACT_PATH and CALLER_ARTIFACT_PATH not in targets:
         targets.append(CALLER_ARTIFACT_PATH)
 
     for art_path in targets:

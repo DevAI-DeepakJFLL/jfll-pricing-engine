@@ -12,8 +12,6 @@ if [ -d "$DIR/.venv" ]; then
     PYTHON="$DIR/.venv/bin/python"
 elif [ -n "$VIRTUAL_ENV" ]; then
     PYTHON="$VIRTUAL_ENV/bin/python"
-elif [ -f "/Users/deepak/.gemini/antigravity-cli/brain/89badbe2-0b7a-449a-ae32-01d520b4a325/scratch/venv/bin/python" ]; then
-    PYTHON="/Users/deepak/.gemini/antigravity-cli/brain/89badbe2-0b7a-449a-ae32-01d520b4a325/scratch/venv/bin/python"
 else
     PYTHON="python3"
 fi

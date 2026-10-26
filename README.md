@@ -69,52 +69,42 @@ air_export_pricing_engine/
 │   └── recommendations_history.db            # SQLite audit trail & leads store
 │
 ├── models/
-│   └── freight_margin_recommender.joblib     # Production model artifact bundle (v2.4)
+│   ├── engine_v3_bundle.joblib               # Production unified Pricing Engine V3 artifact
+│   ├── customer_pit_registry_2025.joblib     # Point-in-time customer history registry
+│   └── checksums.json                        # SHA-256 cryptographic verification digests
 │
 ├── src/
 │   ├── __init__.py
+│   ├── app.py                                # Production Flask web app, REST API & leads dashboard
+│   ├── engine_v3.py                          # Unified Serving Engine V3 (Quantile + Conformal + Guardrails)
+│   ├── quantile_model.py                     # Monotonic Quantile Gradient Boosted Regressor (P10, P50, P90)
+│   ├── conformal_corridors.py                # Split-Conformal prediction corridors (90% coverage)
+│   ├── policy_guardrails.py                  # Commercial cost floors, risk buffers, and margin ceilings
+│   ├── taxonomy.py                           # Commodity classification & regional mapping
+│   ├── customer_normalizer.py                # Customer Master entity normalization
+│   ├── features_pit.py                       # Point-in-time streaming feature lookups
 │   ├── constants.py                          # Commercial guardrails, fees, and thresholds
 │   ├── tiers.py                              # Weight tiers, breaks, arbitrage & account tiers
 │   ├── preprocess.py                         # Cleaning, IATA physics, and geographic mapping
-│   ├── preprocess_job_consolidated.py        # Operational ledger data engineering pipeline
-│   ├── train.py                              # Two-Stage ML training with honest OOF benchmarks
-│   ├── margin_framework.py                   # 3-key hierarchical corridors & Conformal Prediction
-│   ├── engine.py                             # Decision engine, cohort lookup & strategic tiers
-│   ├── history.py                            # Customer historical deal aggregation
-│   ├── db.py                                 # SQLite audit history, soft-delete & preset isolation
+│   ├── preprocess_pipeline_v3.py             # Build gate data validation pipeline
+│   ├── security.py                           # Cryptographic artifact integrity & admin authorization
+│   ├── db.py                                 # SQLite audit history, soft-delete & streaming export
 │   ├── aws_client.py                         # AWS S3 & SSM cloud connector
-│   └── app.py                                # Flask web app, REST API & leads dashboard
+│   └── templates/
+│       ├── index.html                        # Pricing engine web UI with authentic styling
+│       └── history.html                      # Historical quotes & CRM lead management
 │
-├── tests/
-│   ├── data/                                 # Golden test suites & evaluation fixtures
-│   │   ├── benchmark_500_records.csv         # 500-sample production matrix (5 commodities x 5 budgets)
-│   │   ├── benchmark_100_optimization_cases.json # Multi-corridor optimization benchmark
-│   │   ├── unit_test_cases_20.json           # 20 balanced historical regression cases
-│   │   └── README.md                         # Test dataset specifications
-│   ├── test_guardrails.py                    # Hard commercial guardrails & cost floors
-│   ├── test_tiers.py                         # Weight tiers & weight-break arbitrage
-│   ├── test_preprocess_validation.py         # Physical validation & IATA physics
-│   ├── test_label_purity.py                  # Label resolution & status deduplication
-│   ├── test_feature_engineering.py           # Rate indices & feature representation
-│   ├── test_oof_benchmark.py                 # Out-of-fold cross validation benchmark purity
-│   ├── test_model_unit_eval.py               # Unit evaluation on 20 balanced test cases
-│   ├── test_engine_determinism.py            # Temporal determinism & Q4 out-of-window warning
-│   ├── test_cohort_lookup.py                 # Hierarchical empirical cohort quantiles
-│   ├── test_strategy_tiers.py                # Active strategy thresholds & strict distinctness
-│   ├── test_margin_framework.py              # Conformal corridor ordering & coverage guarantees
-│   ├── test_db_audit.py                      # SQLite migrations, soft delete & preset isolation
-│   ├── test_api_quote.py                     # Web API integration & HTTP 400 validation
-│   ├── test_aws_client.py                    # AWS S3 & SSM connector tests
-│   ├── test_e2e_smoke.py                     # Live E2E smoke tests
-│   └── test_scenarios_t1_t15.py              # 15 realistic end-to-end air-export scenarios
+├── tests/                                    # 46 test suites (312 automated tests)
 │
 ├── scripts/
-│   ├── deploy_aws.py                         # Cloud resource provisioning & S3/SSM deployment
+│   ├── ingest_and_split_2025.py              # Ingests and splits temporal training/test sets
+│   ├── train_v3_2025.py                      # Trains PricingEngineV3 bundle
+│   ├── evaluate_2025_test_set.py             # Holdout test set evaluator & scorecard
+│   ├── run_rolling_backtest.py               # Expanding-window backtest harness
 │   ├── monitor_market_drift.py               # Offline Market & Concept Drift Watchdog
 │   ├── verify_vocab_alignment.py             # UI vs. model encoder vocabulary alignment gate
-│   ├── test_runner.py                        # Standalone regression test runner
-│   ├── test_200_random_samples.py            # Stratified 200-sample validation harness
-│   └── test_very_low_budget.py               # Low-budget stress test across commodity verticals
+│   ├── deploy_aws.py                         # Cloud resource provisioning & deployment
+│   └── test_runner.py                        # Standalone regression test runner
 │
 ├── requirements.txt                          # Locked dependencies
 ├── run.sh                                    # Unified project CLI runner

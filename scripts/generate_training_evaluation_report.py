@@ -26,8 +26,8 @@ if PROJECT_ROOT not in sys.path:
 from scripts.evaluate_training_samples import compute_segment_metrics, aggregate_evaluation_results
 
 DEFAULT_INPUT_PATH = os.path.join(PROJECT_ROOT, "tests", "data", "training_eval_results_500.csv")
-DEFAULT_OUTPUT_PATH = os.path.join(PROJECT_ROOT, ".superpowers", "eval", "training_eval_report.md")
-DEFAULT_ARTIFACT_PATH = "/Users/deepak/.gemini/antigravity-cli/brain/57545377-b65f-4021-bfd7-df91f9448593/IN_SAMPLE_MODEL_EVALUATION_REPORT.md"
+DEFAULT_OUTPUT_PATH = os.path.join(PROJECT_ROOT, "docs", "evaluation_report.md")
+DEFAULT_ARTIFACT_PATH = os.environ.get("CALLER_ARTIFACT_PATH", "")
 
 COMMODITY_ORDER: List[str] = [
     "General Cargo",
