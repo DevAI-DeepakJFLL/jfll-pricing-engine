@@ -24,8 +24,16 @@ from typing import Optional, Dict, Any, List
 import joblib
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import sklearn
+
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    HAS_MATPLOTLIB = True
+except ImportError:
+    plt = None
+    HAS_MATPLOTLIB = False
 
 from sklearn.model_selection import KFold, cross_val_predict, train_test_split
 from sklearn.preprocessing import OrdinalEncoder
@@ -366,42 +374,48 @@ def train_and_evaluate(
     final_calibrated_clf.fit(X_clf, y_clf)
 
     # 6. Evaluation Plots
-    os.makedirs(os.path.dirname(plot_output_path), exist_ok=True)
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+    if HAS_MATPLOTLIB and plt is not None:
+        try:
+            os.makedirs(os.path.dirname(plot_output_path), exist_ok=True)
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
 
-    # Panel 1: ROC Curve
-    fpr, tpr, _ = roc_curve(y_test, test_probs)
-    ax1.plot(fpr, tpr, color="#23c2f2", lw=2.5, label=f"Calibrated GBDT (AUC = {auc:.3f})")
-    ax1.plot([0, 1], [0, 1], color="gray", linestyle="--")
-    ax1.set_title("Stage 1B: ROC Curve (Win Classifier)")
-    ax1.set_xlabel("False Positive Rate")
-    ax1.set_ylabel("True Positive Rate")
-    ax1.legend(loc="lower right")
-    ax1.grid(True, alpha=0.3)
+            # Panel 1: ROC Curve
+            fpr, tpr, _ = roc_curve(y_test, test_probs)
+            ax1.plot(fpr, tpr, color="#23c2f2", lw=2.5, label=f"Calibrated GBDT (AUC = {auc:.3f})")
+            ax1.plot([0, 1], [0, 1], color="gray", linestyle="--")
+            ax1.set_title("Stage 1B: ROC Curve (Win Classifier)")
+            ax1.set_xlabel("False Positive Rate")
+            ax1.set_ylabel("True Positive Rate")
+            ax1.legend(loc="lower right")
+            ax1.grid(True, alpha=0.3)
 
-    # Panel 2: Probability Calibration Curve
-    prob_true, prob_pred = calibration_curve(y_test, test_probs, n_bins=8, strategy="uniform")
-    ax2.plot(prob_pred, prob_true, marker="o", color="#a7cf45", lw=2, label="Calibrated Curve")
-    ax2.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfect Calibration")
-    ax2.set_title("Stage 1B: Probability Calibration")
-    ax2.set_xlabel("Mean Predicted Probability")
-    ax2.set_ylabel("Observed Win Rate")
-    ax2.legend(loc="upper left")
-    ax2.grid(True, alpha=0.3)
+            # Panel 2: Probability Calibration Curve
+            prob_true, prob_pred = calibration_curve(y_test, test_probs, n_bins=8, strategy="uniform")
+            ax2.plot(prob_pred, prob_true, marker="o", color="#a7cf45", lw=2, label="Calibrated Curve")
+            ax2.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfect Calibration")
+            ax2.set_title("Stage 1B: Probability Calibration")
+            ax2.set_xlabel("Mean Predicted Probability")
+            ax2.set_ylabel("Observed Win Rate")
+            ax2.legend(loc="upper left")
+            ax2.grid(True, alpha=0.3)
 
-    # Panel 3: Stage 1A CV Residuals
-    residuals = y_won - y_won_cv_pred
-    ax3.hist(residuals, bins=25, color="#f28e2b", edgecolor="black", alpha=0.7)
-    ax3.axvline(0, color="black", linestyle="--", lw=1.5)
-    ax3.set_title(f"Stage 1A: CV Residuals (MAE: {cv_mae:.2f}%)")
-    ax3.set_xlabel("Error (Actual - Predicted Margin %)")
-    ax3.set_ylabel("Frequency")
-    ax3.grid(True, alpha=0.3)
+            # Panel 3: Stage 1A CV Residuals
+            residuals = y_won - y_won_cv_pred
+            ax3.hist(residuals, bins=25, color="#f28e2b", edgecolor="black", alpha=0.7)
+            ax3.axvline(0, color="black", linestyle="--", lw=1.5)
+            ax3.set_title(f"Stage 1A: CV Residuals (MAE: {cv_mae:.2f}%)")
+            ax3.set_xlabel("Error (Actual - Predicted Margin %)")
+            ax3.set_ylabel("Frequency")
+            ax3.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(plot_output_path, dpi=200)
-    plt.close()
-    print(f"[✓] Evaluation diagnostic charts saved to: {plot_output_path}")
+            plt.tight_layout()
+            plt.savefig(plot_output_path, dpi=200)
+            plt.close()
+            print(f"[✓] Evaluation diagnostic charts saved to: {plot_output_path}")
+        except Exception as e:
+            print(f"[!] Warning: Failed to generate diagnostic plots: {e}")
+    else:
+        print("[!] Matplotlib not available; skipping diagnostic plot generation.")
 
     # 7. Serialize complete production payload with full metadata
     os.makedirs(os.path.dirname(output_model_path), exist_ok=True)

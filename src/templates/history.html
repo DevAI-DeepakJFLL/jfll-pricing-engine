@@ -1,0 +1,506 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports & Recommendation History - Air Export Pricing Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Mulish:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-outer: #edf1f5;
+            --surface-card: #ffffff;
+            --border: #e2e8f0;
+            --border-subtle: #f1f5f9;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --text-light: #94a3b8;
+            --pill-dark: #0f172a;
+            --radius-window: 24px;
+            --radius-card: 16px;
+            --radius-control: 8px;
+            --radius-pill: 100px;
+            --shadow-window: 0 20px 60px rgba(15, 23, 42, 0.06);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Mulish', sans-serif; }
+        h1, h2, h3, h4, .font-heading, .btn-pill, .nav-item, .stat-val { font-family: 'Outfit', sans-serif; }
+
+        body {
+            background-color: var(--bg-outer);
+            color: var(--text-dark);
+            padding: 32px 20px 48px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-window {
+            background: var(--surface-card);
+            border-radius: var(--radius-window);
+            box-shadow: var(--shadow-window);
+            width: 100%;
+            max-width: 1320px;
+            padding: 28px 36px 40px;
+        }
+
+        @media (max-width: 768px) {
+            .app-nav {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            .nav-links-center {
+                justify-content: center;
+            }
+            .app-nav .header-actions {
+                justify-content: center;
+                width: 100%;
+            }
+            .app-nav .btn-pill {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body { padding: 12px 10px 24px; }
+            .app-window { padding: 16px 14px 24px; border-radius: 16px; }
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .page-title { font-size: 22px; }
+            .header-actions {
+                width: 100%;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            .header-actions .btn-pill {
+                flex: 1 1 auto;
+                justify-content: center;
+                padding: 10px 12px;
+                font-size: 12px;
+                text-align: center;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 10px !important;
+            }
+            .stat-card {
+                padding: 12px 14px !important;
+            }
+            .stat-val {
+                font-size: 20px !important;
+            }
+            .pagination-bar {
+                flex-direction: column;
+                gap: 12px;
+                align-items: center;
+                text-align: center;
+            }
+            .btn-text-full { display: none !important; }
+            .btn-text-mobile { display: inline !important; }
+        }
+
+        .app-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 22px;
+            margin-bottom: 22px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .nav-logo-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-dark);
+        }
+        .nav-logo-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--pill-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+        .nav-brand-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-dark);
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: -0.2px;
+        }
+        .nav-links-center {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: var(--radius-pill);
+        }
+        .nav-item {
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            padding: 8px 18px;
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-pill);
+            transition: all 0.2s;
+        }
+        .nav-item:hover { color: var(--text-dark); }
+        .nav-item.active { background: var(--pill-dark); color: #ffffff; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15); }
+
+        .page-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .back-breadcrumb {
+            text-decoration: none;
+            font-size: 12.5px;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 6px;
+        }
+        .back-breadcrumb:hover { color: var(--text-dark); }
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-dark);
+            letter-spacing: -0.4px;
+        }
+        .header-actions { display: flex; align-items: center; gap: 10px; }
+        .btn-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            min-height: 44px;
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .btn-white { background: #ffffff; border: 1px solid var(--border); color: var(--text-dark); }
+        .btn-white:hover { background: #f8fafc; }
+        .btn-danger { background: #ffffff; border: 1px solid #fecaca; color: #dc2626; }
+        .btn-danger:hover { background: #fef2f2; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            padding: 18px 20px;
+        }
+        .stat-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .stat-val {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .table-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            background: #ffffff;
+            overflow: hidden;
+        }
+        .table-wrap {
+            overflow-x: auto;
+            max-height: 580px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+        table { width: 100%; min-width: 950px; border-collapse: collapse; font-size: 12.5px; }
+        th {
+            background: #f8fafc;
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-dark);
+        }
+        tr:hover { background: #fbfbfb; }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: var(--radius-pill);
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid transparent;
+            cursor: pointer;
+            outline: none;
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+        }
+        .status-draft { background: #f1f5f9; color: var(--text-dark); border-color: var(--border); }
+        .status-negotiating { background: #f8fafc; color: var(--text-dark); border-color: #cbd5e1; }
+        .status-followup { background: #f1f5f9; color: var(--text-muted); border-color: var(--border); }
+        .status-review { background: #f8fafc; color: var(--text-muted); border-color: var(--border); }
+        .status-won { background: var(--pill-dark); color: #ffffff; border-color: var(--pill-dark); }
+        .status-lost { background: #ffffff; color: var(--text-muted); border-color: var(--border); }
+
+        *:focus-visible {
+            outline: 2px solid var(--pill-dark);
+            outline-offset: 2px;
+        }
+
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .btn-page {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            height: 36px;
+            border-radius: var(--radius-pill);
+            border: 1px solid var(--border);
+            background: #ffffff;
+            color: var(--text-dark);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 11.5px;
+            cursor: pointer;
+        }
+        .btn-page.active { background: var(--pill-dark); color: #ffffff; border-color: var(--pill-dark); }
+        .btn-page:hover:not(.active) { background: #f8fafc; }
+        .btn-page.disabled { opacity: 0.4; pointer-events: none; }
+
+        .ui-icon {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            stroke-width: 2.2;
+            stroke: currentColor;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            vertical-align: -2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-window">
+    <nav class="app-nav">
+        <a href="/" class="nav-logo-box">
+            <div class="nav-logo-badge">
+                <svg class="ui-icon" style="stroke: #ffffff; width: 18px; height: 18px;" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1z"/></svg>
+            </div>
+            <span class="nav-brand-title">Air Export Pricing Engine</span>
+        </a>
+
+        <div class="nav-links-center">
+            <a href="/" class="nav-item">Dashboard</a>
+            <a href="/history" class="nav-item active">Reports</a>
+        </div>
+
+        <div class="header-actions">
+            <a href="/" class="btn-pill btn-white">
+                <svg class="ui-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span class="btn-text-full">New Margin Recommendation</span>
+                <span class="btn-text-mobile" style="display: none;">New Quote</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="page-header">
+        <div>
+            <a href="/" class="back-breadcrumb">
+                <svg class="ui-icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Back to Dashboard
+            </a>
+            <h1 class="page-title">Reports & Recommendation History</h1>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Audit trail and lifecycle status tracking for all generated air export quotations</p>
+        </div>
+        <div class="header-actions">
+            {% if records and records|length > 0 %}
+            <a href="/api/history/export" class="btn-pill btn-white">
+                <svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export CSV
+            </a>
+            <button type="button" class="btn-pill btn-danger" onclick="clearHistory()">
+                <svg class="ui-icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                Clear History
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if records and records|length > 0 %}
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Quotes</div>
+            <div class="stat-val">{{ total_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Won Inquiries</div>
+            <div class="stat-val">{{ won_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Pipeline</div>
+            <div class="stat-val">₹{{ "{:,.0f}".format(total_pipeline) }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-val">{{ "{:.1f}%".format(win_rate) }}</div>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Created At</th>
+                        <th>Trade Lane</th>
+                        <th>Airline Buy (₹)</th>
+                        <th>Quoted Sell (₹)</th>
+                        <th>Profit (₹)</th>
+                        <th>Margin Range</th>
+                        <th>Weight & Cargo</th>
+                        <th>Branch</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in records %}
+                    <tr>
+                        <td style="font-weight: 700; color: var(--text-light);">#{{ r.id }}</td>
+                        <td>{{ r.timestamp }}</td>
+                        <td>
+                            <strong>{{ r.origin_port }}</strong> → <br>
+                            <span style="color: var(--text-muted); font-size: 11px;">{{ r.dest_port }}</span>
+                        </td>
+                        <td>₹{{ "{:,.0f}".format(r.airline_buy_inr) }}</td>
+                        <td style="font-weight: 700;">₹{{ "{:,.0f}".format(r.selling_price_inr) }}</td>
+                        <td style="font-weight: 700;">₹{{ "{:,.0f}".format(r.margin_amount_inr or (r.selling_price_inr - r.airline_buy_inr)) }}</td>
+                        <td><strong style="white-space: nowrap;">{{ r.margin_range if r.margin_range else "{:.1f}%".format(r.margin_pct) }}</strong></td>
+                        <td>
+                            <span>{{ "{:.1f} kg".format(r.chargeable_wt_kg) }}</span><br>
+                            <span style="font-size: 11px; color: var(--text-light);">{{ r.commodity }}</span>
+                        </td>
+                        <td>{{ r.branch }}</td>
+                        <td>
+                            <select class="status-badge status-{{ r.status_class }}" onchange="updateLeadStatus({{ r.id }}, this.value, this)">
+                                {% for s in statuses %}
+                                <option value="{{ s.code }}" {% if r.status == s.code %}selected{% endif %}>{{ s.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination-bar">
+            <div>Showing <strong>{{ start_idx }}</strong> - <strong>{{ end_idx }}</strong> of <strong>{{ total_count }}</strong> quotes</div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+                {% if has_prev %}
+                <a href="/history?page={{ prev_page }}&per_page={{ per_page }}" class="btn-page">‹</a>
+                {% endif %}
+                <span class="btn-page active">{{ page }}</span>
+                {% if has_next %}
+                <a href="/history?page={{ next_page }}&per_page={{ per_page }}" class="btn-page">›</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 60px 20px; color: var(--text-muted); background: #f8fafc; border-radius: 16px; border: 1px solid var(--border);">
+        <h3 style="font-size: 16px; font-weight: 700; color: var(--text-dark);">No Quotations Recorded Yet</h3>
+        <p style="font-size: 13px; margin: 6px 0 16px;">Create your first freight quotation to start tracking leads.</p>
+        <a href="/" class="btn-pill btn-white">Create First Margin Recommendation</a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    const statusMap = {
+        'Draft / Quoted': 'draft',
+        'Negotiating': 'negotiating',
+        'Follow-up': 'followup',
+        'Under Review': 'review',
+        'Won': 'won',
+        'Lost': 'lost'
+    };
+
+    function updateLeadStatus(quoteId, newStatus, selectEl) {
+        fetch('/api/history/update_status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: quoteId, status: newStatus })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                selectEl.className = 'status-badge status-' + (statusMap[newStatus] || 'draft');
+            } else {
+                alert('Status update failed: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => alert('Network error: ' + err.message));
+    }
+
+    function clearHistory() {
+        if (!confirm('Are you sure you want to clear historical records?')) return;
+        fetch('/api/history/clear', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => { if (data.status === 'success') window.location.reload(); });
+    }
+</script>
+</body>
+</html>
+

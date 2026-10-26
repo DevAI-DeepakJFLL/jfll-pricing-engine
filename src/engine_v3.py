@@ -39,6 +39,7 @@ try:
     from customer_normalizer import normalize_customer_name
     from features_pit import CustomerPITRegistry
     from tiers import get_weight_tier, map_account_tier
+    from preprocess import map_origin_region
 except ImportError:
     from src.constants import MODEL_VERSION
     from src.quantile_model import MarginQuantileModel
@@ -48,6 +49,7 @@ except ImportError:
     from src.customer_normalizer import normalize_customer_name
     from src.features_pit import CustomerPITRegistry
     from src.tiers import get_weight_tier, map_account_tier
+    from src.preprocess import map_origin_region
 
 
 _CANDIDATE_BUNDLE_PATHS = [
@@ -330,7 +332,7 @@ class PricingEngineV3:
         canonical_comm = classify_commodity(raw_comm)
 
         origin_port = str(inq.get("Origin_Port") or inq.get("origin") or "Indira Gandhi International Airport")
-        origin_region = str(inq.get("Origin_Region") or "North India")
+        origin_region = str(inq.get("Origin_Region") or map_origin_region(origin_port) or "North India")
 
         raw_dest = str(inq.get("Destination_Port") or inq.get("dest") or inq.get("Destination_Region") or "")
         dest_region = map_destination_region(raw_dest) if raw_dest else str(inq.get("Destination_Region") or "Europe")

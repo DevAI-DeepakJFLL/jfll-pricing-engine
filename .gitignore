@@ -48,6 +48,8 @@ data/recommendations_history.db
 *.pt
 *.pth
 *.onnx
+models/*.tmp
+models/*.bak
 
 # ------------------------------------------------------------------------------
 # 4. ENVIRONMENT VARIABLES, SECRETS & CREDENTIALS

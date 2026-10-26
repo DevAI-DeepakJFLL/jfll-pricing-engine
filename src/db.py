@@ -180,8 +180,10 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
         return
 
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-    with sqlite3.connect(abs_path) as conn:
+    with sqlite3.connect(abs_path, timeout=15.0) as conn:
         cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode = WAL;")
+        cursor.execute("PRAGMA busy_timeout = 5000;")
 
 
         # Base table creation with full schema

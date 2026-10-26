@@ -1,0 +1,229 @@
+<mxfile host="app.diagrams.net">
+<diagram id="workflow_diagram" name="Air Export General Cargo &amp; Billing Workflow">
+<mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1780" pageHeight="2250" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+<mxCell id="2" value="&lt;b&gt;AIR EXPORT GENERAL CARGO &amp; BILLING WORKFLOW&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:12px;font-weight:normal;&#x27;&gt;Standard Operating Procedure: Dynamic Pricing, Software Entry, Operations Handover, 3-Way Reconciliation &amp; Customer Invoicing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=#1e293b;fontColor=#ffffff;fontSize=16;fontStyle=1;align=center;arcSize=6;" vertex="1" parent="1">
+  <mxGeometry x="40" y="30" width="1700" height="55" as="geometry" />
+</mxCell>
+<mxCell id="3" value="&lt;b&gt;Scope:&lt;/b&gt; General Cargo Air Export &amp;nbsp;|&amp;nbsp; &lt;b&gt;Key Actors:&lt;/b&gt; Customer / Agent, Pricing Team, Airlines, Booking Team, Operations, Billing Team &amp;nbsp;|&amp;nbsp; &lt;b&gt;Key Target:&lt;/b&gt; Invoice Raised within 2 Days of Execution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e293b;strokeColor=#334155;fontColor=#94a3b8;fontSize=11;align=center;arcSize=6;" vertex="1" parent="1">
+  <mxGeometry x="40" y="90" width="1700" height="32" as="geometry" />
+</mxCell>
+<mxCell id="4" value="&lt;b&gt;SECTION 1&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;&lt;b&gt;Pre-Shipment, Rates &amp; Airline Surcharges&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;• Rate Validity Span&lt;br/&gt;• Dynamic Negotiation&lt;br/&gt;• Carrier Matching&lt;br/&gt;• Weekly Fuel Surcharges&lt;br/&gt;• 1:1 Margin Protection" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#64748b;fontColor=#0f172a;fontSize=11;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="40" y="150" width="160" height="290" as="geometry" />
+</mxCell>
+<mxCell id="5" value="&lt;b&gt;Start: Rate Inquiry / Booking Request&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Rate validity span defined (e.g., from 28th)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontColor=#1e40af;fontSize=12;fontStyle=1;align=center;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="240" y="150" width="280" height="50" as="geometry" />
+</mxCell>
+<mxCell id="6" value="&lt;b&gt;Airline Rate Matching &amp; Negotiation&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Pricing Team coordinates directly with airline;&lt;br/&gt;Negotiations continue dynamically up to departure&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="225" width="280" height="60" as="geometry" />
+</mxCell>
+<mxCell id="7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="5" target="6" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="8" value="&lt;b&gt;Does Airline Increase&lt;br/&gt;Fuel Surcharge (FSC)?&lt;br/&gt;(e.g., Emirates Weekly)&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontColor=#78350f;fontSize=11;fontStyle=1;align=center;" vertex="1" parent="1">
+  <mxGeometry x="280" y="310" width="200" height="80" as="geometry" />
+</mxCell>
+<mxCell id="9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="6" target="8" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="10" value="&lt;b&gt;Adjust Selling Price Upward 1:1 (+Δ)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;If buy rate increases by 10, selling price&lt;br/&gt;must increase by 10 to protect profit margin&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;fontColor=#9a3412;fontSize=12;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="580" y="320" width="260" height="60" as="geometry" />
+</mxCell>
+<mxCell id="11" value="Yes (Buy +Δ)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16a34a;strokeWidth=2;fontColor=#16a34a;fontSize=11;fontStyle=1;" edge="1" source="8" target="10" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="12" value="&lt;b&gt;Confirm Approved Buy &amp; Sell Rates&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Final rate pair confirmed before cargo dispatch&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="415" width="280" height="50" as="geometry" />
+</mxCell>
+<mxCell id="13" value="No (Rates Steady)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#dc2626;strokeWidth=2;fontColor=#dc2626;fontSize=11;fontStyle=1;" edge="1" source="8" target="12" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="10" target="12" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="15" value="&lt;b&gt;EXPLANATORY NOTE 1: PRE-SHIPMENT, RATES &amp; AIRLINE SURCHARGES&lt;/b&gt;&lt;br/&gt;• &lt;b&gt;Rate Validity &amp; Dynamic Negotiations:&lt;/b&gt; Rate validity can span across specific dates (e.g., starting from the 28th). Rate negotiations and matching with airline rates continue dynamically right up until the shipment actually departs.&lt;br/&gt;• &lt;b&gt;Airline Rate Matching:&lt;/b&gt; The pricing team coordinates closely to match and confirm rates directly with the airline before dispatch.&lt;br/&gt;• &lt;b&gt;Managing Fuel Surcharges (FSC):&lt;/b&gt; Carriers like Emirates update fuel surcharges almost weekly. If an airline increases its fuel surcharge (e.g., buy rate increases by 10), the selling price must be adjusted upward by the exact same amount (e.g., selling price increases by 10) to ensure your profit margin remains protected." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf5;strokeColor=#f59e0b;fontColor=#1c1917;fontSize=11;fontStyle=0;align=left;spacingLeft=14;spacingRight=14;spacingTop=10;spacingBottom=10;arcSize=6;" vertex="1" parent="1">
+  <mxGeometry x="900" y="150" width="840" height="160" as="geometry" />
+</mxCell>
+<mxCell id="16" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f59e0b;strokeWidth=1;dashed=1;endArrow=oval;endFill=1;startArrow=none;" edge="1" source="6" target="15" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="17" value="&lt;b&gt;SECTION 2&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;&lt;b&gt;Booking &amp; System Entry&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;• Customer Confirmation&lt;br/&gt;• Software Integration&lt;br/&gt;• RFQ to Booking&lt;br/&gt;• System Quotation (Buy 100 / Sell 110)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#64748b;fontColor=#0f172a;fontSize=11;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="40" y="480" width="160" height="220" as="geometry" />
+</mxCell>
+<mxCell id="18" value="&lt;b&gt;Customer Confirms Booking&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Shipper awards shipment based on confirmed terms&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontColor=#1e40af;fontSize=12;fontStyle=1;align=center;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="240" y="490" width="280" height="50" as="geometry" />
+</mxCell>
+<mxCell id="19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="12" target="18" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="20" value="&lt;b&gt;Software Integration: Move RFQ to Booking&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Booking Team moves record from RFQ to Booking&lt;br/&gt;inside the shipment management software&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="565" width="280" height="60" as="geometry" />
+</mxCell>
+<mxCell id="21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="18" target="20" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="22" value="&lt;b&gt;Generate System Quotation&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Generates system quotation using Pricing Team&#x27;s&lt;br/&gt;approved rates (e.g., buy rate 100, sell rate 110)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="650" width="280" height="65" as="geometry" />
+</mxCell>
+<mxCell id="23" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="20" target="22" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="24" value="&lt;b&gt;EXPLANATORY NOTE 2: BOOKING AND SYSTEM ENTRY&lt;/b&gt;&lt;br/&gt;• &lt;b&gt;Initial Booking:&lt;/b&gt; The process starts when a customer confirms a booking.&lt;br/&gt;• &lt;b&gt;Software Integration:&lt;/b&gt; The booking team moves the record from RFQ to booking inside the shipment software and generates a system quotation using the pricing team&#x27;s approved rates (e.g., buy rate of 100 and sell rate of 110).&lt;br/&gt;• &lt;b&gt;Single Source of Truth:&lt;/b&gt; The system quotation binds the authorized commercial figures to prevent unauthorized rate drift." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf5;strokeColor=#f59e0b;fontColor=#1c1917;fontSize=11;fontStyle=0;align=left;spacingLeft=14;spacingRight=14;spacingTop=10;spacingBottom=10;arcSize=6;" vertex="1" parent="1">
+  <mxGeometry x="900" y="500" width="840" height="140" as="geometry" />
+</mxCell>
+<mxCell id="25" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f59e0b;strokeWidth=1;dashed=1;endArrow=oval;endFill=1;startArrow=none;" edge="1" source="22" target="24" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="26" value="&lt;b&gt;SECTION 3&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;&lt;b&gt;Execution &amp; Handover&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;• Operations Oversight&lt;br/&gt;• Flight Schedules&lt;br/&gt;• Handover Cutoffs&lt;br/&gt;• Customs Statuses&lt;br/&gt;• Pure Forwarding&lt;br/&gt;• Billing Request Email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#64748b;fontColor=#0f172a;fontSize=11;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="40" y="740" width="160" height="360" as="geometry" />
+</mxCell>
+<mxCell id="27" value="&lt;b&gt;Operations Execution Management&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Pricing Team manages execution, tracking flight schedules,&lt;br/&gt;handover times, and customs clearance statuses&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="740" width="280" height="65" as="geometry" />
+</mxCell>
+<mxCell id="28" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="22" target="27" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="29" value="&lt;b&gt;Is Shipment&lt;br/&gt;Pure Forwarding?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontColor=#78350f;fontSize=11;fontStyle=1;align=center;" vertex="1" parent="1">
+  <mxGeometry x="280" y="830" width="200" height="80" as="geometry" />
+</mxCell>
+<mxCell id="30" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="27" target="29" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="31" value="&lt;b&gt;Proceed Directly to Handover&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Pure forwarding shipments bypass brokerage&lt;br/&gt;and proceed directly to airline handover&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="580" y="840" width="260" height="60" as="geometry" />
+</mxCell>
+<mxCell id="32" value="Yes (Pure Forwarding)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16a34a;strokeWidth=2;fontColor=#16a34a;fontSize=11;fontStyle=1;" edge="1" source="29" target="31" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="33" value="&lt;b&gt;Complete Customs Clearance &amp; Handover&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Customs cleared -&gt; Handover to airline cargo terminal&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="935" width="280" height="55" as="geometry" />
+</mxCell>
+<mxCell id="34" value="No (Standard)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#dc2626;strokeWidth=2;fontColor=#dc2626;fontSize=11;fontStyle=1;" edge="1" source="29" target="33" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="35" value="&lt;b&gt;Flight Departure (Execution Date)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Shipment departs; execution date officially recorded&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontColor=#1e40af;fontSize=12;fontStyle=1;align=center;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="240" y="1015" width="280" height="50" as="geometry" />
+</mxCell>
+<mxCell id="36" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="33" target="35" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="37" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="31" target="35" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="38" value="&lt;b&gt;Pricing Team Initiates Billing Request&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Using &lt;b&gt;execution date&lt;/b&gt; as reference, Pricing Team emails&lt;br/&gt;Billing Team via &lt;b&gt;customer communication thread&lt;/b&gt;,&lt;br/&gt;citing the agreed buy and sell rates&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="1090" width="280" height="75" as="geometry" />
+</mxCell>
+<mxCell id="39" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="35" target="38" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="40" value="&lt;b&gt;EXPLANATORY NOTE 3: EXECUTION &amp; HANDOVER&lt;/b&gt;&lt;br/&gt;• &lt;b&gt;Operations Management:&lt;/b&gt; The pricing team manages shipment execution, tracking flight schedules, handover times, and customs clearance statuses. Pure forwarding shipments proceed directly to handover.&lt;br/&gt;• &lt;b&gt;Billing Request Initiation:&lt;/b&gt; Using the execution date as a reference, the pricing team initiates the billing request by emailing the billing team via the customer communication thread, citing the agreed buy and sell rates.&lt;br/&gt;• &lt;b&gt;Audit Trail Continuity:&lt;/b&gt; Communicating on the customer thread maintains full visibility into rate approvals and client instructions." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf5;strokeColor=#f59e0b;fontColor=#1c1917;fontSize=11;fontStyle=0;align=left;spacingLeft=14;spacingRight=14;spacingTop=10;spacingBottom=10;arcSize=6;" vertex="1" parent="1">
+  <mxGeometry x="900" y="800" width="840" height="160" as="geometry" />
+</mxCell>
+<mxCell id="41" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f59e0b;strokeWidth=1;dashed=1;endArrow=oval;endFill=1;startArrow=none;" edge="1" source="38" target="40" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="42" value="&lt;b&gt;SECTION 4&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;&lt;b&gt;Verification, Discrepancies &amp; Feedback&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;• Cross-Tallying Rates&lt;br/&gt;• Error Identification&lt;br/&gt;• Correction Feedback Loop&lt;br/&gt;• Resolution Before Invoicing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#64748b;fontColor=#0f172a;fontSize=11;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="40" y="1200" width="160" height="260" as="geometry" />
+</mxCell>
+<mxCell id="43" value="&lt;b&gt;Billing Team Cross-Tallying&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Billing Team cross-verifies: (1) System Quotation,&lt;br/&gt;(2) Pricing Team&#x27;s Email Request, and (3) Airline Rates&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="1200" width="280" height="75" as="geometry" />
+</mxCell>
+<mxCell id="44" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="38" target="43" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="45" value="&lt;b&gt;Any Mistakes,&lt;br/&gt;Discrepancies, or&lt;br/&gt;Requested Changes?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontColor=#78350f;fontSize=11;fontStyle=1;align=center;" vertex="1" parent="1">
+  <mxGeometry x="280" y="1305" width="200" height="80" as="geometry" />
+</mxCell>
+<mxCell id="46" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="43" target="45" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="47" value="&lt;b&gt;Correction Loop: Reply with Feedback&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Billing Team replies with feedback outlining necessary&lt;br/&gt;corrections before invoice is finalized&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fee2e2;strokeColor=#dc2626;fontColor=#991b1b;fontSize=12;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="580" y="1310" width="260" height="70" as="geometry" />
+</mxCell>
+<mxCell id="48" value="Yes (Discrepancy)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16a34a;strokeWidth=2;fontColor=#16a34a;fontSize=11;fontStyle=1;" edge="1" source="45" target="47" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="49" value="&lt;b&gt;Pricing / Booking Team Corrections&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Applies required corrections to system quotation&lt;br/&gt;or clarifies rates on thread&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;fontColor=#9a3412;fontSize=12;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="580" y="1205" width="260" height="65" as="geometry" />
+</mxCell>
+<mxCell id="50" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="47" target="49" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="51" value="Re-tally" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#ea580c;strokeWidth=2;fontColor=#ea580c;fontSize=11;fontStyle=1;dashed=1;" edge="1" source="49" target="43" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="52" value="&lt;b&gt;Rates &amp; Charges Cross-Verified&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Clean verification confirmed; ready for invoicing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;fontColor=#14532d;fontSize=11;fontStyle=1;align=center;arcSize=10;" vertex="1" parent="1">
+  <mxGeometry x="240" y="1415" width="280" height="50" as="geometry" />
+</mxCell>
+<mxCell id="53" value="No (Clean Tally)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#dc2626;strokeWidth=2;fontColor=#dc2626;fontSize=11;fontStyle=1;" edge="1" source="45" target="52" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="54" value="&lt;b&gt;EXPLANATORY NOTE 4: VERIFICATION, DISCREPANCIES &amp; FEEDBACK&lt;/b&gt;&lt;br/&gt;• &lt;b&gt;Cross-Tallying:&lt;/b&gt; The billing team cross-verifies the system quotation against the pricing team&#x27;s email request and airline rates.&lt;br/&gt;• &lt;b&gt;Correction Loops:&lt;/b&gt; If the billing team identifies any mistakes, discrepancies, or requested changes, they reply with feedback outlining the necessary corrections before the invoice is finalized.&lt;br/&gt;• &lt;b&gt;Pre-Billing Control:&lt;/b&gt; No invoice is generated while discrepancies or rate variances remain unresolved." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf5;strokeColor=#f59e0b;fontColor=#1c1917;fontSize=11;fontStyle=0;align=left;spacingLeft=14;spacingRight=14;spacingTop=10;spacingBottom=10;arcSize=6;" vertex="1" parent="1">
+  <mxGeometry x="900" y="1200" width="840" height="160" as="geometry" />
+</mxCell>
+<mxCell id="55" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f59e0b;strokeWidth=1;dashed=1;endArrow=oval;endFill=1;startArrow=none;" edge="1" source="47" target="54" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="56" value="&lt;b&gt;SECTION 5&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;&lt;b&gt;Invoicing, Drafts, and Document Delivery&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;• Multi-Location Agents&lt;br/&gt;• 24h Draft Approval&lt;br/&gt;• Rework Minimization&lt;br/&gt;• Digital Soft Copy (Default)&lt;br/&gt;• Monthly Hard Copy&lt;br/&gt;• Strict 2-Day Target" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#64748b;fontColor=#0f172a;fontSize=11;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="40" y="1500" width="160" height="480" as="geometry" />
+</mxCell>
+<mxCell id="57" value="&lt;b&gt;Is Client a&lt;br/&gt;Multi-Location Agent&lt;br/&gt;Needing Revisions?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontColor=#78350f;fontSize=11;fontStyle=1;align=center;" vertex="1" parent="1">
+  <mxGeometry x="280" y="1500" width="200" height="80" as="geometry" />
+</mxCell>
+<mxCell id="58" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="52" target="57" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="59" value="&lt;b&gt;Share Draft Invoice within 24 Hours&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Draft invoice shared for approval within &lt;b&gt;24 hours&lt;/b&gt;&lt;br/&gt;for address adjustments/revisions to minimize rework&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;fontColor=#9a3412;fontSize=12;fontStyle=1;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="580" y="1505" width="260" height="70" as="geometry" />
+</mxCell>
+<mxCell id="60" value="Yes (Multi-Location Agent)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16a34a;strokeWidth=2;fontColor=#16a34a;fontSize=11;fontStyle=1;" edge="1" source="57" target="59" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="61" value="&lt;b&gt;Raise Final Tax Invoice&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Final invoice generated per approved rates/address&lt;br/&gt;&lt;b&gt;Target: Within 2 days of shipment execution&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="240" y="1615" width="280" height="60" as="geometry" />
+</mxCell>
+<mxCell id="62" value="No (Standard)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#dc2626;strokeWidth=2;fontColor=#dc2626;fontSize=11;fontStyle=1;" edge="1" source="57" target="61" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="63" value="Approved" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="59" target="61" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="64" value="&lt;b&gt;Does Client Specifically&lt;br/&gt;Require Physical&lt;br/&gt;Hard Copy?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontColor=#78350f;fontSize=11;fontStyle=1;align=center;" vertex="1" parent="1">
+  <mxGeometry x="280" y="1710" width="200" height="80" as="geometry" />
+</mxCell>
+<mxCell id="65" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="61" target="64" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="66" value="&lt;b&gt;Monthly Physical Dispatch Batch&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;If client specifically requires physical hard copy,&lt;br/&gt;they are dispatched on a &lt;b&gt;monthly basis&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#0284c7;fontColor=#0f172a;fontSize=12;fontStyle=0;align=center;arcSize=8;" vertex="1" parent="1">
+  <mxGeometry x="580" y="1715" width="260" height="70" as="geometry" />
+</mxCell>
+<mxCell id="67" value="Yes (Physical Required)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16a34a;strokeWidth=2;fontColor=#16a34a;fontSize=11;fontStyle=1;" edge="1" source="64" target="66" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="68" value="&lt;b&gt;Digital Email Delivery (Soft Copy)&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Invoices are primarily handled digitally via email&lt;br/&gt;using soft copies within 2 days of execution&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;fontColor=#14532d;fontSize=11;fontStyle=1;align=center;arcSize=10;" vertex="1" parent="1">
+  <mxGeometry x="240" y="1825" width="280" height="65" as="geometry" />
+</mxCell>
+<mxCell id="69" value="No (Digital Default)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#dc2626;strokeWidth=2;fontColor=#dc2626;fontSize=11;fontStyle=1;" edge="1" source="64" target="68" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="70" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="66" target="68" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="71" value="&lt;b&gt;Workflow Completed&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size:10px;&#x27;&gt;Invoice successfully dispatched to customer&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontColor=#1e40af;fontSize=12;fontStyle=1;align=center;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="240" y="1920" width="280" height="50" as="geometry" />
+</mxCell>
+<mxCell id="72" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;fontColor=#334155;fontSize=11;" edge="1" source="68" target="71" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+<mxCell id="73" value="&lt;b&gt;EXPLANATORY NOTE 5: INVOICING, DRAFTS, AND DOCUMENT DELIVERY&lt;/b&gt;&lt;br/&gt;• &lt;b&gt;Invoicing Format:&lt;/b&gt; Invoices are primarily handled digitally via email using soft copies. However, if a client specifically requires a physical hard copy, they are dispatched on a &lt;b&gt;monthly basis&lt;/b&gt;.&lt;br/&gt;• &lt;b&gt;Draft Approvals:&lt;/b&gt; For multi-location agent clients who frequently need address adjustments or revisions, draft invoices are shared for approval within &lt;b&gt;24 hours&lt;/b&gt; to minimize later rework.&lt;br/&gt;• &lt;b&gt;Timeline Targets:&lt;/b&gt; The core performance target is to successfully raise and dispatch the final invoice within &lt;b&gt;two days&lt;/b&gt; of shipment execution." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf5;strokeColor=#f59e0b;fontColor=#1c1917;fontSize=11;fontStyle=0;align=left;spacingLeft=14;spacingRight=14;spacingTop=10;spacingBottom=10;arcSize=6;" vertex="1" parent="1">
+  <mxGeometry x="900" y="1550" width="840" height="190" as="geometry" />
+</mxCell>
+<mxCell id="74" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f59e0b;strokeWidth=1;dashed=1;endArrow=oval;endFill=1;startArrow=none;" edge="1" source="61" target="73" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+  </root>
+</mxGraphModel>
+</diagram>
+</mxfile>
