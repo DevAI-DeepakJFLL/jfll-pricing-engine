@@ -306,4 +306,3 @@ def get_category_commodity_max_margin(
         "effective_max_margin": effective_cap,
         "limiting_factor": limiting_factor
     }
-

@@ -126,15 +126,15 @@ def compute_volumetric_weight(dimensions: Optional[List[Dict[str, Any]]], diviso
     total = 0.0
     for i, item in enumerate(dimensions):
         try:
-            l = float(item["length"])
-            w = float(item["width"])
-            h = float(item["height"])
+            dim_l = float(item["length"])
+            dim_w = float(item["width"])
+            dim_h = float(item["height"])
             pcs = int(item.get("pieces", 1))
         except (KeyError, ValueError, TypeError) as e:
             raise ValueError(f"dimension row {i} invalid: {e}")
-        if min(l, w, h) <= 0 or pcs < 1 or max(l, w, h) > 1200:  # cm (max 12 meters)
-            raise ValueError(f"dimension row {i} out of range: {l}x{w}x{h} cm, {pcs} pcs")
-        total += (l * w * h * pcs) / divisor
+        if min(dim_l, dim_w, dim_h) <= 0 or pcs < 1 or max(dim_l, dim_w, dim_h) > 1200:  # cm (max 12 meters)
+            raise ValueError(f"dimension row {i} out of range: {dim_l}x{dim_w}x{dim_h} cm, {pcs} pcs")
+        total += (dim_l * dim_w * dim_h * pcs) / divisor
     return round(total, 2)
 
 

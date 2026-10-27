@@ -4,9 +4,12 @@ Rigorous backtesting, pinball loss evaluation, empirical corridor coverage measu
 and release gates for Air Export Pricing Engine models.
 """
 
+import logging
 from typing import Dict, Any
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger("pricing_backtest")
 
 
 def pinball(y, q, tau: float) -> float:
@@ -101,7 +104,8 @@ def measure_corridor_coverage(engine, holdout: pd.DataFrame, max_rows: int = 500
             hits += int(c["min_margin_pct"] <= y <= c["max_margin_pct"])
             widths += float(c["band_width_pct"])
             n += 1
-        except Exception:
+        except Exception as err:
+            logger.debug("Failed evaluating row in corridor coverage: %s", err)
             continue
 
     empirical_cov = round(hits / max(n, 1), 4)

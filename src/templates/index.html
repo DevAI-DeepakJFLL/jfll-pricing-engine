@@ -1995,12 +1995,10 @@
             const opt = body.optimal;
             const stratDict = body.strategic_recommendations || (opt && opt.strategic_recommendations) || {};
             currentStrategies = stratDict;
-            currentSensitivityRows = body.sensitivity || [];
             currentChargeableWeight = weights.chargeable_wt || 100;
             currentCorridor = body.negotiation_corridor || (opt && opt.negotiation_corridor) || null;
 
             renderStrategicCards(currentStrategies, 'balanced', currentChargeableWeight, currentCorridor);
-            // renderSensitivityTable removed for clean UI
             updateHeroMetrics(opt, currentCorridor);
 
             // Smooth scroll into results view
@@ -2015,7 +2013,6 @@
 
     let currentStrategies = {};
     let selectedStrategyKey = 'balanced';
-    let currentSensitivityRows = [];
     let currentChargeableWeight = 100;
     let currentCorridor = null;
 
@@ -2165,68 +2162,6 @@
         });
 
         updateHeroMetrics(strat, currentCorridor);
-        // renderSensitivityTable removed for clean UI
-    }
-
-    function renderSensitivityTable(rows, selectedMargin) {
-        currentSensitivityRows = rows || [];
-        const tbody = document.getElementById('sensitivity_body');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-
-        const floorM = currentStrategies.floor ? currentStrategies.floor.Margin_Percentage : -999;
-        const balancedM = currentStrategies.balanced ? currentStrategies.balanced.Margin_Percentage : -999;
-        const premiumM = currentStrategies.premium ? currentStrategies.premium.Margin_Percentage : -999;
-
-        currentSensitivityRows.forEach(row => {
-            const tr = document.createElement('tr');
-            const rowMargin = row.Margin_Percentage;
-            const isSelected = selectedMargin !== undefined && Math.abs(rowMargin - selectedMargin) < 0.15;
-            if (isSelected) tr.className = 'row-tier-selected';
-
-            const rowSell = row.Quoted_Sell_Price_INR || 0;
-            const rowMarginAmt = row.Margin_Amount_INR || 0;
-            const ratePerKg = Math.round(rowSell / Math.max(1, currentChargeableWeight));
-            const grossMarginPct = (rowSell > 0) ? ((rowMarginAmt / rowSell) * 100).toFixed(1) : rowMargin.toFixed(1);
-
-            let confText = '--';
-            if (row.History_Percentile !== undefined && row.History_Percentile !== null) {
-                const rowConf = getConfidenceScore(row.History_Percentile, row.Cohort_N);
-                confText = rowConf.text;
-            } else if (row.Win_Probability !== undefined) {
-                confText = `${(row.Win_Probability * 100).toFixed(1)}%`;
-            }
-
-            let tierBadge = '<span style="color: var(--text-light); font-size: 11px;">Alternative</span>';
-            if (Math.abs(rowMargin - floorM) < 0.15) tierBadge = '<span class="badge badge-floor">Lowest Safe</span>';
-            else if (Math.abs(rowMargin - balancedM) < 0.15) tierBadge = '<span class="badge badge-balanced">Recommended</span>';
-            else if (Math.abs(rowMargin - premiumM) < 0.15) tierBadge = '<span class="badge badge-premium">Higher Profit</span>';
-
-            tr.innerHTML = `
-                <td><strong>${row.Margin_Percentage.toFixed(1)}%</strong></td>
-                <td>${grossMarginPct}%</td>
-                <td>₹${formatINR(rowSell)}</td>
-                <td>₹${formatINR(ratePerKg)}/kg</td>
-                <td>₹${formatINR(rowMarginAmt)}</td>
-                <td>${confText}</td>
-                <td>${tierBadge}</td>
-            `;
-
-            tr.onclick = function() {
-                updateHeroMetrics(row, currentCorridor);
-                if (Math.abs(rowMargin - floorM) < 0.15) selectStrategyCard('floor');
-                else if (Math.abs(rowMargin - balancedM) < 0.15) selectStrategyCard('balanced');
-                else if (Math.abs(rowMargin - premiumM) < 0.15) selectStrategyCard('premium');
-                else {
-                    ['floor', 'balanced', 'premium'].forEach(k => {
-                        const el = document.getElementById(`strat_card_${k}`);
-                        if (el) el.classList.remove('selected');
-                    });
-                    renderSensitivityTable(currentSensitivityRows, row.Margin_Percentage);
-                }
-            };
-            tbody.appendChild(tr);
-        });
     }
 
     function copyQuoteSummary() {

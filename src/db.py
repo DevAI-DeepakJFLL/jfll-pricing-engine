@@ -196,7 +196,6 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
         cursor.execute("PRAGMA journal_mode = WAL;")
         cursor.execute("PRAGMA busy_timeout = 5000;")
 
-
         # Base table creation with full schema
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS recommendation_history (
@@ -270,7 +269,6 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
             "carrier": "TEXT",
             "sales_person": "TEXT"
         }
-
 
         for col, col_type in col_defs.items():
             if col not in existing_cols:
@@ -432,7 +430,7 @@ def get_history_stats(db_path: str, include_presets: bool = False) -> Dict[str, 
         cursor = conn.cursor()
         if include_presets:
             query = """
-                SELECT 
+                SELECT
                     COUNT(*),
                     SUM(CASE WHEN status = 'Won' THEN 1 ELSE 0 END),
                     SUM(COALESCE(selling_price_inr, 0))
@@ -442,7 +440,7 @@ def get_history_stats(db_path: str, include_presets: bool = False) -> Dict[str, 
             cursor.execute(query)
         else:
             query = """
-                SELECT 
+                SELECT
                     COUNT(*),
                     SUM(CASE WHEN status = 'Won' THEN 1 ELSE 0 END),
                     SUM(COALESCE(selling_price_inr, 0))

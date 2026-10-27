@@ -20,6 +20,7 @@ import csv
 import json
 import logging
 import datetime
+import threading
 from functools import lru_cache
 from typing import Dict, Optional
 import numpy as np
@@ -107,8 +108,6 @@ try:
     from preprocess import get_air_cargo_season
 except ImportError:
     from src.preprocess import get_air_cargo_season
-
-import threading
 
 try:
     from engine_v3 import PricingEngineV3
@@ -325,7 +324,7 @@ def _build_destinations_catalog(bundle=None, root_path=ENGINE_ROOT):
             model_dests = set(PORT_LABELS.keys())
     else:
         model_dests = set(PORT_LABELS.keys())
-    
+
     comb_csv = os.path.join(root_path, "data", "processed", "Air_Export_Pricing_Combined_ML.csv")
     freq_order = []
     if os.path.exists(comb_csv):
@@ -336,10 +335,10 @@ def _build_destinations_catalog(bundle=None, root_path=ENGINE_ROOT):
         except Exception as e:
             logger.warning(f"Could not load destination frequencies from CSV: {e}")
             freq_order = []
-            
+
     remaining = sorted([p for p in model_dests if p not in freq_order])
     full_list = freq_order + remaining
-    
+
     opts = []
     for port in full_list:
         label = PORT_LABELS.get(port, port)
@@ -572,12 +571,12 @@ def api_quote():
         dimensions = data["dimensions"]
     elif any(k in data for k in ["dim_l", "dim_w", "dim_h"]):
         try:
-            l = float(data.get("dim_l", 0))
-            w = float(data.get("dim_w", 0))
-            h = float(data.get("dim_h", 0))
+            dim_l = float(data.get("dim_l", 0))
+            dim_w = float(data.get("dim_w", 0))
+            dim_h = float(data.get("dim_h", 0))
             pcs = int(data.get("dim_pcs", 1))
-            if l > 0 and w > 0 and h > 0:
-                dimensions = [{"length": l, "width": w, "height": h, "pieces": pcs}]
+            if dim_l > 0 and dim_w > 0 and dim_h > 0:
+                dimensions = [{"length": dim_l, "width": dim_w, "height": dim_h, "pieces": pcs}]
         except (ValueError, TypeError):
             pass
 
@@ -636,14 +635,21 @@ def api_quote():
 
     # Robust Dual Buy Resolution: If both provided, but total buy implies < 10 while unit buy is valid, resolve total buy
     if buy_cost is not None and unit_buy_rate is not None:
-        if chargeable_wt >= 30.0 and unit_buy_rate >= 10.0 and (abs(buy_cost - unit_buy_rate) < 1.0 or (buy_cost / chargeable_wt) < 10.0):
+        if (
+            chargeable_wt >= 30.0
+            and unit_buy_rate >= 10.0
+            and (abs(buy_cost - unit_buy_rate) < 1.0 or (buy_cost / chargeable_wt) < 10.0)
+        ):
             buy_cost = round(unit_buy_rate * chargeable_wt, 2)
 
     if buy_cost is None:
         if unit_buy_rate is not None:
             buy_cost = round(unit_buy_rate * chargeable_wt, 2)
         else:
-            return jsonify({"status": "error", "message": "Invalid Airline Buy Cost. Please provide a positive numeric value for buy or unit_buy."}), 400
+            return jsonify({
+                "status": "error",
+                "message": "Invalid Airline Buy Cost. Please provide a positive numeric value for buy or unit_buy."
+            }), 400
 
     if unit_buy_rate is None and buy_cost is not None:
         unit_buy_rate = round(buy_cost / max(0.1, chargeable_wt), 2)
@@ -879,7 +885,6 @@ def api_quote():
     except Exception as err:
         logger.error(f"PricingEngineV3 recommendation error: {err}", exc_info=True)
         return jsonify({"status": "error", "message": "Optimization engine encountered an internal error. Please verify your quotation parameters."}), 500
-
 
 
 @app.route("/api/history/outcome", methods=["POST"])

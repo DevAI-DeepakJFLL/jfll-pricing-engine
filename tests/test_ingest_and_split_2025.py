@@ -240,7 +240,7 @@ class TestPersistedGeneratedFiles(unittest.TestCase):
         for fname, is_margin in expected_files.items():
             fpath = os.path.join(proc_dir, fname)
             self.assertTrue(os.path.exists(fpath), f"Expected file {fpath} does not exist.")
-            df = pd.read_csv(fpath)
+            df = pd.read_csv(fpath, low_memory=False)
             self.assertGreater(len(df), 0, f"File {fname} is empty.")
             # Run build gate assertions
             validate_build_gates(df, is_margin_dataset=is_margin, dataset_name=fname)

@@ -214,16 +214,20 @@ def build_tables(won: pd.DataFrame) -> Dict[str, Any]:
 def _blend(child: Optional[dict], parent: dict, k: int = SHRINK_K) -> dict:
     if not child:
         return dict(parent)
-    n = child["n"]; w = n / (n + k)
+    n = child["n"]
+    w = n / (n + k)
     return {key: w * child[key] + (1 - w) * parent[key] for key in ("q25", "q50", "q85", "q90")} | {"n": n}
 
 
 def get_band(t, slab, dest_region):
-    g = t["global"]; s = _blend(t["slab"].get(slab), g); sr = _blend(t["slab_region"].get((slab, dest_region)), s)
+    g = t["global"]
+    s = _blend(t["slab"].get(slab), g)
+    sr = _blend(t["slab_region"].get((slab, dest_region)), s)
     return sr
 
 
-def _tanh(x, scale): return math.tanh(x / scale)
+def _tanh(x, scale):
+    return math.tanh(x / scale)
 
 
 def _pos_to_log(pos, lo, mid, hi):
@@ -233,17 +237,25 @@ def _pos_to_log(pos, lo, mid, hi):
 
 def signals(inq: Dict[str, Any], t, band) -> Dict[str, Dict[str, Any]]:
     out = {}
-    comm = str(inq.get("Commodity_Group", "General Cargo")); cat = str(inq.get("Company_Group", "Subagent"))
+    comm = str(inq.get("Commodity_Group", "General Cargo"))
+    cat = str(inq.get("Company_Group", "Subagent"))
     # commodity: 50% policy prior (risk buffer) + 50% data (shrunk residual); data absent => prior only
     buf = max([v for k, v in COMMODITY_RISK_BUFFERS.items() if _norm(k) == _norm(comm)] or [0.0])
     prior = min(1.0, buf / 0.06)
     has_data = comm in t["commodity_eff"] and comm != "General Cargo"
     data_s = _tanh(t["commodity_eff"][comm], 0.5) if has_data else 0.0
-    out["commodity"] = dict(s=0.5 * prior + 0.5 * data_s if has_data else prior, why=f"{comm}: risk prior {prior:.2f}, data {data_s:.2f}")
+    out["commodity"] = dict(
+        s=0.5 * prior + 0.5 * data_s if has_data else prior,
+        why=f"{comm}: risk prior {prior:.2f}, data {data_s:.2f}"
+    )
     # category: policy prior from cap ladder vs default 28, plus data
-    cap = get_client_category_max_margin(cat); prior_c = max(-1.0, min(1.0, (cap - 28.0) / 30.0))
+    cap = get_client_category_max_margin(cat)
+    prior_c = max(-1.0, min(1.0, (cap - 28.0) / 30.0))
     data_c = _tanh(t["category_eff"].get(cat, 0.0), 0.5) if cat in t["category_eff"] else 0.0
-    out["category"] = dict(s=0.5 * prior_c + 0.5 * data_c, why=f"{cat}: cap-ladder prior {prior_c:.2f}, data {data_c:.2f}")
+    out["category"] = dict(
+        s=0.5 * prior_c + 0.5 * data_c,
+        why=f"{cat}: cap-ladder prior {prior_c:.2f}, data {data_c:.2f}"
+    )
     # customer history (own won margins shrunk towards relationship tier prior)
     cust = str(inq.get("Customer_Company") or "")
     n, med = t["customer"].get(cust, (0, band["q50"]))
@@ -266,8 +278,12 @@ def signals(inq: Dict[str, Any], t, band) -> Dict[str, Dict[str, Any]]:
     rt = {"spot": 0.5, "contract": -0.3}.get(str(inq.get("Rate_Type", "")).lower(), 0.0)
     out["market"] = dict(s=max(-1, min(1, season + rt)), why=f"season {season:+.1f}, rate type {rt:+.1f}")
     # complexity / credit
-    cdays = float(inq.get("Credit_Days", 30) or 30); over = 1.0 if inq.get("Oversize") else 0.0
-    out["complexity_credit"] = dict(s=min(1.0, 0.5 * over + 0.5 * max(0.0, (cdays - 30) / 60.0)), why=f"oversize={bool(over)}, credit {cdays:.0f}d")
+    cdays = float(inq.get("Credit_Days", 30) or 30)
+    over = 1.0 if inq.get("Oversize") else 0.0
+    out["complexity_credit"] = dict(
+        s=min(1.0, 0.5 * over + 0.5 * max(0.0, (cdays - 30) / 60.0)),
+        why=f"oversize={bool(over)}, credit {cdays:.0f}d"
+    )
     # competitive evidence
     comp = inq.get("Competitor_Sell_Per_Kg")
     if comp is None or str(comp).strip() == "":
@@ -289,8 +305,10 @@ def signals(inq: Dict[str, Any], t, band) -> Dict[str, Dict[str, Any]]:
 
 def recommend(inq: Dict[str, Any], t, weights: Dict[str, float] = None, is_spot_tender: bool = False) -> Dict[str, Any]:
     W = (weights or ADJUSTER_WEIGHTS).copy()
-    buy = float(inq["Total_Buy_INR"]); wt = float(inq["Chargeable_Weight_Kg"])
-    slab = get_weight_tier(wt); region = inq.get("Destination_Region", "")
+    buy = float(inq["Total_Buy_INR"])
+    wt = float(inq["Chargeable_Weight_Kg"])
+    slab = get_weight_tier(wt)
+    region = inq.get("Destination_Region", "")
     dest = str(inq.get("Destination_Port", ""))
     comm = inq.get("Commodity_Group", "General Cargo")
     cat = inq.get("Company_Group", "Subagent")
@@ -457,26 +475,50 @@ def recommend(inq: Dict[str, Any], t, weights: Dict[str, float] = None, is_spot_
         y = _pos_to_log(pos, lo, mid, hi)
         inr = math.expm1(y) * wt
         clamped = None
-        if inr < floor_inr: inr, clamped = floor_inr, "cost_floor"
-        if inr > cap_inr and cap_inr >= floor_inr: inr, clamped = cap_inr, "cap"
-        tiers[name] = dict(position=round(pos, 3), margin_inr=round(inr, 2), margin_per_kg=round(inr / wt, 2),
-                           margin_pct=round(inr / buy * 100, 2), sell_inr=round(buy + inr, 2), clamped_by=clamped)
+        if inr < floor_inr:
+            inr, clamped = floor_inr, "cost_floor"
+        if inr > cap_inr and cap_inr >= floor_inr:
+            inr, clamped = cap_inr, "cap"
+        tiers[name] = dict(
+            position=round(pos, 3),
+            margin_inr=round(inr, 2),
+            margin_per_kg=round(inr / wt, 2),
+            margin_pct=round(inr / buy * 100, 2),
+            sell_inr=round(buy + inr, 2),
+            clamped_by=clamped
+        )
 
     order = ["floor", "balanced", "premium"]
     for a, b in zip(order, order[1:]):
         if tiers[b]["margin_inr"] <= tiers[a]["margin_inr"]:
             inr = tiers[a]["margin_inr"] + max(0.005 * buy, 0.25 * wt)
-            tiers[b].update(margin_inr=round(inr, 2), margin_per_kg=round(inr / wt, 2), margin_pct=round(inr / buy * 100, 2),
-                            sell_inr=round(buy + inr, 2), clamped_by="ordering")
+            tiers[b].update(
+                margin_inr=round(inr, 2),
+                margin_per_kg=round(inr / wt, 2),
+                margin_pct=round(inr / buy * 100, 2),
+                sell_inr=round(buy + inr, 2),
+                clamped_by="ordering"
+            )
 
     approval = []
-    if floor_inr > cap_inr: approval.append("cost floor above cap")
-    if comm in ("Dangerous Goods", "Valuables", "Live Animals"): approval.append(f"special cargo: {comm}")
-    if band_n < 30: approval.append(f"thin cohort (n={band_n})")
-    return dict(slab=slab, band=dict(P25=round(math.expm1(lo), 1), P50=round(math.expm1(mid), 1), P85=round(math.expm1(hi), 1), n=band_n),
-                position=round(p0, 3), signals={k: dict(weight=W.get(k, 0.0), s=round(v["s"], 3), why=v["why"]) for k, v in sig.items()},
-                tiers=tiers, cap_pct=eff_cap_pct, cost_floor_inr=round(floor_inr, 2), approval_required=approval,
-                pricing_mode="spot_tender" if tender_active else "standard", win_probability=None)
+    if floor_inr > cap_inr:
+        approval.append("cost floor above cap")
+    if comm in ("Dangerous Goods", "Valuables", "Live Animals"):
+        approval.append(f"special cargo: {comm}")
+    if band_n < 30:
+        approval.append(f"thin cohort (n={band_n})")
+    return dict(
+        slab=slab,
+        band=dict(P25=round(math.expm1(lo), 1), P50=round(math.expm1(mid), 1), P85=round(math.expm1(hi), 1), n=band_n),
+        position=round(p0, 3),
+        signals={k: dict(weight=W.get(k, 0.0), s=round(v["s"], 3), why=v["why"]) for k, v in sig.items()},
+        tiers=tiers,
+        cap_pct=eff_cap_pct,
+        cost_floor_inr=round(floor_inr, 2),
+        approval_required=approval,
+        pricing_mode="spot_tender" if tender_active else "standard",
+        win_probability=None
+    )
 
 
 # ----------------------------------------------------------------------------------------------
@@ -490,13 +532,17 @@ def history_percentile(t, slab: str, margin_per_kg: float) -> float:
 
 def to_legacy_response(inq: Dict[str, Any], rec: Dict[str, Any], t) -> Dict[str, Any]:
     """Map recommend() output to the keys app.py / the UI already consume. Win_Probability is None on purpose."""
-    buy = float(inq["Total_Buy_INR"]); wt = float(inq["Chargeable_Weight_Kg"])
-    meta = {"floor": ("Lowest Safe Price", "Best Chance to Win", "Minimum safe price that covers airline costs and protects profitability", "cyan"),
-            "balanced": ("Recommended Standard Price", "Most Balanced", "Optimal price balancing high win chance with standard business profits", "emerald"),
-            "premium": ("Higher Profit Price", "Maximum Earnings", "Higher margin price suited for urgent cargo, peak season, or premium service", "violet")}
+    buy = float(inq["Total_Buy_INR"])
+    wt = float(inq["Chargeable_Weight_Kg"])
+    meta = {
+        "floor": ("Lowest Safe Price", "Best Chance to Win", "Minimum safe price that covers airline costs and protects profitability", "cyan"),
+        "balanced": ("Recommended Standard Price", "Most Balanced", "Optimal price balancing high win chance with standard business profits", "emerald"),
+        "premium": ("Higher Profit Price", "Maximum Earnings", "Higher margin price suited for urgent cargo, peak season, or premium service", "violet")
+    }
     strat = {}
     for k, v in rec["tiers"].items():
-        sell = v["sell_inr"]; m = v["margin_inr"]
+        sell = v["sell_inr"]
+        m = v["margin_inr"]
         strat[k] = {"Margin_Percentage": v["margin_pct"], "Gross_Margin_Percentage": round(m / sell * 100, 2),
                     "Quoted_Sell_Price_INR": sell, "Margin_Amount_INR": m, "Rate_Per_Kg": round(sell / wt, 2),
                     "Margin_Per_Kg": v["margin_per_kg"], "Win_Probability": None, "Expected_Profit_INR": None,
@@ -552,15 +598,31 @@ def to_legacy_response(inq: Dict[str, Any], rec: Dict[str, Any], t) -> Dict[str,
         )
     }
 
-    return {"strategic_recommendations": strat, "negotiation_corridor": corridor,
-            "optimal": {**strat["balanced"], "strategic_recommendations": strat, "negotiation_corridor": corridor,
-            "Cost_Floor_Price_INR": round(buy + rec["cost_floor_inr"], 2), "Cohort_Band_Per_Kg": rec["band"],
-            "Signals": rec["signals"], "Approval_Required": rec["approval_required"]}}
+    return {
+        "strategic_recommendations": strat,
+        "negotiation_corridor": corridor,
+        "optimal": {
+            **strat["balanced"],
+            "strategic_recommendations": strat,
+            "negotiation_corridor": corridor,
+            "Cost_Floor_Price_INR": round(buy + rec["cost_floor_inr"], 2),
+            "Cohort_Band_Per_Kg": rec["band"],
+            "Signals": rec["signals"],
+            "Approval_Required": rec["approval_required"]
+        }
+    }
 
 
-def sensitivity_grid(inq: Dict[str, Any], rec: Dict[str, Any], t, steps: int = 15, corridor: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def sensitivity_grid(
+    inq: Dict[str, Any],
+    rec: Dict[str, Any],
+    t,
+    steps: int = 15,
+    corridor: Optional[Dict[str, Any]] = None
+) -> List[Dict[str, Any]]:
     """Margin ladder spanning from pre-approved corridor minimum to corridor maximum (or tier floor to premium)."""
-    buy = float(inq["Total_Buy_INR"]); wt = float(inq["Chargeable_Weight_Kg"])
+    buy = float(inq["Total_Buy_INR"])
+    wt = float(inq["Chargeable_Weight_Kg"])
     slab = rec["slab"]
     n_count = rec.get("band", {}).get("n", 30)
 

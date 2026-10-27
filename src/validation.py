@@ -56,7 +56,8 @@ def validate_inquiry(inq: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(inq)
 
     # 1. Chargeable Weight Validation
-    wt = _first(inq, ("Chargeable_Weight_Kg", "chargeable_wt", "chargeable_weight", "direct_weight", "Chargeable_Weight"))
+    wt_keys = ("Chargeable_Weight_Kg", "chargeable_wt", "chargeable_weight", "direct_weight", "Chargeable_Weight")
+    wt = _first(inq, wt_keys)
     if wt is None:
         raise QuoteValidationError("Chargeable weight is required")
     wt = _num(wt, "Chargeable weight (kg)", 0.0, MAX_WEIGHT_KG)
@@ -68,7 +69,11 @@ def validate_inquiry(inq: Dict[str, Any]) -> Dict[str, Any]:
         buy = _num(buy, "Total buy (INR)", 0.0, 1e9)
         if unit is not None:
             unit_val = _num(unit, "Unit buy (INR/kg)", 0.0, MAX_RATE)
-            if wt >= 30.0 and unit_val >= MIN_RATE and (abs(buy - unit_val) < 1.0 or (buy / wt) < MIN_RATE):
+            if (
+                wt >= 30.0
+                and unit_val >= MIN_RATE
+                and (abs(buy - unit_val) < 1.0 or (buy / wt) < MIN_RATE)
+            ):
                 buy = round(unit_val * wt, 2)
     else:
         if unit is None:
@@ -82,7 +87,8 @@ def validate_inquiry(inq: Dict[str, Any]) -> Dict[str, Any]:
     max_allowed_rate = MAX_RATE if wt >= 45.0 else 250000.0
     if not (MIN_RATE <= implied_rate <= max_allowed_rate):
         raise QuoteValidationError(
-            f"Implied buy rate {implied_rate:.2f} INR/kg outside plausible range [{MIN_RATE}, {max_allowed_rate}] INR/kg"
+            f"Implied buy rate {implied_rate:.2f} INR/kg outside plausible range "
+            f"[{MIN_RATE}, {max_allowed_rate}] INR/kg"
         )
 
     # 3. Destination Validation
