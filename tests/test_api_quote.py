@@ -16,6 +16,11 @@ class TestApiQuoteIntegration(unittest.TestCase):
     def setUp(self):
         app.config["TESTING"] = True
         self.client = app.test_client()
+        os.environ["ALLOW_INSECURE_DEV"] = "1"
+
+    def tearDown(self):
+        os.environ.pop("ALLOW_INSECURE_DEV", None)
+        os.environ.pop("ADMIN_API_KEY", None)
 
     def test_api_quote_valid_payload(self):
         payload = {
@@ -97,6 +102,7 @@ class TestApiQuoteIntegration(unittest.TestCase):
         """Verifies CWE-306/CWE-862 authentication enforcement on clear & export endpoints."""
         test_key = "secure-audit-key-888"
         os.environ["ADMIN_API_KEY"] = test_key
+        os.environ.pop("ALLOW_INSECURE_DEV", None)
         try:
             # 1. Clear endpoint without key -> 401
             res_clear_unauth = self.client.post("/api/history/clear")
@@ -115,12 +121,17 @@ class TestApiQuoteIntegration(unittest.TestCase):
             res_export_unauth = self.client.get("/api/history/export")
             self.assertEqual(res_export_unauth.status_code, 401)
 
-            # 5. Export endpoint with valid query param -> 200 CSV
-            res_export_auth = self.client.get(f"/api/history/export?api_key={test_key}")
+            # 5. Export endpoint with query param -> strictly 401 rejected (CWE-598)
+            res_export_query = self.client.get(f"/api/history/export?api_key={test_key}")
+            self.assertEqual(res_export_query.status_code, 401)
+
+            # 6. Export endpoint with Bearer auth header -> 200 CSV
+            res_export_auth = self.client.get("/api/history/export", headers={"Authorization": f"Bearer {test_key}"})
             self.assertEqual(res_export_auth.status_code, 200)
             self.assertEqual(res_export_auth.mimetype, "text/csv")
         finally:
             os.environ.pop("ADMIN_API_KEY", None)
+            os.environ["ALLOW_INSECURE_DEV"] = "1"
 
     def test_api_history_outcome(self):
         # First generate a quote to have an entry in history

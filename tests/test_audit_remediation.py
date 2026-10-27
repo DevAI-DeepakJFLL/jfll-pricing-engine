@@ -187,3 +187,69 @@ class TestEngineV3LaneIntegrity(unittest.TestCase):
         self.assertEqual(rec_oov["confidence"], "Low")
         oov_warnings = [w for w in rec_oov["warnings"] if "Out-of-vocabulary" in w]
         self.assertTrue(len(oov_warnings) > 0, f"Expected OOV warning, got: {rec_oov['warnings']}")
+
+
+class TestSecurityEndpointRemediation(unittest.TestCase):
+    """Verifies authentication and validation on /api/history/outcome and /api/history/update_status."""
+
+    def setUp(self):
+        import os
+        from src.app import app
+        self.app = app
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+        os.environ.pop("ADMIN_API_KEY", None)
+        os.environ.pop("ALLOW_INSECURE_DEV", None)
+
+    def tearDown(self):
+        import os
+        os.environ.pop("ADMIN_API_KEY", None)
+        os.environ.pop("ALLOW_INSECURE_DEV", None)
+
+    def test_outcome_and_status_require_auth(self):
+        """Endpoints must return 401 when ADMIN_API_KEY is configured and no credentials supplied."""
+        import os
+        import json
+        test_key = "secure-audit-secret-token"
+        os.environ["ADMIN_API_KEY"] = test_key
+
+        # Outcome without auth -> 401
+        res = self.client.post("/api/history/outcome", json={"id": 1, "status": "Won", "final_price_inr": 1000})
+        self.assertEqual(res.status_code, 401)
+
+        # Update status without auth -> 401
+        res = self.client.post("/api/history/update_status", json={"id": 1, "status": "Quoted"})
+        self.assertEqual(res.status_code, 401)
+
+        # Query param auth rejected -> 401
+        res = self.client.post(f"/api/history/outcome?api_key={test_key}", json={"id": 1, "status": "Won", "final_price_inr": 1000})
+        self.assertEqual(res.status_code, 401)
+
+    def test_invalid_id_returns_400(self):
+        """Endpoints must return 400 when quote ID is missing, non-numeric, or non-positive."""
+        import os
+        import json
+        test_key = "secure-audit-secret-token"
+        os.environ["ADMIN_API_KEY"] = test_key
+        headers = {"X-API-Key": test_key}
+
+        # 1. Outcome with string non-numeric ID -> 400
+        res = self.client.post("/api/history/outcome", headers=headers, json={"id": "invalid_id", "status": "Won"})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Invalid quote ID", res.get_json()["message"])
+
+        # 2. Outcome with missing ID -> 400
+        res = self.client.post("/api/history/outcome", headers=headers, json={"status": "Won"})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Missing quote ID", res.get_json()["message"])
+
+        # 3. Update status with string non-numeric ID -> 400
+        res = self.client.post("/api/history/update_status", headers=headers, json={"id": "abc", "status": "Quoted"})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Invalid quote ID", res.get_json()["message"])
+
+        # 4. Update status with non-positive ID -> 400
+        res = self.client.post("/api/history/update_status", headers=headers, json={"id": -5, "status": "Quoted"})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Invalid quote ID", res.get_json()["message"])
+

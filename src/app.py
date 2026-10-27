@@ -825,17 +825,32 @@ def api_quote():
 
 
 @app.route("/api/history/outcome", methods=["POST"])
+@require_admin_auth
 def api_history_outcome():
     d = request.get_json(force=True, silent=True) or {}
+    raw_id = d.get("id")
+    if raw_id is None:
+        return jsonify({"status": "error", "message": "Missing quote ID."}), 400
+    try:
+        quote_id = int(raw_id)
+        if quote_id <= 0:
+            raise ValueError()
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Invalid quote ID. Must be a positive integer."}), 400
+
+    status = d.get("status")
+    if not status:
+        return jsonify({"status": "error", "message": "Missing status."}), 400
+
     ok = record_outcome(
         HISTORY_DB_PATH,
-        int(d.get("id", 0)),
-        d.get("status"),
+        quote_id,
+        status,
         final_price_inr=d.get("final_price_inr"),
         loss_reason=d.get("loss_reason"),
         competitor_rate_per_kg=d.get("competitor_rate_per_kg")
     )
-    return (jsonify({"status": "success"}), 200) if ok else (jsonify({
+    return (jsonify({"status": "success", "id": quote_id, "outcome": status}), 200) if ok else (jsonify({
         "status": "error",
         "message": "Won needs final_price_inr; Lost needs a coded loss_reason."
     }), 400)
@@ -878,15 +893,23 @@ def history_view():
 
 
 @app.route("/api/history/update_status", methods=["POST"])
+@require_admin_auth
 def api_history_update_status():
     data = request.get_json(force=True, silent=True) or {}
-    quote_id = data.get("id")
+    raw_id = data.get("id")
     new_status = data.get("status")
 
-    if not quote_id or not new_status:
+    if raw_id is None or not new_status:
         return jsonify({"status": "error", "message": "Missing quote ID or status."}), 400
 
-    success = update_lead_status(HISTORY_DB_PATH, int(quote_id), new_status)
+    try:
+        quote_id = int(raw_id)
+        if quote_id <= 0:
+            raise ValueError()
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Invalid quote ID. Must be a positive integer."}), 400
+
+    success = update_lead_status(HISTORY_DB_PATH, quote_id, new_status)
     if success:
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Invalid status or record not found."}), 400
