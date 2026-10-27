@@ -1154,11 +1154,11 @@
                     <div class="form-row">
                         <div class="field-group">
                             <label for="unit_buy">Unit Buy Rate (₹/kg) <span class="req">*</span></label>
-                            <input type="number" id="unit_buy" class="clean-input" value="277.78" min="0.1" step="any" placeholder="e.g. 250" oninput="onUnitBuyInput()">
+                            <input type="number" id="unit_buy" class="clean-input" value="" min="0.1" step="any" placeholder="e.g. 150.00" oninput="onUnitBuyInput()">
                         </div>
                         <div class="field-group">
                             <label for="buy">Total Airline Buy (₹ INR) <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">(Auto-calculated)</span></label>
-                            <input type="number" id="buy" class="clean-input" value="125000" min="1" step="any" placeholder="e.g. 125000" oninput="onTotalBuyInput()">
+                            <input type="number" id="buy" class="clean-input" value="" min="1" step="any" placeholder="e.g. 50000" oninput="onTotalBuyInput()">
                         </div>
                     </div>
 
@@ -1174,12 +1174,12 @@
                     </div>
 
                     <!-- Hidden Physical Gross Weight (Preserves backwards compatibility for scripts/tests) -->
-                    <input type="hidden" id="gross_wt" value="450">
+                    <input type="hidden" id="gross_wt" value="">
 
                     <!-- Direct Chargeable Weight Mode Container (Single primary weight input) -->
                     <div class="field-group full" id="direct_weight_container" style="display: none; margin-top: 10px; margin-bottom: 12px;">
                         <label for="direct_ch_wt">Airline Chargeable Weight (kg) <span class="req">*</span></label>
-                        <input type="number" id="direct_ch_wt" class="clean-input" value="450" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 450">
+                        <input type="number" id="direct_ch_wt" class="clean-input" value="" min="0.1" step="any" oninput="updateDimensions()" placeholder="e.g. 450">
                     </div>
 
                     <!-- Box Dimensions Mode Container (Calculates Airline Chargeable Weight) -->
@@ -1194,18 +1194,18 @@
                                     <button type="button" class="dim-unit-btn" id="unit_btn_m" onclick="setDimUnit('m')">m</button>
                                 </div>
                             </div>
-                            <span id="dims_ch_wt_badge" style="font-size: 12.5px; font-weight: 700; color: var(--text-dark); background: #e2e8f0; padding: 3px 10px; border-radius: 5px;">Chargeable: 432.0 kg</span>
+                            <span id="dims_ch_wt_badge" style="font-size: 12.5px; font-weight: 700; color: var(--text-dark); background: #e2e8f0; padding: 3px 10px; border-radius: 5px;">Chargeable: — kg</span>
                         </div>
                         <div class="dim-box">
                             <div class="dim-grid">
-                                <div><label id="dim_l_label">Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="120" min="0.01" step="any" oninput="updateDimensions()" style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_w_label">Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="80" min="0.01" step="any" oninput="updateDimensions()" style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_h_label">Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="90" min="0.01" step="any" oninput="updateDimensions()" style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_pcs_label">Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="3" min="1" step="1" oninput="updateDimensions()" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_l_label">Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="120" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_w_label">Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="80" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_h_label">Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="90" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_pcs_label">Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="1" min="1" step="1" oninput="updateDimensions()" placeholder="1" style="padding: 7px 10px; min-height: 38px;"></div>
                             </div>
                             <div class="dim-info" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-                                <span id="vol_wt_display">Volumetric: 432.0 kg (Formula: L × W × H × Pcs ÷ 6000)</span>
-                                <span id="ch_wt_display" style="font-weight: 700; color: var(--text-dark);">Chargeable: 432.0 kg</span>
+                                <span id="vol_wt_display">Volumetric: — kg (Formula: L × W × H × Pcs ÷ 6000)</span>
+                                <span id="ch_wt_display" style="font-weight: 700; color: var(--text-dark);">Chargeable: — kg</span>
                             </div>
                         </div>
                     </div>
@@ -1222,7 +1222,7 @@
                     <div class="form-row">
                         <div class="field-group">
                             <label for="customer_company">Customer Company / Account</label>
-                            <input type="text" id="customer_company" class="clean-input" list="customer_accounts_list" placeholder="Search customer (e.g. UNIVERSAL CLEARING)..." value="UNIVERSAL CLEARING AND FORWARDING" autocomplete="off">
+                            <input type="text" id="customer_company" class="clean-input" list="customer_accounts_list" placeholder="Search customer account or leave blank for new client..." value="" autocomplete="off">
                             <datalist id="customer_accounts_list">
                                 {% for cust in top_customers %}
                                 <option value="{{ cust }}"></option>
@@ -1579,10 +1579,17 @@
         };
         const formulaNote = formulaMap[currentDimUnit] || 'Formula: L × W × H × Pcs ÷ 6000';
 
-        if (volEl) volEl.innerText = `Volumetric: ${vol_wt.toFixed(1)} kg (${formulaNote})`;
-        if (chEl) chEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
-        if (badgeEl) badgeEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
-        if (summaryChEl) summaryChEl.innerText = `${ch_wt.toFixed(1)} kg`;
+        if (vol_wt > 0) {
+            if (volEl) volEl.innerText = `Volumetric: ${vol_wt.toFixed(1)} kg (${formulaNote})`;
+            if (chEl) chEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
+            if (badgeEl) badgeEl.innerText = `Chargeable: ${ch_wt.toFixed(1)} kg`;
+            if (summaryChEl) summaryChEl.innerText = `${ch_wt.toFixed(1)} kg`;
+        } else {
+            if (volEl) volEl.innerText = `Volumetric: — kg (${formulaNote})`;
+            if (chEl) chEl.innerText = `Chargeable: — kg`;
+            if (badgeEl) badgeEl.innerText = `Chargeable: — kg`;
+            if (summaryChEl) summaryChEl.innerText = `— kg`;
+        }
 
         // Keep total buy synchronized when weights change, if user set unit_buy
         const unitEl = document.getElementById('unit_buy');
