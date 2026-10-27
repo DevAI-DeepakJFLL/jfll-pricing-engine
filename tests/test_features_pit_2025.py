@@ -13,7 +13,6 @@ import unittest
 import joblib
 import numpy as np
 import pandas as pd
-import pytest
 
 # Ensure project root is in sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -159,7 +158,7 @@ class TestForwardLeakagePrevention(unittest.TestCase):
         train_raw_path = os.path.join(PROJECT_ROOT, "data", "processed", "won_deals_2025_train_70.csv")
         test_raw_path = os.path.join(PROJECT_ROOT, "data", "processed", "won_deals_2025_test_30.csv")
         if not (os.path.exists(train_raw_path) and os.path.exists(test_raw_path)):
-            pytest.skip("Base train/test 2025 files not present")
+            self.skipTest("Base train/test 2025 files not present")
 
         train_df = pd.read_csv(train_raw_path, low_memory=False)
         test_df = pd.read_csv(test_raw_path, low_memory=False)
@@ -200,7 +199,7 @@ class TestPITFeatureCompletenessAndSchema(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if not (os.path.exists(TRAIN_PIT_PATH) and os.path.exists(TEST_PIT_PATH)):
-            pytest.skip("Generated PIT datasets not found on disk. Run compute_pit_2025.py first.")
+            raise unittest.SkipTest("Generated PIT datasets not found on disk. Run compute_pit_2025.py first.")
         cls.train_df = pd.read_csv(TRAIN_PIT_PATH, low_memory=False)
         cls.test_df = pd.read_csv(TEST_PIT_PATH, low_memory=False)
 
@@ -286,7 +285,7 @@ class TestCustomerPITRegistry2025(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if not os.path.exists(REGISTRY_PATH):
-            pytest.skip(f"Serialized registry {REGISTRY_PATH} not found. Run compute_pit_2025.py first.")
+            raise unittest.SkipTest(f"Serialized registry {REGISTRY_PATH} not found. Run compute_pit_2025.py first.")
         cls.registry: CustomerPITRegistry = joblib.load(REGISTRY_PATH)
 
     def test_registry_instance_type(self):
