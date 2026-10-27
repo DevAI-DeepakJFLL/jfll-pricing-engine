@@ -50,7 +50,8 @@ from constants import (
     compute_cost_floor_price,
     get_category_commodity_max_margin
 )
-from preprocess import get_air_cargo_season, compute_cyclical_month, map_origin_region, map_dest_region
+from preprocess import get_air_cargo_season, compute_cyclical_month, map_origin_region
+from taxonomy import map_destination_region as map_dest_region
 from tiers import get_weight_tier, map_account_tier
 
 

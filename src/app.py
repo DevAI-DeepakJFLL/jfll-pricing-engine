@@ -20,7 +20,7 @@ import csv
 import json
 import logging
 import datetime
-from functools import wraps
+from functools import wraps, lru_cache
 from typing import Dict, Optional, Any
 import joblib
 import numpy as np
@@ -146,6 +146,12 @@ def get_engine() -> PricingEngineV3:
 def __getattr__(name: str):
     if name == "engine_v3":
         return get_engine()
+    if name == "DESTINATION_OPTIONS":
+        return get_destination_options()
+    if name == "TOP_CUSTOMERS":
+        return get_top_customers()
+    if name == "TOP_CUSTOMERS_JSON":
+        return json.dumps(get_top_customers()).replace("</", "<\\/")
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
@@ -342,7 +348,10 @@ def _build_destinations_catalog(bundle=None, root_path=ENGINE_ROOT):
         opts.append({"value": port, "label": label})
     return opts
 
-DESTINATION_OPTIONS = _build_destinations_catalog(None, ENGINE_ROOT)
+@lru_cache(maxsize=1)
+def get_destination_options(root_path: str = ENGINE_ROOT):
+    return _build_destinations_catalog(None, root_path)
+
 PORT_LABELS_JSON = json.dumps(PORT_LABELS).replace("</", "<\\/")
 
 CARRIER_OPTIONS = [
@@ -435,8 +444,9 @@ def _build_top_customers_catalog(root_path: str):
             logger.warning(f"Could not load customer accounts from CSV: {e}")
     return DEFAULT_TOP_CUSTOMERS
 
-TOP_CUSTOMERS = _build_top_customers_catalog(ENGINE_ROOT)
-TOP_CUSTOMERS_JSON = json.dumps(TOP_CUSTOMERS).replace("</", "<\\/")
+@lru_cache(maxsize=1)
+def get_top_customers(root_path: str = ENGINE_ROOT):
+    return _build_top_customers_catalog(root_path)
 
 SALES_PERSON_OPTIONS = [
     {"value": "", "label": "Unassigned / General Sales Desk"},
@@ -484,14 +494,15 @@ HISTORY_TEMPLATE = _load_template_str("history.html")
 # ------------------------------------------------------------------------------
 @app.route("/")
 def index():
+    top_cust = get_top_customers()
     return render_template(
         "index.html",
         model_version=MODEL_VERSION,
         origin_options=ORIGIN_OPTIONS,
-        dest_options=DESTINATION_OPTIONS,
+        dest_options=get_destination_options(),
         carrier_options=CARRIER_OPTIONS,
-        top_customers=TOP_CUSTOMERS,
-        top_customers_json=TOP_CUSTOMERS_JSON,
+        top_customers=top_cust,
+        top_customers_json=json.dumps(top_cust).replace("</", "<\\/"),
         sales_person_options=SALES_PERSON_OPTIONS,
         default_quote_date=datetime.date.today().isoformat(),
         client_options=CLIENT_OPTIONS,
