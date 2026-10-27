@@ -14,7 +14,6 @@ import os
 import sys
 import json
 import unittest
-import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

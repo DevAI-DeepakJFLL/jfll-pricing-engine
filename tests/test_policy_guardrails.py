@@ -12,13 +12,10 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from policy_guardrails import GuardrailResult, apply_commercial_guardrails
+from policy_guardrails import apply_commercial_guardrails
 from constants import (
     MIN_MARGIN_PER_AWB_INR,
     MIN_MARGIN_PER_KG_INR,
-    OPS_HANDLING_FEE_AWB_INR,
-    COMMODITY_MAX_MARGIN_CAPS,
-    CLIENT_CATEGORY_MAX_MARGIN_CAPS,
 )
 
 

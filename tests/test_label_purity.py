@@ -10,7 +10,6 @@ from src.preprocess import (
     filter_pure_resolved_quotes,
     filter_worked_quotes,
     is_valid_indian_origin,
-    map_origin_region,
 )
 from src.taxonomy import map_destination_region as map_dest_region
 

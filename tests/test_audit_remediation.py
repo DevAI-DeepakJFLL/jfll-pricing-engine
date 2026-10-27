@@ -13,8 +13,8 @@ Task 1: Unify Destination Taxonomy & Fix Collisions
 - engine_v3 ignores caller-supplied Regional_Lane and warns on out-of-vocabulary categories
 """
 
+import os
 import unittest
-import numpy as np
 import pandas as pd
 
 from src.taxonomy import (
@@ -193,7 +193,6 @@ class TestSecurityEndpointRemediation(unittest.TestCase):
     """Verifies authentication and validation on /api/history/outcome and /api/history/update_status."""
 
     def setUp(self):
-        import os
         from src.app import app
         self.app = app
         self.app.config["TESTING"] = True
@@ -202,14 +201,11 @@ class TestSecurityEndpointRemediation(unittest.TestCase):
         os.environ.pop("ALLOW_INSECURE_DEV", None)
 
     def tearDown(self):
-        import os
         os.environ.pop("ADMIN_API_KEY", None)
         os.environ.pop("ALLOW_INSECURE_DEV", None)
 
     def test_outcome_and_status_require_auth(self):
         """Endpoints must return 401 when ADMIN_API_KEY is configured and no credentials supplied."""
-        import os
-        import json
         test_key = "secure-audit-secret-token"
         os.environ["ADMIN_API_KEY"] = test_key
 
@@ -227,8 +223,6 @@ class TestSecurityEndpointRemediation(unittest.TestCase):
 
     def test_invalid_id_returns_400(self):
         """Endpoints must return 400 when quote ID is missing, non-numeric, or non-positive."""
-        import os
-        import json
         test_key = "secure-audit-secret-token"
         os.environ["ADMIN_API_KEY"] = test_key
         headers = {"X-API-Key": test_key}
@@ -346,7 +340,6 @@ class TestPhase2FinancialAndDimensionSafeguards(unittest.TestCase):
     """Verifies Phase 2: Financial input safeguards, dimensions validation, and engine singleton."""
 
     def setUp(self):
-        import os
         from src.app import app
         self.app = app
         self.app.config["TESTING"] = True

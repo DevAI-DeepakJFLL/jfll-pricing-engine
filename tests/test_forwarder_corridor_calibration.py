@@ -31,7 +31,6 @@ class TestForwarderCorridorCalibration(unittest.TestCase):
 
         target_m = corr["target_margin_pct"]
         min_m = corr["min_margin_pct"]
-        max_m = corr["max_margin_pct"]
         band_width = corr["band_width_pct"]
 
         # 1. Bandwidth must be realistic for air freight operations (<= 4.5 pp)

@@ -42,9 +42,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from engine_v3 import PricingEngineV3
-from quantile_model import MarginQuantileModel, FEATURE_COLS
-from conformal_corridors import ConformalCorridorCalibrator
-from features_pit import CustomerPITRegistry
+from quantile_model import FEATURE_COLS
 
 BUNDLE_PATH = os.path.join(BASE_DIR, "models", "engine_v3_bundle.joblib")
 PREV_BUNDLE_PATH = os.path.join(BASE_DIR, "models", "engine_v3_bundle_prev.joblib")

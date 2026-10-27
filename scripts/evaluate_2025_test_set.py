@@ -32,7 +32,7 @@ import math
 import shutil
 import argparse
 import datetime
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any, List, Optional
 import numpy as np
 import pandas as pd
 
@@ -507,8 +507,8 @@ def generate_markdown_report(results: Dict[str, Any]) -> str:
 
     lines.append("# Out-of-Time 30% Holdout Benchmark Evaluation Report")
     lines.append("")
-    lines.append(f"> **Model Serving Engine:** `PricingEngineV3` (Production Quantile Regressor + Conformal Calibrator)")
-    lines.append(f"> **Holdout Dataset:** `data/processed/won_deals_2025_test_30_pit.csv` (Point-in-Time Won Inquiries)")
+    lines.append("> **Model Serving Engine:** `PricingEngineV3` (Production Quantile Regressor + Conformal Calibrator)")
+    lines.append("> **Holdout Dataset:** `data/processed/won_deals_2025_test_30_pit.csv` (Point-in-Time Won Inquiries)")
     lines.append(f"> **Evaluation Period:** {results['quote_date_min']} to {results['quote_date_max']} (Q4 2025 Out-of-Time)")
     lines.append(f"> **Sample Size:** {results['n_samples']:,} unique won transactions")
     lines.append(f"> **Evaluation Timestamp:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
@@ -632,7 +632,7 @@ def generate_markdown_report(results: Dict[str, Any]) -> str:
     lines.append(f"| **Total Gross Margin (INR)** | ₹{results['tot_realized_margin']:,.2f} | ₹{results['tot_sim_margin']:,.2f} | Recommended gross margin if 100% converted |")
     lines.append(f"| **Aggregate Margin Percentage** | **{results['realized_margin_pct_agg']:.2f}%** | **{results['sim_margin_pct_agg']:.2f}%** | Aggregate margin on total portfolio buy |")
     lines.append(f"| **Simulated Expected Profit (EV)** | N/A | **₹{results['tot_sim_ev']:,.2f}** | Probability-weighted expected gross earnings ($P(\\text{{Win}}) \\approx 0.45$) |")
-    lines.append(f"| **Cost Floor Violations** | 0 | **0** | Strict sub-cost protection maintained |")
+    lines.append("| **Cost Floor Violations** | 0 | **0** | Strict sub-cost protection maintained |")
     lines.append("")
 
     # Section 8: Key Findings & Operational Conclusion
@@ -651,7 +651,7 @@ def generate_markdown_report(results: Dict[str, Any]) -> str:
                  "Decoupled guardrails successfully insulate pricing decisions from model estimation noise.")
     lines.append("")
     lines.append("---")
-    lines.append(f"*Report generated automatically by `scripts/evaluate_2025_test_set.py` for Jet Freight Logistics.*")
+    lines.append("*Report generated automatically by `scripts/evaluate_2025_test_set.py` for Jet Freight Logistics.*")
 
     return "\n".join(lines)
 
@@ -689,7 +689,7 @@ def run_evaluation(
     elapsed = (datetime.datetime.now() - t0).total_seconds()
     print(f"    Completed evaluation in {elapsed:.2f} seconds.")
 
-    print(f"[*] Generating Markdown evaluation report...")
+    print("[*] Generating Markdown evaluation report...")
     report_content = generate_markdown_report(results)
 
     os.makedirs(os.path.dirname(os.path.abspath(output_report_path)), exist_ok=True)

@@ -10,7 +10,7 @@ Guarantees:
 
 import math
 import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # Indian Standard Time (UTC+05:30)
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))

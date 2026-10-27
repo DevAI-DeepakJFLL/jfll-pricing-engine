@@ -18,9 +18,6 @@ if PROJECT_ROOT not in sys.path:
 
 from scripts.generate_training_evaluation_report import (
     generate_report,
-    DEFAULT_INPUT_PATH,
-    COMMODITY_ORDER,
-    BUDGET_ORDER,
 )
 
 RESULTS_CSV_PATH = os.path.join(PROJECT_ROOT, "tests", "data", "training_eval_results_500.csv")

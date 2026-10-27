@@ -26,10 +26,9 @@ Tests:
 
 import os
 import unittest
-import numpy as np
 import pandas as pd
 
-from src.preprocess_pipeline_v3 import validate_build_gates, run_pipeline_v3
+from src.preprocess_pipeline_v3 import validate_build_gates
 
 
 CLEANED_V3_PATH = "data/processed/Air_Export_Pricing_Cleaned_V3.csv"

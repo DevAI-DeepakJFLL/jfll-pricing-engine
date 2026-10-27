@@ -19,8 +19,6 @@ from constants import (
     CLIENT_CATEGORY_MAX_MARGIN_CAPS,
     MODEL_VERSION,
     STRATEGY_THRESHOLDS,
-    MIN_CANDIDATE_MARGIN,
-    MAX_CANDIDATE_MARGIN,
     compute_cost_floor_price,
     get_commodity_max_margin,
     get_client_category_max_margin,

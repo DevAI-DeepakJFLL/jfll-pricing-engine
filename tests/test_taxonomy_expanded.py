@@ -11,7 +11,6 @@ import pandas as pd
 from src.taxonomy import (
     map_destination_region,
     classify_carrier_tier,
-    DESTINATION_REGIONS,
     CARRIER_TIERS,
     CARRIER_TIER_PREMIUM,
     CARRIER_TIER_STANDARD,

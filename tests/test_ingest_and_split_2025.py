@@ -9,7 +9,6 @@ import sys
 import unittest
 import numpy as np
 import pandas as pd
-import pytest
 
 # Ensure project root is in sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

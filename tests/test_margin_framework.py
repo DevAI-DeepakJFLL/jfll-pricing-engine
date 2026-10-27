@@ -1,5 +1,5 @@
-import os, sys, math, unittest
-import numpy as np, pandas as pd
+import os, sys, unittest
+import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -37,7 +37,7 @@ class TestMarginFramework(unittest.TestCase):
             self.assertGreaterEqual(t["floor"]["margin_inr"] + 0.01, o["cost_floor_inr"])
 
     def test_cap_never_exceeded_unless_floor_conflicts(self):
-        o = self.q(Company_Group="GSA"); buy = 125000
+        o = self.q(Company_Group="GSA")
         for v in o["tiers"].values():
             if v["margin_inr"] > o["cost_floor_inr"] + 1:
                 self.assertLessEqual(v["margin_pct"], o["cap_pct"] + 0.01)

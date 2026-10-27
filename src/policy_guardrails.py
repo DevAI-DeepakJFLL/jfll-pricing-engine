@@ -4,13 +4,11 @@ Decoupled post-model commercial guardrails, operational floors, margin ceilings,
 risk buffers, and governance approval rules. (Issue M1, Fix 4)
 """
 
-import re
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Tuple
 
 try:
     from constants import (
-        COMMODITY_RISK_BUFFERS,
         MIN_CANDIDATE_MARGIN,
         MIN_MARGIN_PER_AWB_INR,
         MIN_MARGIN_PER_KG_INR,
@@ -23,7 +21,6 @@ try:
     from taxonomy import classify_commodity
 except ImportError:
     from src.constants import (
-        COMMODITY_RISK_BUFFERS,
         MIN_CANDIDATE_MARGIN,
         MIN_MARGIN_PER_AWB_INR,
         MIN_MARGIN_PER_KG_INR,

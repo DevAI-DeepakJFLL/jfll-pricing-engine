@@ -14,7 +14,6 @@ Test Specification:
 
 import os
 import sys
-import json
 import joblib
 import unittest
 import numpy as np
@@ -155,7 +154,7 @@ class TestPricingModelEvaluation(unittest.TestCase):
         print("\n" + "=" * 80)
         print("PRICING MODEL UNIT TEST: 20-CASE EVALUATION RESULTS")
         print("=" * 80)
-        print(f"Cohort Mix               : 8 Won (40.0%), 12 Lost (60.0%)")
+        print("Cohort Mix               : 8 Won (40.0%), 12 Lost (60.0%)")
         print(f"ROC-AUC Discrimination   : {auc:.4f}  (Passing benchmark: >= 0.85)")
         print(f"Brier Calibration Score  : {brier:.4f}  (Passing benchmark: <= 0.15)")
         print(f"Log Loss                 : {logloss:.4f}")

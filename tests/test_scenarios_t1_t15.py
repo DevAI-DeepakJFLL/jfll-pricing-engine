@@ -33,22 +33,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.constants import (
-    MODEL_VERSION,
     MIN_MARGIN_PER_AWB_INR,
-    MIN_MARGIN_PER_KG_INR,
     COMMODITY_RISK_BUFFERS,
     compute_cost_floor_price
 )
 from src.tiers import (
     check_weight_break_arbitrage,
-    map_account_tier,
-    get_weight_tier
+    map_account_tier
 )
 from src.preprocess import (
-    validate_shipment_physics,
-    compute_volumetric_weight,
-    normalize_port_name,
-    map_commodity_group
+    validate_shipment_physics
 )
 from src.engine import MarginRecommendationEngine
 from src.db import (

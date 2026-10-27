@@ -17,7 +17,7 @@ Key Principles:
 import os
 import sys
 import argparse
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 import joblib
 import numpy as np
 import pandas as pd
@@ -68,7 +68,7 @@ def compute_pit_pipeline(
     if not os.path.exists(test_path):
         raise FileNotFoundError(f"Holdout test dataset not found: {test_path}")
 
-    print(f"[*] 1. Loading splits from:")
+    print("[*] 1. Loading splits from:")
     print(f"       Train: {train_path}")
     print(f"       Test:  {test_path}")
 
@@ -175,7 +175,7 @@ def compute_pit_pipeline(
     print("       [✓] Hard build validation gates and PIT schema checks PASSED.")
 
     # 7. Persist Output CSV Files
-    print(f"\n[*] 7. Persisting PIT datasets to disk...")
+    print("\n[*] 7. Persisting PIT datasets to disk...")
     os.makedirs(os.path.dirname(os.path.abspath(train_out_path)), exist_ok=True)
     os.makedirs(os.path.dirname(os.path.abspath(test_out_path)), exist_ok=True)
 

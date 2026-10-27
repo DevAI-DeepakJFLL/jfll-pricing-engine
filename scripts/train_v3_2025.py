@@ -20,7 +20,7 @@ import sys
 import shutil
 import argparse
 import datetime
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 import joblib
 import numpy as np
 import pandas as pd
@@ -34,7 +34,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from constants import MODEL_VERSION
-from quantile_model import MarginQuantileModel, FEATURE_COLS
+from quantile_model import MarginQuantileModel
 from conformal_corridors import ConformalCorridorCalibrator
 from features_pit import CustomerPITRegistry
 from engine_v3 import PricingEngineV3
@@ -69,7 +69,7 @@ def train_v3_pipeline(
 
     # 1. Safety Backup of Existing Engine Bundle
     if os.path.exists(bundle_path):
-        print(f"[*] 1. Backing up existing bundle:")
+        print("[*] 1. Backing up existing bundle:")
         print(f"       From: {bundle_path}")
         print(f"       To:   {prev_bundle_path}")
         shutil.copy2(bundle_path, prev_bundle_path)
@@ -117,12 +117,12 @@ def train_v3_pipeline(
         else "N/A"
     )
 
-    print(f"\n[*] 3. Chronological Partitioning (80% Model Fit / 20% Calibration):")
+    print("\n[*] 3. Chronological Partitioning (80% Model Fit / 20% Calibration):")
     print(f"       - Model Fitting Set : {len(fit_df):,} records ({fit_date_range})")
     print(f"       - Calibration Set   : {len(cal_df):,} records ({cal_date_range})")
 
     # 4. Train Stage 1A MarginQuantileModel
-    print(f"\n[*] 4. Fitting MarginQuantileModel (P10, P50, P90) with Monotonic Constraints...")
+    print("\n[*] 4. Fitting MarginQuantileModel (P10, P50, P90) with Monotonic Constraints...")
     model = MarginQuantileModel(
         learning_rate=0.08,
         max_iter=80,
@@ -160,12 +160,12 @@ def train_v3_pipeline(
         print(f"         - Customer '{ctype}': {hw:.2f} pp")
 
     # 6. Customer Point-In-Time Registry
-    print(f"\n[*] 6. Preparing CustomerPITRegistry...")
+    print("\n[*] 6. Preparing CustomerPITRegistry...")
     if os.path.exists(registry_path):
         print(f"       Loading warmed registry from: {registry_path}")
         pit_registry = joblib.load(registry_path)
     else:
-        print(f"       Constructing registry from training transactions...")
+        print("       Constructing registry from training transactions...")
         pit_registry = CustomerPITRegistry.from_dataframe(
             df_train,
             date_col="quote_date" if "quote_date" in df_train.columns else "Year_Month",
@@ -175,7 +175,7 @@ def train_v3_pipeline(
     print(f"       Registry customers tracked: {len(pit_registry._customers):,}")
 
     # 7. Compute Empirical Slab Quantiles and Reference Buy Rates
-    print(f"\n[*] 7. Computing Slab Historical Quantiles and Reference Rates...")
+    print("\n[*] 7. Computing Slab Historical Quantiles and Reference Rates...")
     slab_quantiles: Dict[str, list] = {}
     slab_counts: Dict[str, int] = {}
     slab_ref_rates: Dict[str, float] = {}
@@ -220,7 +220,7 @@ def train_v3_pipeline(
     print(f"       Bundle successfully saved ({bundle_size:,} bytes).")
 
     # 9. Statistical Evaluation on Calibration and Holdout Test Sets
-    print(f"\n[*] 9. Evaluating Model Performance & Coverage...")
+    print("\n[*] 9. Evaluating Model Performance & Coverage...")
     # Calibration set metrics
     cal_p10, cal_p50, cal_p90 = model.predict_quantiles(cal_df)
     cal_pb10 = pinball_loss(cal_actual, cal_p10, 0.10)
@@ -285,7 +285,7 @@ def train_v3_pipeline(
         print(f"       Quantile Invar.  : P10 <= P50 <= P90 -> {'PASSED' if ordering_test else 'FAILED'}")
 
     # 10. PricingEngineV3 End-to-End Corridor Bandwidth Verification
-    print(f"\n[*] 10. Sample End-to-End Corridor Predictions from PricingEngineV3:")
+    print("\n[*] 10. Sample End-to-End Corridor Predictions from PricingEngineV3:")
     engine = PricingEngineV3(bundle_path=bundle_path)
 
     sample_weights = [
@@ -310,7 +310,6 @@ def train_v3_pipeline(
         }
         res = engine.recommend_quote(inq)
         corr = res["negotiation_corridor"]
-        strat = res["strategic_recommendations"]
         hw = corr["conformal_half_width_pct"]
         bw = corr["band_width_pct"]
         t_m = corr["target_margin_pct"]

@@ -15,7 +15,7 @@ report and scoreboard covering:
 import os
 import sys
 import argparse
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 import pandas as pd
 
 # Add project root to sys.path
@@ -97,9 +97,9 @@ def build_markdown_report(df: pd.DataFrame, aggregations: Dict[str, Any]) -> str
     lines.append("## 1. Executive Summary")
     lines.append("")
     lines.append(
-        f"This report evaluates the performance of **PricingEngineV3** on a representative sample of 500 historical inquiries "
-        f"sampled directly from the training distribution. The evaluation assesses quotation accuracy, systematic bias, "
-        f"conformal negotiation corridor calibration, and guardrail clamping behaviors."
+        "This report evaluates the performance of **PricingEngineV3** on a representative sample of 500 historical inquiries "
+        "sampled directly from the training distribution. The evaluation assesses quotation accuracy, systematic bias, "
+        "conformal negotiation corridor calibration, and guardrail clamping behaviors."
     )
     lines.append("")
     lines.append("| Global Metric | Value | Target / Benchmark | Assessment |")
@@ -295,7 +295,7 @@ def main() -> None:
         artifact_path=args.artifact,
     )
 
-    print(f"Report generated successfully!")
+    print("Report generated successfully!")
     print(f" - Primary output:  {args.output} ({len(markdown_content)} bytes)")
     if args.artifact:
         print(f" - Artifact output: {args.artifact}")

@@ -7,8 +7,6 @@ and production model artifact metadata.
 import unittest
 import os
 import joblib
-import numpy as np
-import pandas as pd
 from src.constants import MODEL_VERSION
 
 FORBIDDEN_PROCESS_COLS = {

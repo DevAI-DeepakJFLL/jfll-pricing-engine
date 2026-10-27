@@ -16,7 +16,7 @@ import os
 import sys
 import re
 import argparse
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split

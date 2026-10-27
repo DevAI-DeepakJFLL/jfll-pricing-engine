@@ -20,12 +20,11 @@ import csv
 import json
 import logging
 import datetime
-from functools import wraps, lru_cache
-from typing import Dict, Optional, Any
-import joblib
+from functools import lru_cache
+from typing import Dict, Optional
 import numpy as np
 import pandas as pd
-from flask import Flask, request, jsonify, render_template, render_template_string, Response, stream_with_context
+from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 
 # Ensure local directories are in python path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -46,12 +45,11 @@ from preprocess import (
     validate_shipment_physics,
     compute_volumetric_weight
 )
-from security import verify_artifact_integrity, require_admin_auth
+from security import require_admin_auth
 from db import (
     init_history_db,
     log_recommendation,
     record_outcome,
-    get_all_history,
     iter_all_history,
     get_history_paginated,
     update_lead_status,
@@ -118,9 +116,9 @@ except ImportError:
     from src.engine_v3 import PricingEngineV3
 
 try:
-    from validation import validate_inquiry, QuoteValidationError
+    from validation import QuoteValidationError
 except ImportError:
-    from src.validation import validate_inquiry, QuoteValidationError
+    from src.validation import QuoteValidationError
 
 _engine: Optional[PricingEngineV3] = None
 _engine_lock = threading.Lock()

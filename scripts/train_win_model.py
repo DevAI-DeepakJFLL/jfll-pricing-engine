@@ -32,7 +32,7 @@ def main():
     model = WinModel(random_state=42)
     model.fit(df)
 
-    print(f"Training completed successfully.")
+    print("Training completed successfully.")
     print("Holdout Evaluation Metrics:")
     for k, v in model.metrics.items():
         print(f"  - {k}: {v}")

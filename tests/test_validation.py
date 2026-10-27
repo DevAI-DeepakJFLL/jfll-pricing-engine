@@ -9,8 +9,6 @@ from src.validation import (
     validate_inquiry,
     QuoteValidationError,
     IST,
-    MIN_RATE,
-    MAX_RATE,
 )
 
 

@@ -10,7 +10,6 @@ Unit tests verifying commercial logistics logic for:
 import sys
 import os
 import unittest
-import pytest
 
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 _ROOT_DIR = os.path.dirname(_TESTS_DIR)
@@ -151,7 +150,7 @@ class TestRevisionAndActivityLogistics(unittest.TestCase):
 
         # Heavy cargo commercial sanity: Premium on 450kg should be <= 10.0%, not 18.57%
         self.assertLessEqual(m_prem, 10.0, f"Premium margin on 450kg ({m_prem}%) should be <= 10.0%")
-        self.assertGreaterEqual(m_prem, m_bal + 1.0, f"Premium margin must be at least +1.0 pp above balanced")
+        self.assertGreaterEqual(m_prem, m_bal + 1.0, "Premium margin must be at least +1.0 pp above balanced")
 
     def test_api_quote_revision_and_activity_endpoint(self):
         """

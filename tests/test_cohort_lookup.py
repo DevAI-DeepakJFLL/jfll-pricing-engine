@@ -8,9 +8,6 @@ import os
 import joblib
 from src.engine import MarginRecommendationEngine
 from src.constants import (
-    MIN_MARGIN_PER_AWB_INR,
-    MIN_MARGIN_PER_KG_INR,
-    OPS_HANDLING_FEE_AWB_INR,
     compute_cost_floor_price
 )
 

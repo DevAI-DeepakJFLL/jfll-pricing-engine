@@ -9,7 +9,6 @@ from src.tiers import (
     map_account_tier,
     get_next_weight_break,
     check_weight_break_arbitrage,
-    IATA_WEIGHT_BREAKS,
 )
 
 

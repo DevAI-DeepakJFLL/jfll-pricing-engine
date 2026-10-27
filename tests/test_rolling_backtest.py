@@ -17,8 +17,6 @@ Verifies:
 import os
 import sys
 import unittest
-import pandas as pd
-import numpy as np
 
 # Add project root to sys.path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

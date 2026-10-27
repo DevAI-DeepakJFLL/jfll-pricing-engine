@@ -17,11 +17,14 @@ Unifies:
 import os
 import sys
 import math
+import logging
 import datetime
 from typing import Dict, Any, List, Optional
 import joblib
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger("pricing_engine_v3")
 
 _SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 _BASE_DIR = os.path.dirname(_SRC_DIR)
@@ -41,7 +44,7 @@ try:
     from tiers import get_weight_tier, map_account_tier
     from preprocess import map_origin_region
     from security import verify_artifact_integrity
-    from validation import validate_inquiry, QuoteValidationError
+    from validation import validate_inquiry
     from win_model import WinModel
     from backtest import temporal_split, measure_corridor_coverage
 except ImportError:
@@ -55,7 +58,7 @@ except ImportError:
     from src.tiers import get_weight_tier, map_account_tier
     from src.preprocess import map_origin_region
     from src.security import verify_artifact_integrity
-    from src.validation import validate_inquiry, QuoteValidationError
+    from src.validation import validate_inquiry
     from src.win_model import WinModel
     from src.backtest import temporal_split, measure_corridor_coverage
 

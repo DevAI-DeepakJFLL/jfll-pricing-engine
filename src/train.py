@@ -313,7 +313,7 @@ def train_and_evaluate(
     mean_ratio_won = float(df_all.loc[won_mask, "Margin_Ratio"].mean())
     std_ratio_won = float(df_all.loc[won_mask, "Margin_Ratio"].std())
     mean_ratio_lost = float(df_all.loc[~won_mask, "Margin_Ratio"].mean())
-    print(f"\n[*] §1.2 Honest OOF Margin_Ratio Distribution:")
+    print("\n[*] §1.2 Honest OOF Margin_Ratio Distribution:")
     print(f"    - Won Deals OOF Margin_Ratio Mean : {mean_ratio_won:.3f} (Std: {std_ratio_won:.3f})")
     print(f"    - Lost Deals Margin_Ratio Mean    : {mean_ratio_lost:.3f}")
 

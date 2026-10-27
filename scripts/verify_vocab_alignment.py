@@ -9,7 +9,6 @@ import sys
 import os
 import re
 import joblib
-import pandas as pd
 
 def extract_select_options(html_content, select_id):
     """Extract all option values from a select element or custom searchable dropdown."""
@@ -50,7 +49,6 @@ def main():
     model_bundle = joblib.load(model_path)
     encoder = model_bundle.get("encoder")
     cat_cols = model_bundle.get("native_cat_cols", model_bundle.get("cat_cols"))
-    feature_cols = model_bundle.get("feature_cols")
 
     if encoder is None or cat_cols is None:
         print("[FAIL] Missing 'encoder' or 'cat_cols' in model artifact.")
@@ -97,7 +95,6 @@ def main():
             continue
 
         col_idx = cat_cols.index(cat_col)
-        learned_vocab = set(encoder.categories_[col_idx])
         options = ui_options_map.get(select_id)
         if not options:
             try:
@@ -112,17 +109,13 @@ def main():
             total_checked += 1
             # Check direct or normalized
             resolved = normalize_port(opt) if "Port" in cat_col else opt
-            in_vocab = resolved in learned_vocab
 
-            # Verify with encoder transform
-            dummy_df = pd.DataFrame({cat_col: [str(resolved)]})
             # Sub-encoder transform check
             try:
                 enc_val = encoder.categories_[col_idx].tolist().index(str(resolved))
             except ValueError:
                 enc_val = -1
 
-            status = "PASS" if enc_val >= 0 else "FAIL (-1 Unknown)"
             if enc_val < 0:
                 failures.append((select_id, cat_col, opt, resolved))
                 print(f"  [FAIL] '{opt}' (resolved: '{resolved}') -> enc_value: {enc_val}")
