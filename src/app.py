@@ -57,6 +57,7 @@ from db import (
     update_lead_status,
     clear_history_table,
     get_recent_competitor_rate_benchmark,
+    get_quote_for_registry,
     LEAD_STATUSES
 )
 
@@ -893,6 +894,30 @@ def api_history_outcome():
         loss_reason=d.get("loss_reason"),
         competitor_rate_per_kg=d.get("competitor_rate_per_kg")
     )
+    if ok:
+        try:
+            q_row = get_quote_for_registry(HISTORY_DB_PATH, quote_id)
+            if q_row:
+                eng = get_engine()
+                if getattr(eng, "pit_registry", None):
+                    is_won = 1 if status.upper() == "WON" else 0
+                    final_p = float(d.get("final_price_inr") or 0.0)
+                    buy_p = float(q_row.get("airline_buy_inr") or 0.0)
+                    margin_pct = ((final_p - buy_p) / max(1.0, buy_p) * 100.0) if buy_p > 0 and is_won else 0.0
+                    orig_reg = map_origin_region(q_row.get("origin_port") or "")
+                    dest_reg = map_destination_region(q_row.get("dest_port") or "")
+                    lane = f"{orig_reg} -> {dest_reg}"
+                    eng.pit_registry.update(
+                        quote_date=q_row.get("timestamp"),
+                        customer_id=q_row.get("customer_name") or "Unknown",
+                        is_won=is_won,
+                        margin=margin_pct,
+                        sell_inr=final_p,
+                        regional_lane=lane,
+                    )
+        except Exception as e:
+            app.logger.warning(f"Failed to update PIT registry for quote {quote_id}: {e}")
+
     return (jsonify({"status": "success", "id": quote_id, "outcome": status}), 200) if ok else (jsonify({
         "status": "error",
         "message": "Won needs final_price_inr; Lost needs a coded loss_reason."

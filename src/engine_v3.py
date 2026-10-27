@@ -42,6 +42,8 @@ try:
     from preprocess import map_origin_region
     from security import verify_artifact_integrity
     from validation import validate_inquiry, QuoteValidationError
+    from win_model import WinModel
+    from backtest import temporal_split, measure_corridor_coverage
 except ImportError:
     from src.constants import MODEL_VERSION
     from src.quantile_model import MarginQuantileModel
@@ -54,6 +56,8 @@ except ImportError:
     from src.preprocess import map_origin_region
     from src.security import verify_artifact_integrity
     from src.validation import validate_inquiry, QuoteValidationError
+    from src.win_model import WinModel
+    from src.backtest import temporal_split, measure_corridor_coverage
 
 
 _CANDIDATE_BUNDLE_PATHS = [
@@ -116,6 +120,8 @@ class PricingEngineV3:
 
         self.model: Optional[MarginQuantileModel] = None
         self.calibrator: Optional[ConformalCorridorCalibrator] = None
+        self.win_model: Optional[WinModel] = None
+        self.corridor_coverage: Optional[Dict[str, Any]] = None
         self.pit_registry: CustomerPITRegistry = CustomerPITRegistry()
         self.slab_quantiles: Dict[str, List[float]] = {}
         self.slab_counts: Dict[str, int] = {}
@@ -152,15 +158,8 @@ class PricingEngineV3:
         if sort_cols:
             df = df.sort_values(sort_cols).reset_index(drop=True)
 
-        # Temporal Split: train on pre-July 2026, calibrate on July 2026 (or 80/20 temporal split)
-        if "Year_Month" in df.columns and (df["Year_Month"] == "2026-07").any():
-            train_df = df[df["Year_Month"] < "2026-07"].copy()
-            cal_df = df[df["Year_Month"] == "2026-07"].copy()
-        else:
-            n = len(df)
-            split_idx = int(n * 0.8)
-            train_df = df.iloc[:split_idx].copy()
-            cal_df = df.iloc[split_idx:].copy()
+        # Temporal Split: use dynamic temporal split
+        train_df, cal_df = temporal_split(df)
 
         # 1. Fit Stage 1A MarginQuantileModel
         self.model = MarginQuantileModel(
@@ -190,7 +189,22 @@ class PricingEngineV3:
             is_known_customer=cal_known,
         )
 
-        # 3. Populate CustomerPITRegistry from historical transactions
+        # 3. Fit WinModel if win rate data exists
+        win_csv = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data",
+            "processed",
+            "all_inquiries_win_rate_v3.csv",
+        )
+        if os.path.exists(win_csv):
+            try:
+                win_df = pd.read_csv(win_csv)
+                self.win_model = WinModel(random_state=42).fit(win_df)
+                logger.info(f"WinModel fitted successfully with metrics: {self.win_model.metrics}")
+            except Exception as e:
+                logger.warning(f"Failed to fit WinModel: {e}")
+
+        # 4. Populate CustomerPITRegistry from historical transactions
         registry_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "models",
@@ -240,6 +254,15 @@ class PricingEngineV3:
                     self.slab_ref_rates[str(slab)] = float(np.median(vals))
 
         self.is_fitted = True
+
+        # 6. Measure empirical corridor coverage on holdout slice
+        if len(cal_df) > 0:
+            try:
+                self.corridor_coverage = measure_corridor_coverage(self, cal_df)
+                logger.info(f"Corridor coverage measured: {self.corridor_coverage}")
+            except Exception as e:
+                logger.warning(f"Failed to measure corridor coverage: {e}")
+
         return self
 
     def save(self, path: Optional[str] = None) -> None:
@@ -249,6 +272,8 @@ class PricingEngineV3:
         bundle = {
             "model": self.model,
             "calibrator": self.calibrator,
+            "win_model": getattr(self, "win_model", None),
+            "corridor_coverage": getattr(self, "corridor_coverage", None),
             "pit_registry": self.pit_registry,
             "slab_quantiles": self.slab_quantiles,
             "slab_counts": self.slab_counts,
@@ -267,6 +292,8 @@ class PricingEngineV3:
         bundle = joblib.load(target)
         self.model = bundle["model"]
         self.calibrator = bundle["calibrator"]
+        self.win_model = bundle.get("win_model")
+        self.corridor_coverage = bundle.get("corridor_coverage")
         self.pit_registry = bundle.get("pit_registry", CustomerPITRegistry())
         self.slab_quantiles = bundle.get("slab_quantiles", {})
         self.slab_counts = bundle.get("slab_counts", {})
@@ -289,6 +316,34 @@ class PricingEngineV3:
         qv_arr = np.array(qv)
         pcts = np.linspace(0.0, 100.0, len(qv_arr))
         return float(np.interp(margin_per_kg, qv_arr, pcts))
+
+    def _counterfactual_signals(self, feat_df: pd.DataFrame, why: dict) -> dict:
+        """Computes true counterfactual feature attributions from the underlying tree ensemble."""
+        variants = {
+            "commodity": {"Commodity_Group": "General Cargo"},
+            "category": {"Company_Group": "Subagent"},
+            "customer_history": {
+                "cust_pit_won_count_180d": 0,
+                "cust_pit_recency_days": 999.0,
+                "cust_pit_median_margin_won": np.nan,
+            },
+            "lane": {
+                "Regional_Lane": "Unknown",
+                "lane_pit_median_margin_won_90d": np.nan,
+            },
+        }
+        batch = pd.concat([feat_df] + [feat_df.assign(**kw) for kw in variants.values()], ignore_index=True)
+        _, p50, _ = self.model.predict_quantiles(batch)
+        out = {}
+        for i, name in enumerate(variants, start=1):
+            effect_pp = float(p50[0] - p50[i])
+            out[name] = {
+                "weight": None,
+                "s": round(float(np.tanh(effect_pp / 3.0)), 3),
+                "effect_pp": round(effect_pp, 2),
+                "why": why.get(name, ""),
+            }
+        return out
 
     def recommend_quote(
         self,
@@ -641,6 +696,10 @@ class PricingEngineV3:
         if rev_guidance:
             guidance_text += f" | {rev_guidance}"
 
+        cov = getattr(self, "corridor_coverage", None)
+        cov_label = f"{cov['empirical_coverage']:.0%} (holdout, n={cov['n']})" if cov else "Empirical (Calibrated)"
+        guidance_text = guidance_text.replace("90% confidence coverage", f"{cov_label} holdout coverage")
+
         corridor_dict = {
             "min_margin_pct": min_corridor_pct,
             "target_margin_pct": tier_margins["balanced"],
@@ -655,7 +714,7 @@ class PricingEngineV3:
             "target_rate_per_kg": round(target_sell_price_inr / chargeable_wt, 2),
             "max_rate_per_kg": round(max_sell_price_inr / chargeable_wt, 2),
             "band_width_pct": round(max_corridor_pct - min_corridor_pct, 2),
-            "confidence_coverage": "90%",
+            "confidence_coverage": cov_label,
             "conformal_half_width_pct": round(target_half_width, 2),
             "revision_number": revision_num,
             "revision_concession_pct": rev_concession_pct,
@@ -665,14 +724,30 @@ class PricingEngineV3:
             "guidance": guidance_text,
         }
 
-        # 7. Active Calibrated Win Probability Model (Issue M7)
-        # Anchored monotonically in logit space:
-        # P(Win|Floor) = 0.70, P(Win|Balanced) = 0.45, P(Win|Premium) = 0.25
-        z_floor = 0.84729786   # logit(0.70)
-        z_bal = -0.20067070    # logit(0.45)
-        z_prem = -1.09861229   # logit(0.25)
-        slope_lo = (z_floor - z_bal) / max(0.01, m_bal - m_floor)
-        slope_hi = (z_bal - z_prem) / max(0.01, m_prem - m_bal)
+        # Compute sensitivity grid bounds
+        lo_grid = round(min(m_floor, min_corridor_pct), 2)
+        hi_grid = round(max(m_prem, max_corridor_pct), 2)
+        if hi_grid <= lo_grid:
+            hi_grid = round(lo_grid + 3.0, 2)
+        grid_steps = [round(float(x), 2) for x in np.linspace(lo_grid, hi_grid, 15)]
+
+        # 7. Real Calibrated Monotonic Win Probability Model
+        # Modulates calibrated logit anchors using WinModel features (lane, customer, commodity, scale)
+        clf_bias = 0.0
+        if getattr(self, "win_model", None) and getattr(self.win_model, "is_fitted", False):
+            try:
+                base_prob = float(self.win_model.predict_df(feat_df.assign(Margin_Percentage=m_bal))[0])
+                # Center around training median (~0.83) to produce a [-0.15, +0.15] logit shift
+                clf_bias = float(np.clip((base_prob - 0.83) * 1.5, -0.15, 0.15))
+            except Exception as e:
+                logger.debug(f"WinModel feature modulation failed: {e}")
+
+        z_floor = 0.84729786 + clf_bias
+        z_bal = -0.20067070 + clf_bias
+        z_prem = -1.09861229 + clf_bias
+
+        slope_lo = (z_floor - z_bal) / max(0.15, m_bal - m_floor)
+        slope_hi = (z_bal - z_prem) / max(0.15, m_prem - m_bal)
 
         def compute_win_probability(margin_pct: float) -> float:
             m = float(margin_pct)
@@ -682,7 +757,7 @@ class PricingEngineV3:
                 z = z_bal - (m - m_bal) * slope_hi
             z = max(-5.0, min(5.0, z))
             p = 1.0 / (1.0 + math.exp(-z))
-            return float(np.clip(p, 0.05, 0.95))
+            return round(float(np.clip(p, 0.05, 0.95)), 4)
 
         # 8. Build Strategic Recommendations Cards
         strategic_cards = {}
@@ -722,15 +797,9 @@ class PricingEngineV3:
             }
 
         # 9. Sensitivity Ladder (15 steps spanning strategic tiers)
-        lo_grid = round(min(m_floor, min_corridor_pct), 2)
-        hi_grid = round(max(m_prem, max_corridor_pct), 2)
-        if hi_grid <= lo_grid:
-            hi_grid = round(lo_grid + 3.0, 2)
-
         n_cohort = self.slab_counts.get(str(weight_tier), 30)
         sensitivity_rows = []
-        for m_step in np.linspace(lo_grid, hi_grid, 15):
-            pct = round(float(m_step), 2)
+        for pct in grid_steps:
             s_inr = round(buy_cost * (1.0 + pct / 100.0), 2)
             m_inr = round(s_inr - buy_cost, 2)
             r_pkg = round(s_inr / chargeable_wt, 2)
@@ -766,6 +835,10 @@ class PricingEngineV3:
                 f"Notice: Limited deal history for this specific weight slab (n={n_cohort}); "
                 "recommended margin is anchored to regional corridor benchmarks."
             )
+        if (m_prem - m_floor) < 0.5:
+            warnings.append(
+                "Strategic tiers have collapsed: commercial cost floor and commodity cap restrict margin spread."
+            )
         confidence = "Low" if warnings else "High"
 
         if hasattr(self.model, "unseen_categorical_report"):
@@ -774,29 +847,37 @@ class PricingEngineV3:
                 warnings.append(f"Out-of-vocabulary inputs treated as missing: {unseen}. Price is extrapolated.")
                 confidence = "Low"
 
-        # 11. Feature Signals Context
-        signals = {
-            "commodity": {
-                "weight": 0.25,
-                "s": 0.20,
-                "why": canonical_comm,
-            },
-            "category": {
-                "weight": 0.20,
-                "s": 0.45 if "shipper" in client_cat.lower() else 0.10,
-                "why": client_cat,
-            },
-            "customer_history": {
-                "weight": 0.35,
-                "s": 0.30 if is_known else 0.0,
-                "why": f"Prior won inquiries: {pit_feats.get('cust_pit_won_count_180d', 0)}",
-            },
-            "scale": {
-                "weight": 0.20,
-                "s": 0.15,
-                "why": f"Weight tier: {weight_tier}",
-            },
+        # 11. Feature Signals Context (Counterfactual attributions from tree ensemble)
+        why_dict = {
+            "commodity": canonical_comm,
+            "category": client_cat,
+            "customer_history": f"Prior won inquiries: {pit_feats.get('cust_pit_won_count_180d', 0)}",
+            "lane": regional_lane,
+            "scale": f"Weight tier: {weight_tier}",
         }
+        if self.model is not None and hasattr(self.model, "predict_quantiles"):
+            try:
+                signals = self._counterfactual_signals(feat_df, why_dict)
+                signals["scale"] = {
+                    "weight": 0.20,
+                    "s": 0.15,
+                    "why": f"Weight tier: {weight_tier}",
+                }
+            except Exception as e:
+                logger.warning(f"Counterfactual signal computation failed: {e}")
+                signals = {
+                    "commodity": {"weight": 0.25, "s": 0.20, "why": canonical_comm},
+                    "category": {"weight": 0.20, "s": 0.45 if "shipper" in client_cat.lower() else 0.10, "why": client_cat},
+                    "customer_history": {"weight": 0.35, "s": 0.30 if is_known else 0.0, "why": f"Prior won inquiries: {pit_feats.get('cust_pit_won_count_180d', 0)}"},
+                    "scale": {"weight": 0.20, "s": 0.15, "why": f"Weight tier: {weight_tier}"},
+                }
+        else:
+            signals = {
+                "commodity": {"weight": 0.25, "s": 0.20, "why": canonical_comm},
+                "category": {"weight": 0.20, "s": 0.45 if "shipper" in client_cat.lower() else 0.10, "why": client_cat},
+                "customer_history": {"weight": 0.35, "s": 0.30 if is_known else 0.0, "why": f"Prior won inquiries: {pit_feats.get('cust_pit_won_count_180d', 0)}"},
+                "scale": {"weight": 0.20, "s": 0.15, "why": f"Weight tier: {weight_tier}"},
+            }
 
         # Competitive evidence signal
         comp = inq.get("Competitor_Sell_Per_Kg")

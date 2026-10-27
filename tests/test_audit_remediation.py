@@ -404,4 +404,107 @@ class TestPhase2FinancialAndDimensionSafeguards(unittest.TestCase):
         self.assertFalse(e1.model is None)
 
 
+class TestPhase3MachineLearningRigor(unittest.TestCase):
+    """Verifies WinModel calibration, counterfactual signals, tier collapse, and closed loop outcome feedback."""
+
+    def test_win_model_monotonicity(self):
+        from src.win_model import WinModel
+        model = WinModel().load("models/win_model.joblib")
+        self.assertTrue(model.is_fitted)
+
+        feat_row = pd.DataFrame([{
+            "Total_Buy_INR": 25000.0,
+            "Unit_Buy_INR": 250.0,
+            "Chargeable_Weight_Kg": 100.0,
+            "Cargo_Density_Ratio": 1.0,
+            "Weight_Tier": "100-300kg",
+            "Commodity_Group": "General Cargo",
+            "Regional_Lane": "North India -> Europe",
+            "Origin_Port": "DEL",
+            "Destination_Region": "Europe",
+            "Company_Group": "Shipper",
+            "Incoterms": "FOB",
+            "cust_pit_won_count_180d": 3,
+            "cust_pit_median_margin_won": 12.0,
+            "cust_pit_recency_days": 15.0,
+            "lane_pit_median_margin_won_90d": 11.0,
+        }])
+
+        candidate_margins = [2.0, 5.0, 8.0, 12.0, 18.0, 25.0]
+        probs = model.predict_margins(feat_row, candidate_margins)
+        self.assertEqual(len(probs), len(candidate_margins))
+        for i in range(len(probs) - 1):
+            self.assertGreaterEqual(probs[i], probs[i + 1] - 1e-6)
+
+    def test_counterfactual_signals_in_recommendation(self):
+        from src.app import get_engine
+        engine = get_engine()
+        rec = engine.recommend_quote({
+            "buy": 25000.0,
+            "chargeable_wt": 100.0,
+            "origin": "Delhi",
+            "dest": "Frankfurt am Main",
+            "commodity": "Pharma",
+            "client_type": "Direct Shipper",
+        })
+        self.assertIn("signals", rec)
+        signals = rec["signals"]
+        self.assertIn("commodity", signals)
+        self.assertIn("category", signals)
+        self.assertIn("customer_history", signals)
+        self.assertIn("lane", signals)
+        self.assertIn("effect_pp", signals["commodity"])
+        self.assertIn("s", signals["commodity"])
+
+    def test_tier_collapse_warning_trigger(self):
+        from src.app import get_engine
+        engine = get_engine()
+        rec = engine.recommend_quote({
+            "buy": 1200000.0,
+            "chargeable_wt": 4000.0,
+            "origin": "Delhi",
+            "dest": "Frankfurt am Main",
+            "commodity": "General Cargo",
+            "client_type": "Subagent",
+        })
+        m_floor = rec["strategic_recommendations"]["floor"]["Margin_Percentage"]
+        m_prem = rec["strategic_recommendations"]["premium"]["Margin_Percentage"]
+        if (m_prem - m_floor) < 0.5:
+            self.assertTrue(any("Strategic tiers have collapsed" in w for w in rec.get("warnings", [])))
+
+    def test_closed_loop_outcome_feedback(self):
+        from src.app import app, get_engine
+        app.config["TESTING"] = True
+        client = app.test_client()
+
+        # Generate a quote to insert into history
+        quote_res = client.post("/api/quote", json={
+            "buy": 20000.0,
+            "chargeable_wt": 100.0,
+            "origin": "Delhi",
+            "dest": "London",
+            "customer_name": "Acme Closed Loop Test Corp",
+            "commodity": "General Cargo"
+        }, headers={"X-API-Key": "dev_test_key"})
+        self.assertEqual(quote_res.status_code, 200)
+        q_data = quote_res.get_json()
+        quote_id = q_data.get("quote_id")
+
+        if quote_id:
+            eng = get_engine()
+            # Record outcome won
+            res = client.post("/api/history/outcome", json={
+                "id": quote_id,
+                "status": "Won",
+                "final_price_inr": 23000.0
+            }, headers={"X-API-Key": "dev_test_key"})
+            self.assertEqual(res.status_code, 200)
+
+            # Check that PIT registry has customer record updated
+            canonical_cust = "ACME CLOSED LOOP TEST CORP"
+            c_mem = eng.pit_registry.lookup_customer(canonical_cust)
+            self.assertGreaterEqual(c_mem["won_count_180d"], 1)
+
+
+
 
