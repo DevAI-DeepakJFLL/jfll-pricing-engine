@@ -18,6 +18,20 @@ Architecture:
 
 import os
 import sys
+import warnings
+
+if os.environ.get("ALLOW_LEGACY_ENGINE") != "1":
+    if "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ:
+        warnings.warn(
+            "Legacy training pipeline (v2.x). Superseded by engine_v3.py; set ALLOW_LEGACY_ENGINE=1 to run for archaeology only.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        raise RuntimeError(
+            "Legacy training pipeline (v2.x). Superseded by engine_v3.py; set ALLOW_LEGACY_ENGINE=1 to run for archaeology only."
+        )
+
 import argparse
 import datetime
 from typing import Optional, Dict, Any, List

@@ -505,6 +505,18 @@ class TestPhase3MachineLearningRigor(unittest.TestCase):
             c_mem = eng.pit_registry.lookup_customer(canonical_cust)
             self.assertGreaterEqual(c_mem["won_count_180d"], 1)
 
+    def test_legacy_engine_shielded_without_env_var(self):
+        """Verifies legacy modules raise RuntimeError if imported outside ALLOW_LEGACY_ENGINE."""
+        import subprocess, sys, os
+        env = dict(os.environ)
+        env.pop("ALLOW_LEGACY_ENGINE", None)
+        env.pop("PYTEST_CURRENT_TEST", None)
+        cmd = [sys.executable, "-c", "from src import engine"]
+        res = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("RuntimeError: Legacy engine (v2.x). Superseded by engine_v3.py", res.stderr)
+
+
 
 
 

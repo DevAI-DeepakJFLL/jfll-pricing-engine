@@ -6,6 +6,22 @@ Level 1 (structure): weight slab x destination region sets the margin BAND [P25,
 Level 2 (weights):   signals in [-1, +1] move the quote position inside the band.
 Level 3 (gates):     cost floor, cohort-aware cap, approval flags. Gates are NOT weights.
 """
+import os
+import sys
+import warnings
+
+if os.environ.get("ALLOW_LEGACY_ENGINE") != "1":
+    if "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ:
+        warnings.warn(
+            "Legacy margin framework (v2.x). Superseded by engine_v3.py; set ALLOW_LEGACY_ENGINE=1 to run for archaeology only.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        raise RuntimeError(
+            "Legacy margin framework (v2.x). Superseded by engine_v3.py; set ALLOW_LEGACY_ENGINE=1 to run for archaeology only."
+        )
+
 from typing import Dict, Any, Optional, List
 import math
 import re
