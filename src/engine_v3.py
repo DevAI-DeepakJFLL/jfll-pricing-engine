@@ -41,6 +41,7 @@ try:
     from tiers import get_weight_tier, map_account_tier
     from preprocess import map_origin_region
     from security import verify_artifact_integrity
+    from validation import validate_inquiry, QuoteValidationError
 except ImportError:
     from src.constants import MODEL_VERSION
     from src.quantile_model import MarginQuantileModel
@@ -52,6 +53,7 @@ except ImportError:
     from src.tiers import get_weight_tier, map_account_tier
     from src.preprocess import map_origin_region
     from src.security import verify_artifact_integrity
+    from src.validation import validate_inquiry, QuoteValidationError
 
 
 _CANDIDATE_BUNDLE_PATHS = [
@@ -107,7 +109,7 @@ class PricingEngineV3:
         self,
         bundle_path: Optional[str] = None,
         data_path: Optional[str] = None,
-        auto_train: bool = True,
+        auto_train: bool = False,
     ):
         self.bundle_path = bundle_path or DEFAULT_BUNDLE_PATH
         self.data_path = data_path or DEFAULT_DATA_PATH
@@ -299,56 +301,20 @@ class PricingEngineV3:
         if not self.is_fitted or self.model is None or self.calibrator is None:
             raise RuntimeError("PricingEngineV3 must be fitted or loaded before recommend_quote()")
 
-        inq = dict(inquiry_dict)
+        # 1. Base input validation and entity normalization
+        inq = validate_inquiry(inquiry_dict)
+        chargeable_wt = inq["Chargeable_Weight_Kg"]
+        buy_cost = inq["Total_Buy_INR"]
+        quote_date = inq["quote_date"]
 
-        # 1. Base input parsing and entity normalization
-        raw_chg_wt = (
-            inq.get("Chargeable_Weight_Kg")
-            if inq.get("Chargeable_Weight_Kg") is not None
-            else (
-                inq.get("chargeable_wt")
-                if inq.get("chargeable_wt") is not None
-                else (
-                    inq.get("chargeable_weight")
-                    if inq.get("chargeable_weight") is not None
-                    else inq.get("direct_weight")
-                )
-            )
-        )
-        chargeable_wt = float(raw_chg_wt or 1.0)
-        raw_gross_wt = (
-            inq.get("Gross_Weight_Kg")
-            if inq.get("Gross_Weight_Kg") is not None
-            else (inq.get("gross_wt") if inq.get("gross_wt") is not None else inq.get("gross_weight"))
-        )
-        gross_wt = float(raw_gross_wt or chargeable_wt)
-        density_ratio = float(inq.get("Cargo_Density_Ratio", chargeable_wt / max(1.0, gross_wt)))
+        raw_gross_wt = inq.get("Gross_Weight_Kg") or inq.get("gross_wt") or inq.get("gross_weight")
+        gross_provided = raw_gross_wt is not None and str(raw_gross_wt).strip() != ""
+        gross_wt = float(raw_gross_wt) if gross_provided else float("nan")
 
-        raw_buy = (
-            inq.get("Total_Buy_INR")
-            if inq.get("Total_Buy_INR") is not None
-            else (
-                inq.get("buy")
-                if inq.get("buy") is not None
-                else inq.get("airline_buy_price")
-            )
-        )
-        if raw_buy is not None and str(raw_buy).strip() != "":
-            buy_cost = float(raw_buy)
+        if "Cargo_Density_Ratio" in inq and not math.isnan(float(inq["Cargo_Density_Ratio"])):
+            density_ratio = float(inq["Cargo_Density_Ratio"])
         else:
-            raw_unit_buy = (
-                inq.get("Unit_Buy_INR")
-                if inq.get("Unit_Buy_INR") is not None
-                else (
-                    inq.get("unit_buy")
-                    if inq.get("unit_buy") is not None
-                    else inq.get("buy_rate")
-                )
-            )
-            if raw_unit_buy is not None and str(raw_unit_buy).strip() != "":
-                buy_cost = float(raw_unit_buy) * chargeable_wt
-            else:
-                buy_cost = 0.0
+            density_ratio = (chargeable_wt / gross_wt) if (gross_provided and gross_wt > 0) else float("nan")
 
         raw_carrier = str(
             inq.get("Quoted Carrier")
@@ -377,7 +343,6 @@ class PricingEngineV3:
         incoterms = str(inq.get("Incoterms") or inq.get("incoterms") or "FOB")
 
         weight_tier = str(inq.get("Weight_Tier") or get_weight_tier(chargeable_wt))
-        quote_date = str(inq.get("quote_date") or datetime.date.today().isoformat())[:10]
 
         raw_cust = str(
             inq.get("customer_name")

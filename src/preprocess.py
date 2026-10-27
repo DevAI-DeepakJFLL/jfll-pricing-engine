@@ -112,30 +112,37 @@ def normalize_port_name(port: Any) -> str:
 # ------------------------------------------------------------------------------
 # PHYSICAL PLAUSIBILITY & VOLUMETRIC LOGIC
 # ------------------------------------------------------------------------------
-def compute_volumetric_weight(dimensions: Optional[List[Dict[str, Any]]]) -> float:
+def compute_volumetric_weight(dimensions: Optional[List[Dict[str, Any]]], divisor: float = 6000.0) -> float:
     """
     Compute total volumetric weight across cargo pieces using IATA standard:
-    Volumetric Weight (kg) = (Length_cm * Width_cm * Height_cm * Pieces) / 6000.
+    Volumetric Weight (kg) = (Length_cm * Width_cm * Height_cm * Pieces) / divisor.
+    Default divisor is 6000.0 (standard commercial airfreight); courier/express often uses 5000.0.
+    Raises ValueError on negative, invalid, or out-of-range dimensions.
     """
     if not dimensions:
         return 0.0
-    total_vol = 0.0
-    for item in dimensions:
+    if divisor <= 0.0:
+        raise ValueError(f"Volumetric divisor must be positive, got {divisor}")
+    total = 0.0
+    for i, item in enumerate(dimensions):
         try:
-            l = float(item.get("length", 0.0))
-            w = float(item.get("width", 0.0))
-            h = float(item.get("height", 0.0))
+            l = float(item["length"])
+            w = float(item["width"])
+            h = float(item["height"])
             pcs = int(item.get("pieces", 1))
-            total_vol += (l * w * h * max(1, pcs)) / 6000.0
-        except (ValueError, TypeError):
-            continue
-    return round(total_vol, 2)
+        except (KeyError, ValueError, TypeError) as e:
+            raise ValueError(f"dimension row {i} invalid: {e}")
+        if min(l, w, h) <= 0 or pcs < 1 or max(l, w, h) > 1200:  # cm (max 12 meters)
+            raise ValueError(f"dimension row {i} out of range: {l}x{w}x{h} cm, {pcs} pcs")
+        total += (l * w * h * pcs) / divisor
+    return round(total, 2)
 
 
 def validate_shipment_physics(
     gross_wt: float,
     ch_wt: float,
     dimensions: Optional[List[Dict[str, Any]]] = None,
+    divisor: float = 6000.0,
 ) -> Tuple[bool, float, float, Optional[str]]:
     """
     Validate and enforce physical plausibility of cargo weight & density according to IATA standards.
@@ -156,7 +163,10 @@ def validate_shipment_physics(
     except (ValueError, TypeError):
         return False, 0.0, 0.0, "Invalid numeric weight inputs"
 
-    vol_wt = compute_volumetric_weight(dimensions) if dimensions else 0.0
+    try:
+        vol_wt = compute_volumetric_weight(dimensions, divisor=divisor) if dimensions else 0.0
+    except ValueError as e:
+        return False, 0.0, 0.0, str(e)
 
     # Raw chargeable weight cannot be less than gross or volumetric weight
     raw_ch_wt = max(g_wt, c_wt, vol_wt)

@@ -342,3 +342,66 @@ class TestRiskBufferDeduplication(unittest.TestCase):
                     self.assertAlmostEqual(buf1, undiscounted * 0.50, places=4)
 
 
+class TestPhase2FinancialAndDimensionSafeguards(unittest.TestCase):
+    """Verifies Phase 2: Financial input safeguards, dimensions validation, and engine singleton."""
+
+    def setUp(self):
+        import os
+        from src.app import app
+        self.app = app
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+
+    def test_missing_destination_returns_422(self):
+        """Quotation without destination must return 422."""
+        payload = {
+            "buy": 20000.0,
+            "chargeable_wt": 100.0,
+            "origin": "Bangalore"
+        }
+        res = self.client.post("/api/quote", json=payload)
+        self.assertEqual(res.status_code, 422)
+        self.assertIn("Destination is required", res.get_json()["message"])
+
+    def test_ambiguous_buy_rate_requires_confirmation_422(self):
+        """Ambiguous buy rate (< 10 INR/kg) without confirm_total_buy must return 422."""
+        payload = {
+            "buy": 500.0,
+            "chargeable_wt": 100.0,
+            "origin": "Bangalore",
+            "dest": "Frankfurt am Main"
+        }
+        res = self.client.post("/api/quote", json=payload)
+        self.assertEqual(res.status_code, 422)
+        self.assertIn("confirm_total_buy=true", res.get_json()["message"])
+
+    def test_strict_dimensions_validation(self):
+        """Invalid physical dimensions must raise ValueError / return 400 or 422."""
+        from src.preprocess import compute_volumetric_weight
+
+        # Zero length
+        with self.assertRaises(ValueError):
+            compute_volumetric_weight([{"length": 0, "width": 50, "height": 50}])
+
+        # Negative height
+        with self.assertRaises(ValueError):
+            compute_volumetric_weight([{"length": 50, "width": 50, "height": -10}])
+
+        # Out-of-range length (> 1200 cm)
+        with self.assertRaises(ValueError):
+            compute_volumetric_weight([{"length": 1500, "width": 50, "height": 50}])
+
+        # Courier 5000 divisor
+        vol_5000 = compute_volumetric_weight([{"length": 100, "width": 50, "height": 50}], divisor=5000.0)
+        self.assertEqual(vol_5000, 50.0)
+
+    def test_lazy_threadsafe_engine_singleton(self):
+        """get_engine() returns a single initialized instance across repeated calls."""
+        from src.app import get_engine
+        e1 = get_engine()
+        e2 = get_engine()
+        self.assertIs(e1, e2)
+        self.assertFalse(e1.model is None)
+
+
+

@@ -172,6 +172,17 @@ def get_recent_competitor_rate_benchmark(
         }
 
 
+def get_quote_for_registry(db_path: str, quote_id: int) -> Optional[Dict[str, Any]]:
+    """Retrieve quote row from recommendation_history for closed-loop PIT registry updates."""
+    with sqlite3.connect(db_path, timeout=5.0) as conn:
+        conn.row_factory = sqlite3.Row
+        r = conn.execute(
+            "SELECT timestamp, customer_name, origin_port, dest_port, airline_buy_inr "
+            "FROM recommendation_history WHERE id = ? AND is_deleted = 0",
+            (quote_id,)
+        ).fetchone()
+    return dict(r) if r else None
+
 
 def init_history_db(db_path: str = "data/recommendations_history.db", force: bool = False):
     """Initialize database, create performance indexes, and perform versioned schema migrations."""

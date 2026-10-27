@@ -78,6 +78,7 @@ class TestApiQuoteIntegration(unittest.TestCase):
         payload = {
             "buy": 20000,
             "gross_wt": 20,
+            "dest": "Frankfurt am Main",
             "dim_l": 100,
             "dim_w": 50,
             "dim_h": 40,
@@ -259,10 +260,24 @@ class TestApiQuoteIntegration(unittest.TestCase):
             "client": "Subagent",
             "commodity": "General Cargo",
         }
-        res = self.client.post("/api/quote", data=json.dumps(payload), content_type="application/json")
+        # 1. Without confirmation, must return 422 to prevent silent money mutation
+        res_ambiguous = self.client.post("/api/quote", data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(res_ambiguous.status_code, 422)
+        self.assertIn("confirm_total_buy=true", res_ambiguous.get_json()["message"])
+
+        # 2. Resubmitted properly with unit_buy=300 -> successfully calculates total buy 135,000 INR
+        payload_unit = {
+            "unit_buy": 300.0,
+            "gross_wt": 420.0,
+            "chargeable_wt": 450.0,
+            "origin": "Chhatrapati Shivaji Maharaj International Airport",
+            "dest": "Dubai",
+            "client": "Subagent",
+            "commodity": "General Cargo",
+        }
+        res = self.client.post("/api/quote", data=json.dumps(payload_unit), content_type="application/json")
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
-        # Verify buy was scaled from 300 to 135,000 INR
         self.assertEqual(data["buy"], 135000.0)
         self.assertEqual(data["unit_buy"], 300.0)
         # Margin should be commercially realistic (~5% to 7%), not > 100%

@@ -21,7 +21,7 @@ import json
 import logging
 import datetime
 from functools import wraps
-from typing import Dict
+from typing import Dict, Optional, Any
 import joblib
 import numpy as np
 import pandas as pd
@@ -109,12 +109,43 @@ try:
 except ImportError:
     from src.preprocess import get_air_cargo_season
 
+import threading
+
 try:
     from engine_v3 import PricingEngineV3
 except ImportError:
     from src.engine_v3 import PricingEngineV3
 
-engine_v3 = PricingEngineV3()
+try:
+    from validation import validate_inquiry, QuoteValidationError
+except ImportError:
+    from src.validation import validate_inquiry, QuoteValidationError
+
+_engine: Optional[PricingEngineV3] = None
+_engine_lock = threading.Lock()
+
+
+def get_engine() -> PricingEngineV3:
+    """Thread-safe lazy singleton accessor for PricingEngineV3."""
+    global _engine
+    if _engine is None:
+        with _engine_lock:
+            if _engine is None:
+                if os.environ.get("S3_BUCKET_NAME"):
+                    try:
+                        from aws_client import sync_model_from_s3
+                        bundle_dest = os.path.join(ENGINE_ROOT, "models", "engine_v3_bundle.joblib")
+                        sync_model_from_s3(local_dest=bundle_dest)
+                    except Exception as e:
+                        logger.warning(f"Could not sync model from S3: {e}")
+                _engine = PricingEngineV3(auto_train=False)
+    return _engine
+
+
+def __getattr__(name: str):
+    if name == "engine_v3":
+        return get_engine()
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 # ------------------------------------------------------------------------------
@@ -576,19 +607,22 @@ def api_quote():
         except (ValueError, TypeError):
             return jsonify({"status": "error", "message": "Invalid Airline Unit Buy Rate. Please provide a positive numeric rate (₹/kg)."}), 400
 
-    # Smart Safeguard: Detect when raw_buy was entered as unit rate instead of total buy
-    if buy_cost is not None and chargeable_wt >= 30.0:
+    # Financial Safeguard (Finding 1.3): Disallow silent money mutations on ambiguous buy rates
+    if (
+        buy_cost is not None
+        and unit_buy_rate is None
+        and chargeable_wt >= 30.0
+        and (buy_cost / chargeable_wt) < 10.0
+        and not data.get("confirm_total_buy")
+    ):
         implied_unit_rate = buy_cost / chargeable_wt
-        # In international air freight, rate < 10 INR/kg is physically impossible.
-        # If buy_cost is a realistic unit rate (e.g. >= 20 INR) and unit_buy_rate is either missing or equal to buy_cost:
-        if implied_unit_rate < 10.0 and buy_cost >= 20.0 and (unit_buy_rate is None or abs(unit_buy_rate - buy_cost) < 0.01):
-            logger.warning(
-                f"Auto-resolving unit buy rate entered into total buy: buy={buy_cost} INR for {chargeable_wt} kg "
-                f"(implied {implied_unit_rate:.2f} INR/kg). Auto-converting to unit rate {buy_cost} INR/kg "
-                f"-> Total Buy: {round(buy_cost * chargeable_wt, 2)} INR."
-            )
-            unit_buy_rate = buy_cost
-            buy_cost = round(buy_cost * chargeable_wt, 2)
+        return jsonify({
+            "status": "error",
+            "message": (
+                f"Total buy ₹{buy_cost:,.0f} for {chargeable_wt:g} kg implies ₹{implied_unit_rate:.2f}/kg. "
+                "If this is a per-kg rate, resubmit as unit_buy; otherwise resend with confirm_total_buy=true."
+            ),
+        }), 422
 
     if buy_cost is None:
         if unit_buy_rate is not None:
@@ -614,8 +648,12 @@ def api_quote():
     except (ValueError, TypeError):
         revision = 1
 
+    raw_dest = data.get("dest") or data.get("Destination_Port") or data.get("Destination_Region")
+    if not raw_dest or not str(raw_dest).strip():
+        return jsonify({"status": "error", "message": "Destination is required."}), 422
+
     origin_input = str(data.get("origin") or "Indira Gandhi International Airport").strip()
-    dest_input = str(data.get("dest") or "Heathrow Apt/London").strip()
+    dest_input = str(raw_dest).strip()
 
     origin = normalize_port_name(origin_input)
     dest = normalize_port_name(dest_input)
@@ -669,12 +707,15 @@ def api_quote():
     tier = get_weight_tier(chargeable_wt)
     cust_tier = map_account_tier(frequency)
 
+    gross_provided = raw_gross is not None and str(raw_gross).strip() != ""
+    density_val = density_ratio if gross_provided else float("nan")
+
     inquiry_payload = {
         "Total_Buy_INR": buy_cost,
         "Unit_Buy_INR": unit_buy_rate,
         "Chargeable_Weight_Kg": chargeable_wt,
-        "Gross_Weight_Kg": gross_wt,
-        "Cargo_Density_Ratio": density_ratio,
+        "Gross_Weight_Kg": gross_wt if gross_provided else float("nan"),
+        "Cargo_Density_Ratio": density_val,
         "Weight_Tier": tier,
         "Business_Vertical": vertical,
         "Commodity_Group": commodity,
@@ -759,7 +800,7 @@ def api_quote():
     })
 
     try:
-        quote_res = engine_v3.recommend_quote(
+        quote_res = get_engine().recommend_quote(
             inquiry_dict=inquiry_payload,
             pricing_strategy=pricing_strategy,
         )
@@ -818,6 +859,8 @@ def api_quote():
             "history_logged": history_logged,
             "model_version": MODEL_VERSION,
         })
+    except QuoteValidationError as err:
+        return jsonify({"status": "error", "message": str(err)}), 422
     except Exception as err:
         logger.error(f"PricingEngineV3 recommendation error: {err}", exc_info=True)
         return jsonify({"status": "error", "message": "Optimization engine encountered an internal error. Please verify your quotation parameters."}), 500
