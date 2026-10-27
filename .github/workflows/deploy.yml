@@ -33,10 +33,14 @@ jobs:
           python scripts/verify_vocab_alignment.py
 
       - name: Run Production Serving & Model Test Suite
+        env:
+          ALLOW_LEGACY_ENGINE: "1"
+          PYTHONPATH: ".:src"
         run: |
           python -m unittest \
             tests/test_api_quote.py \
             tests/test_api_v3_quote.py \
+            tests/test_audit_remediation.py \
             tests/test_aws_client.py \
             tests/test_benchmark_integrity.py \
             tests/test_cohort_lookup.py \
@@ -56,7 +60,9 @@ jobs:
             tests/test_security_integrity.py \
             tests/test_strategy_tiers.py \
             tests/test_taxonomy.py \
-            tests/test_tiers.py
+            tests/test_tiers.py \
+            tests/test_validation.py \
+            tests/test_win_model.py
 
   deploy-aws:
     name: Package & Deploy to AWS Free Tier
