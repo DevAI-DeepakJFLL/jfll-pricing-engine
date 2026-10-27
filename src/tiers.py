@@ -81,6 +81,7 @@ def check_weight_break_arbitrage(
     if next_break is None:
         return {
             "has_arbitrage": False,
+            "is_estimate": False,
             "original_chargeable_wt": float(chargeable_wt),
             "recommended_chargeable_wt": float(chargeable_wt),
             "original_cost": float(current_total_cost),
@@ -91,29 +92,44 @@ def check_weight_break_arbitrage(
             "advisory": None,
         }
 
+    # Normalize JSON slab_rates keys (which may arrive as strings e.g. {"100": 130.0}) to floats
+    normalized_slabs: Dict[float, float] = {}
+    if slab_rates:
+        for k, v in slab_rates.items():
+            try:
+                normalized_slabs[float(k)] = float(v)
+            except (ValueError, TypeError):
+                continue
+
     target_rate: Optional[float] = None
+    is_estimate = False
     if next_slab_rate_per_kg is not None and float(next_slab_rate_per_kg) > 0:
         target_rate = float(next_slab_rate_per_kg)
-    elif slab_rates and next_break in slab_rates:
-        target_rate = float(slab_rates[next_break])
+        is_estimate = False
+    elif normalized_slabs and next_break in normalized_slabs:
+        target_rate = float(normalized_slabs[next_break])
+        is_estimate = False
     elif chargeable_wt > 0 and current_total_cost > 0:
         # Near a break threshold (within 20% of break, e.g. >= 80kg for 100kg break, >= 420kg for 500kg break)
         if chargeable_wt >= 0.80 * next_break:
             cur_rate = current_total_cost / chargeable_wt
             target_rate = round(cur_rate * (1.0 - default_break_discount_pct), 2)
+            is_estimate = True
 
     if target_rate is not None and target_rate > 0:
         arbitrage_cost = round(next_break * target_rate, 2)
         if arbitrage_cost < current_total_cost:
             savings = round(current_total_cost - arbitrage_cost, 2)
             savings_pct = round((savings / current_total_cost) * 100.0, 2) if current_total_cost > 0 else 0.0
+            prefix = "ESTIMATE (assumes 12% break discount): " if is_estimate else ""
             advisory = (
-                f"Weight-break arbitrage detected: Bumping declared weight from {chargeable_wt:.1f} kg to "
+                f"{prefix}Weight-break arbitrage detected: Bumping declared weight from {chargeable_wt:.1f} kg to "
                 f"{next_break:.1f} kg reduces carrier cost from ₹{current_total_cost:,.2f} to ₹{arbitrage_cost:,.2f}, "
                 f"saving ₹{savings:,.2f} ({savings_pct}%)."
             )
             return {
                 "has_arbitrage": True,
+                "is_estimate": is_estimate,
                 "original_chargeable_wt": float(chargeable_wt),
                 "recommended_chargeable_wt": float(next_break),
                 "original_cost": float(current_total_cost),
@@ -127,6 +143,7 @@ def check_weight_break_arbitrage(
 
     return {
         "has_arbitrage": False,
+        "is_estimate": is_estimate,
         "original_chargeable_wt": float(chargeable_wt),
         "recommended_chargeable_wt": float(chargeable_wt),
         "original_cost": float(current_total_cost),

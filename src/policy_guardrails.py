@@ -18,6 +18,7 @@ try:
         compute_cost_floor_price,
         get_commodity_max_margin,
         get_client_category_max_margin,
+        resolve_risk_buffer,
     )
     from taxonomy import classify_commodity
 except ImportError:
@@ -30,6 +31,7 @@ except ImportError:
         compute_cost_floor_price,
         get_commodity_max_margin,
         get_client_category_max_margin,
+        resolve_risk_buffer,
     )
     from src.taxonomy import classify_commodity
 
@@ -57,32 +59,8 @@ class GuardrailResult:
         return asdict(self)
 
 
-def _resolve_risk_buffer(commodity_str: str, client_cat_str: str) -> float:
-    """Helper to resolve commodity risk buffer and intermediary discount."""
-    key = re.sub(r"[^a-z0-9]+", "_", str(commodity_str).lower()).strip("_")
-    risk_buffer = COMMODITY_RISK_BUFFERS.get(key, 0.0)
-    if risk_buffer == 0.0:
-        if "pharma" in key or "vaccine" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("pharmaceuticals", 0.04)
-        elif "perish" in key or "food" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("perishable_cold_chain", 0.035)
-        elif "danger" in key or "dgr" in key or "haz" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("dangerous_goods", 0.06)
-        elif "valuable" in key or "vun" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("valuable_cargo", 0.05)
-        elif "engineer" in key or "machine" in key or "auto" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("engineering_machinery", 0.015)
-        elif "courier" in key or "express" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("courier_express", 0.02)
-        elif "animal" in key or "avi" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("live_animals", 0.05)
-        elif "other" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("other", 0.025)
-
-    if any(k in str(client_cat_str).lower() for k in ["gsa", "nvocc", "coloader"]):
-        risk_buffer *= 0.50
-
-    return float(risk_buffer)
+# Canonical reference to unified risk buffer in constants.py
+_resolve_risk_buffer = resolve_risk_buffer
 
 
 def apply_commercial_guardrails(

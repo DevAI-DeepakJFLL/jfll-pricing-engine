@@ -253,3 +253,92 @@ class TestSecurityEndpointRemediation(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("Invalid quote ID", res.get_json()["message"])
 
+
+class TestWeightBreakArbitrageAndBoundaryParity(unittest.TestCase):
+    """Verifies Task 3: Weight-break arbitrage string keys, estimates, and 45kg boundary parity."""
+
+    def test_string_keys_in_slab_rates(self):
+        """JSON payloads provide string keys like '100' or '100.0'. Must resolve correctly."""
+        from src.tiers import check_weight_break_arbitrage
+
+        # 92kg @ 150 INR/kg = 13800. Next break 100kg @ 130 INR/kg = 13000.
+        res = check_weight_break_arbitrage(
+            chargeable_wt=92.0,
+            current_total_cost=13800.0,
+            slab_rates={"100": 130.0}  # String key
+        )
+        self.assertTrue(res["has_arbitrage"])
+        self.assertEqual(res["recommended_chargeable_wt"], 100.0)
+        self.assertEqual(res["arbitrage_cost"], 13000.0)
+        self.assertEqual(res["savings"], 800.0)
+        self.assertFalse(res["is_estimate"])
+        self.assertNotIn("ESTIMATE", res["advisory"])
+
+    def test_estimated_arbitrage_flag_and_advisory(self):
+        """When no carrier rates are supplied, arbitrage is flagged as an estimate."""
+        from src.tiers import check_weight_break_arbitrage
+
+        # 92kg @ 150 INR/kg = 13800. No slab rates.
+        # Near 100kg break (92 >= 80kg), estimate assumes 12% discount.
+        res = check_weight_break_arbitrage(
+            chargeable_wt=92.0,
+            current_total_cost=13800.0,
+        )
+        self.assertTrue(res["has_arbitrage"])
+        self.assertTrue(res["is_estimate"])
+        self.assertIn("ESTIMATE (assumes 12% break discount)", res["advisory"])
+
+    def test_45kg_boundary_parity(self):
+        """Verifies 45.0kg boundary behavior across compute_cost_floor_price and get_weight_tier."""
+        from src.tiers import get_weight_tier
+        from src.constants import compute_cost_floor_price, MIN_MARGIN_PER_AWB_INR
+
+        # At exactly 45.0kg, get_weight_tier classifies as 45-100kg
+        tier = get_weight_tier(45.0)
+        self.assertEqual(tier, "45-100kg")
+
+        # In compute_cost_floor_price, small shipments <= 45.0kg strictly enforce full AWB documentation floor
+        price_45_0 = compute_cost_floor_price(airline_buy_inr=5000.0, chargeable_wt_kg=45.0)
+        margin_45 = price_45_0 - 5000.0
+        self.assertGreaterEqual(margin_45, MIN_MARGIN_PER_AWB_INR)
+
+        # Above 45.0kg (e.g., 45.1kg), unit and documentation minimums scale dynamically with buy rate
+        price_45_1 = compute_cost_floor_price(airline_buy_inr=5000.0, chargeable_wt_kg=45.1)
+        self.assertTrue(price_45_1 > 0)
+
+
+class TestRiskBufferDeduplication(unittest.TestCase):
+    """Verifies Task 4: Deduplicated canonical resolve_risk_buffer in constants.py."""
+
+    def test_unified_risk_buffer_resolution(self):
+        from src.constants import resolve_risk_buffer
+        from src.policy_guardrails import _resolve_risk_buffer
+
+        commodities = [
+            "Pharmaceuticals", "pharma_active", "Vaccines",
+            "Perishable Foodstuff", "fresh_fruits",
+            "Dangerous Goods", "dgr_hazmat",
+            "Valuables", "gold_vun",
+            "Machinery", "auto_parts",
+            "Courier Express", "express_documents",
+            "Live Animals", "avi_equine",
+            "General Cargo", "unknown_commodity"
+        ]
+
+        companies = ["Shipper", "Subagent", "IATA Cargo Agent", "GSA Wholesale", "NVOCC Master", "Coloader"]
+
+        for comm in commodities:
+            for comp in companies:
+                buf1 = resolve_risk_buffer(comm, comp)
+                buf2 = _resolve_risk_buffer(comm, comp)
+                self.assertEqual(
+                    buf1, buf2,
+                    f"Risk buffer mismatch for commodity='{comm}', company='{comp}': {buf1} != {buf2}"
+                )
+
+                # Wholesale discount check
+                if any(k in comp.lower() for k in ["gsa", "nvocc", "coloader"]):
+                    undiscounted = resolve_risk_buffer(comm, "Shipper")
+                    self.assertAlmostEqual(buf1, undiscounted * 0.50, places=4)
+
+

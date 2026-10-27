@@ -60,6 +60,38 @@ COMMODITY_RISK_BUFFERS: Dict[str, float] = {
 }
 
 
+def resolve_risk_buffer(commodity_group: str, company_group: str = "Subagent") -> float:
+    """
+    Resolves deterministic commodity risk buffer and intermediary wholesale discount.
+    Canonical single-source-of-truth across pricing engine and guardrails.
+    """
+    key = re.sub(r"[^a-z0-9]+", "_", str(commodity_group or "").lower()).strip("_")
+    risk_buffer = COMMODITY_RISK_BUFFERS.get(key, 0.0)
+    if risk_buffer == 0.0:
+        if "pharma" in key or "vaccine" in key:
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("pharmaceuticals", 0.04)
+        elif "perish" in key or "food" in key:
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("perishable_cold_chain", 0.035)
+        elif "danger" in key or "dgr" in key or "haz" in key:
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("dangerous_goods", 0.06)
+        elif "valuable" in key or "vun" in key:
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("valuable_cargo", 0.05)
+        elif "engineer" in key or "machine" in key or "auto" in key:
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("engineering_machinery", 0.015)
+        elif "courier" in key or "express" in key:
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("courier_express", 0.02)
+        elif "animal" in key or "avi" in key:
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("live_animals", 0.05)
+        elif "other" in key:
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("other", 0.025)
+
+    # Intermediary wholesale discount: 50% risk buffer reduction
+    if any(k in str(company_group or "").lower() for k in ["gsa", "nvocc", "coloader"]):
+        risk_buffer *= 0.50
+
+    return float(risk_buffer)
+
+
 def compute_cost_floor_price(
     airline_buy_inr: float,
     chargeable_wt_kg: float,
@@ -87,30 +119,7 @@ def compute_cost_floor_price(
         awb_min = min(MIN_MARGIN_PER_AWB_INR, max(350.0, 0.015 * buy))
         ops_fee = min(OPS_HANDLING_FEE_AWB_INR, max(200.0, 0.010 * buy))
 
-    # Commodity risk buffer:
-    key = re.sub(r"[^a-z0-9]+", "_", str(commodity_group).lower()).strip("_")
-    risk_buffer = COMMODITY_RISK_BUFFERS.get(key, 0.0)
-    if risk_buffer == 0.0:
-        if "pharma" in key or "vaccine" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS["pharmaceuticals"]
-        elif "perish" in key or "food" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS["perishable_cold_chain"]
-        elif "danger" in key or "dgr" in key or "haz" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS["dangerous_goods"]
-        elif "valuable" in key or "vun" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS["valuable_cargo"]
-        elif "engineer" in key or "machine" in key or "auto" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS["engineering_machinery"]
-        elif "courier" in key or "express" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS["courier_express"]
-        elif "animal" in key or "avi" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS["live_animals"]
-        elif "other" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS["other"]
-
-    # Intermediary wholesale discount
-    if any(k in str(company_group).lower() for k in ["gsa", "nvocc", "coloader"]):
-        risk_buffer *= 0.50
+    risk_buffer = resolve_risk_buffer(commodity_group, company_group)
 
     pct_floor_price = (buy * (1.0 + (min_pct / 100.0) + risk_buffer)) + ops_fee
     abs_floor_price = buy + awb_min + (unit_min * wt)
