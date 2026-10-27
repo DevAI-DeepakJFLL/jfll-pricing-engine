@@ -1430,7 +1430,15 @@
         const weights = updateDimensions();
         const chWt = weights.chargeable_wt || 1;
         if (!isNaN(buyVal) && buyVal > 0 && chWt > 0) {
-            unitEl.value = (buyVal / chWt).toFixed(2);
+            if (chWt >= 30 && (buyVal / chWt) < 10.0 && buyVal >= 10.0) {
+                unitEl.value = buyVal.toFixed(2);
+                buyEl.value = Math.round(buyVal * chWt);
+                if (typeof showToast === 'function') {
+                    showToast(`Detected ₹${buyVal}/kg in Total Buy — auto-scaled to ₹${formatINR(buyEl.value)} for ${chWt} kg`);
+                }
+            } else {
+                unitEl.value = (buyVal / chWt).toFixed(2);
+            }
         }
     }
 
@@ -1913,12 +1921,15 @@
         // Smart Safeguard: Check if total buy was mistakenly entered as unit rate
         if (!isNaN(buyVal) && buyVal > 0 && chWt >= 30) {
             const impliedRate = buyVal / chWt;
-            if (impliedRate < 10.0 && buyVal >= 20.0) {
+            if (impliedRate < 10.0 && buyVal >= 10.0) {
                 unitBuyVal = buyVal;
                 buyVal = Math.round(buyVal * chWt);
                 if (buyEl) buyEl.value = buyVal;
                 if (unitBuyEl) unitBuyEl.value = unitBuyVal.toFixed(2);
                 showToast(`Auto-scaled ₹${unitBuyVal}/kg to Total Buy ₹${formatINR(buyVal)} for ${chWt} kg`);
+            } else if (!isNaN(unitBuyVal) && unitBuyVal >= 10.0 && (Math.abs(buyVal - unitBuyVal) < 1.0 || impliedRate < 10.0)) {
+                buyVal = Math.round(unitBuyVal * chWt);
+                if (buyEl) buyEl.value = buyVal;
             }
         }
 

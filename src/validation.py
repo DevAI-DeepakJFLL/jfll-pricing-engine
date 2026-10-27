@@ -63,10 +63,14 @@ def validate_inquiry(inq: Dict[str, Any]) -> Dict[str, Any]:
 
     # 2. Airline Buy Cost Validation
     buy = _first(inq, ("Total_Buy_INR", "buy", "airline_buy_price", "buy_cost"))
+    unit = _first(inq, ("Unit_Buy_INR", "unit_buy", "buy_rate"))
     if buy is not None:
         buy = _num(buy, "Total buy (INR)", 0.0, 1e9)
+        if unit is not None:
+            unit_val = _num(unit, "Unit buy (INR/kg)", 0.0, MAX_RATE)
+            if wt >= 30.0 and unit_val >= MIN_RATE and (abs(buy - unit_val) < 1.0 or (buy / wt) < MIN_RATE):
+                buy = round(unit_val * wt, 2)
     else:
-        unit = _first(inq, ("Unit_Buy_INR", "unit_buy", "buy_rate"))
         if unit is None:
             raise QuoteValidationError("Total buy or unit buy rate is required")
         unit_val = _num(unit, "Unit buy (INR/kg)", 0.0, MAX_RATE)

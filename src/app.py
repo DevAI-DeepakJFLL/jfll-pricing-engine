@@ -634,6 +634,11 @@ def api_quote():
             ),
         }), 422
 
+    # Robust Dual Buy Resolution: If both provided, but total buy implies < 10 while unit buy is valid, resolve total buy
+    if buy_cost is not None and unit_buy_rate is not None:
+        if chargeable_wt >= 30.0 and unit_buy_rate >= 10.0 and (abs(buy_cost - unit_buy_rate) < 1.0 or (buy_cost / chargeable_wt) < 10.0):
+            buy_cost = round(unit_buy_rate * chargeable_wt, 2)
+
     if buy_cost is None:
         if unit_buy_rate is not None:
             buy_cost = round(unit_buy_rate * chargeable_wt, 2)
