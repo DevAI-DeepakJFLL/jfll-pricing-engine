@@ -439,6 +439,10 @@
             outline: 2px solid var(--pill-dark);
             outline-offset: 2px;
         }
+        .input-error-highlight {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22) !important;
+        }
 
         /* Searchable Custom Select Dropdowns */
         .searchable-select {
@@ -1093,7 +1097,7 @@
                 <span class="col-badge">Commercial Inputs</span>
             </div>
 
-            <form id="quoteForm" onsubmit="event.preventDefault(); runInference();">
+            <form id="quoteForm" novalidate onsubmit="event.preventDefault(); runInference();">
                 <!-- Source & Destination Airports Section -->
                 <div class="field-section">
                     <div class="section-label">Source & Destination Airports</div>
@@ -1150,11 +1154,11 @@
                     <div class="form-row">
                         <div class="field-group">
                             <label for="unit_buy">Unit Buy Rate (₹/kg) <span class="req">*</span></label>
-                            <input type="number" id="unit_buy" class="clean-input" value="277.78" min="0.1" step="any" placeholder="e.g. 250" oninput="onUnitBuyInput()" required>
+                            <input type="number" id="unit_buy" class="clean-input" value="277.78" min="0.1" step="any" placeholder="e.g. 250" oninput="onUnitBuyInput()">
                         </div>
                         <div class="field-group">
                             <label for="buy">Total Airline Buy (₹ INR) <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">(Auto-calculated)</span></label>
-                            <input type="number" id="buy" class="clean-input" value="125000" min="1" step="any" placeholder="e.g. 125000" oninput="onTotalBuyInput()" required>
+                            <input type="number" id="buy" class="clean-input" value="125000" min="1" step="any" placeholder="e.g. 125000" oninput="onTotalBuyInput()">
                         </div>
                     </div>
 
@@ -1194,10 +1198,10 @@
                         </div>
                         <div class="dim-box">
                             <div class="dim-grid">
-                                <div><label id="dim_l_label">Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="120" min="0.01" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_w_label">Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="80" min="0.01" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_h_label">Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="90" min="0.01" step="any" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_pcs_label">Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="3" min="1" step="1" oninput="updateDimensions()" required style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_l_label">Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="120" min="0.01" step="any" oninput="updateDimensions()" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_w_label">Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="80" min="0.01" step="any" oninput="updateDimensions()" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_h_label">Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="90" min="0.01" step="any" oninput="updateDimensions()" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_pcs_label">Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="3" min="1" step="1" oninput="updateDimensions()" style="padding: 7px 10px; min-height: 38px;"></div>
                             </div>
                             <div class="dim-info" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
                                 <span id="vol_wt_display">Volumetric: 432.0 kg (Formula: L × W × H × Pcs ÷ 6000)</span>
@@ -1306,7 +1310,10 @@
                     </div>
                 </div>
 
-                <button type="submit" id="submitBtn" class="submit-btn">
+                <!-- Inline Form Error Alert placed right above Submit Button -->
+                <div id="submitErrorAlert" style="display: none; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 11px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; font-weight: 600; line-height: 1.4;"></div>
+
+                <button type="button" id="submitBtn" class="submit-btn" onclick="runInference();">
                     <svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                     Generate Margin Recommendation
                 </button>
@@ -1512,7 +1519,7 @@
 
         if (currentWeightMode === 'direct') {
             const rawDirect = parseFloat(document.getElementById('direct_ch_wt')?.value);
-            ch_wt = (rawDirect && rawDirect > 0) ? rawDirect : 100;
+            ch_wt = (!isNaN(rawDirect) && rawDirect > 0) ? rawDirect : 0;
             vol_wt = ch_wt;
         } else {
             const lRaw = parseFloat(document.getElementById('dim_l')?.value);
@@ -1530,8 +1537,19 @@
                 // Standard IATA air cargo: 0.5 kg ceiling increment
                 ch_wt = Math.max(0.5, Math.ceil(vol_wt * 2.0) / 2.0);
             } else {
-                vol_wt = 0;
-                ch_wt = 0;
+                // If dimensions are missing/cleared, gracefully fallback to direct weight or gross weight if available
+                const fallbackDirect = parseFloat(document.getElementById('direct_ch_wt')?.value);
+                const fallbackGross = parseFloat(document.getElementById('gross_wt')?.value);
+                if (!isNaN(fallbackDirect) && fallbackDirect > 0) {
+                    ch_wt = fallbackDirect;
+                    vol_wt = ch_wt;
+                } else if (!isNaN(fallbackGross) && fallbackGross > 0) {
+                    ch_wt = fallbackGross;
+                    vol_wt = ch_wt;
+                } else {
+                    vol_wt = 0;
+                    ch_wt = 0;
+                }
             }
         }
 
@@ -1721,6 +1739,26 @@
 
     const ALL_DROPDOWN_IDS = ['origin', 'dest', 'client', 'commodity', 'frequency', 'revision'];
 
+    ['origin', 'dest'].forEach(fieldId => {
+        const searchInput = document.getElementById(`${fieldId}_search`);
+        if (searchInput) {
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const list = document.getElementById(`${fieldId}_options_list`);
+                    if (list) {
+                        const firstVisible = Array.from(list.children).find(li => li.style.display !== 'none');
+                        if (firstVisible) {
+                            const val = firstVisible.getAttribute('data-value');
+                            const label = (firstVisible.querySelector('span') ? firstVisible.querySelector('span').innerText : firstVisible.innerText).trim();
+                            selectSearchableOption(fieldId, val, label);
+                        }
+                    }
+                }
+            });
+        }
+    });
+
     ALL_DROPDOWN_IDS.forEach(fieldId => {
         const list = document.getElementById(`${fieldId}_options_list`);
         if (list) {
@@ -1812,9 +1850,38 @@
         if (buyEl) buyEl.focus();
     }
 
+    function showFormError(msg, focusElId) {
+        const errorAlert = document.getElementById('errorAlert');
+        const submitError = document.getElementById('submitErrorAlert');
+        if (errorAlert) {
+            errorAlert.style.display = 'block';
+            errorAlert.innerText = msg;
+        }
+        if (submitError) {
+            submitError.style.display = 'block';
+            submitError.innerText = msg;
+            submitError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else if (errorAlert) {
+            errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (focusElId) {
+            const el = document.getElementById(focusElId);
+            if (el) {
+                el.focus();
+                el.classList.add('input-error-highlight');
+                setTimeout(() => el.classList.remove('input-error-highlight'), 3000);
+            }
+        }
+        if (typeof showToast === 'function') {
+            showToast(msg);
+        }
+    }
+
     function runInference(isPreset = false) {
         const errorAlert = document.getElementById('errorAlert');
+        const submitError = document.getElementById('submitErrorAlert');
         if (errorAlert) { errorAlert.style.display = 'none'; errorAlert.innerText = ''; }
+        if (submitError) { submitError.style.display = 'none'; submitError.innerText = ''; }
 
         const submitBtn = document.getElementById('submitBtn');
         const submitBtnTop = document.getElementById('submitBtnTop');
@@ -1826,17 +1893,27 @@
         const buyEl = document.getElementById('buy');
         let unitBuyVal = parseFloat(unitBuyEl?.value);
         let buyVal = parseFloat(buyEl?.value);
+        const chWt = weights.chargeable_wt || 0;
 
+        // Auto-compute missing Total Buy from Unit Buy if provided
         if ((isNaN(buyVal) || buyVal <= 0) && !isNaN(unitBuyVal) && unitBuyVal > 0) {
-            buyVal = Math.round(unitBuyVal * (weights.chargeable_wt || 1));
-            if (buyEl) buyEl.value = buyVal;
+            if (chWt > 0) {
+                buyVal = Math.round(unitBuyVal * chWt);
+                if (buyEl) buyEl.value = buyVal;
+            }
+        }
+        // Auto-compute missing Unit Buy from Total Buy if provided
+        if ((isNaN(unitBuyVal) || unitBuyVal <= 0) && !isNaN(buyVal) && buyVal > 0) {
+            if (chWt > 0) {
+                unitBuyVal = Math.round((buyVal / chWt) * 100) / 100;
+                if (unitBuyEl) unitBuyEl.value = unitBuyVal.toFixed(2);
+            }
         }
 
         // Smart Safeguard: Check if total buy was mistakenly entered as unit rate
-        if (!isNaN(buyVal) && buyVal > 0) {
-            const chWt = weights.chargeable_wt || 1;
+        if (!isNaN(buyVal) && buyVal > 0 && chWt >= 30) {
             const impliedRate = buyVal / chWt;
-            if (chWt >= 30 && impliedRate < 10.0 && buyVal >= 20.0) {
+            if (impliedRate < 10.0 && buyVal >= 20.0) {
                 unitBuyVal = buyVal;
                 buyVal = Math.round(buyVal * chWt);
                 if (buyEl) buyEl.value = buyVal;
@@ -1845,29 +1922,17 @@
             }
         }
 
-        if (isNaN(buyVal) || buyVal <= 0) {
+        if (isNaN(chWt) || chWt <= 0) {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
             if (submitBtnTop) { submitBtnTop.disabled = false; }
-            if (errorAlert) {
-                errorAlert.style.display = 'block';
-                errorAlert.innerText = 'Please enter a valid positive Airline Buy Cost (₹ INR).';
-            }
-            document.getElementById('buy')?.focus();
+            showFormError('Please enter a valid Airline Chargeable Weight greater than 0 kg.', currentWeightMode === 'direct' ? 'direct_ch_wt' : 'dim_l');
             return;
         }
 
-        if (isNaN(weights.chargeable_wt) || weights.chargeable_wt <= 0) {
+        if (isNaN(buyVal) || buyVal <= 0) {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
             if (submitBtnTop) { submitBtnTop.disabled = false; }
-            if (errorAlert) {
-                errorAlert.style.display = 'block';
-                errorAlert.innerText = 'Please enter a valid Airline Chargeable Weight greater than 0 kg.';
-            }
-            if (currentWeightMode === 'direct') {
-                document.getElementById('direct_ch_wt')?.focus();
-            } else {
-                document.getElementById('dim_l')?.focus();
-            }
+            showFormError('Please enter a valid positive Airline Buy Cost (₹ INR or ₹/kg).', 'unit_buy');
             return;
         }
 
@@ -1927,15 +1992,13 @@
             // renderSensitivityTable removed for clean UI
             updateHeroMetrics(opt, currentCorridor);
 
-            // Advisory warning box removed as per instructions
+            // Smooth scroll into results view
+            results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         })
         .catch(err => {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Margin Recommendation'; }
             if (submitBtnTop) { submitBtnTop.disabled = false; }
-            if (errorAlert) {
-                errorAlert.style.display = 'block';
-                errorAlert.innerText = `Error: ${err.message}`;
-            }
+            showFormError(`Error: ${err.message}`, 'buy');
         });
     }
 
