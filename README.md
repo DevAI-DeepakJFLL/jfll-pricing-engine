@@ -70,7 +70,7 @@ flowchart TD
   - **Courier & Small Parcels ($\le 45\text{ kg}$):** Full minimum documentation and terminal fee enforcement:
     $$\text{Cost Floor} = \max\Big(\text{Buy} \times (1 + \text{Min \%} + \text{Risk Buffer}) + \text{Ops Fee (₹850)}, \quad \text{Buy} + \text{₹1,500/AWB} + (\text{₹3/kg} \times \text{Chargeable Wt})\Big)$$
   - **Mid & Bulk Commercial Cargo ($> 45\text{ kg}$):** Fixed fees scale sublinearly with buy cost to prevent artificial margin inflation on high-tonnage shipments:
-    $$\text{unit\_min} = \min(3.0, \max(0.50, 0.015 \times \text{rate})), \quad \text{awb\_min} = \min(1500.0, \max(350.0, 0.015 \times \text{buy})), \quad \text{ops\_fee} = \min(850.0, \max(200.0, 0.010 \times \text{buy}))$$
+    $$\text{UnitMin} = \min(3.0, \max(0.50, 0.015 \times \text{rate})), \quad \text{AwbMin} = \min(1500.0, \max(350.0, 0.015 \times \text{buy})), \quad \text{OpsFee} = \min(850.0, \max(200.0, 0.010 \times \text{buy}))$$
 - **Dual-Buy Input Disambiguation:** Automatically detects and resolves user input mismatches (e.g. when a per-kg rate like ₹180 is entered into the total buy field, or when total buy implies a rate below ₹10/kg for bulk freight).
 - **Weight-Break Arbitrage Checker:** Automatically detects when declaring cargo at the next higher IATA weight slab (e.g., billing 98 kg at the +100 kg break rate) yields a lower total bill for the shipper.
 - **Commodity Risk Buffers:** Built-in margin buffers for specialized cargo:
@@ -86,7 +86,7 @@ flowchart TD
 
 ### 2. 🤝 Conformal Prediction Negotiation Corridors
 Rather than forcing a single rigid quote, Pricing Engine V3 provides an approved **negotiation band $[X\%, Y\%]$ centered on optimal target $M\%$**:
-- **Distribution-Free Coverage Guarantee:** Nonconformity scores $R_i = |y_i - \hat{y}_i|$ are calculated across historical won inquiries per $(Trade\_Lane, Weight\_Tier, Commodity\_Group)$ with finite-sample corrections and Empirical Bayes smoothing ($K = 15$).
+- **Distribution-Free Coverage Guarantee:** Nonconformity scores $R_i = |y_i - \hat{y}_i|$ are calculated across historical won inquiries per `(Trade_Lane, Weight_Tier, Commodity_Group)` with finite-sample corrections and Empirical Bayes smoothing ($K = 15$).
 - **Strict Invariance:** Target quote $M\%$ remains invariant while empirical corridors achieve verified 90% confidence coverage on out-of-time test sets.
 - **Controlled Commercial Latitude:** Heavy shipments receive narrow spreads ($\le 1.80\text{ pp}$), while courier parcels allow appropriate operating fee latitude.
 
