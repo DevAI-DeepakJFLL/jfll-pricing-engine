@@ -522,22 +522,23 @@ def api_quote():
     raw_gross = data.get("gross_wt") or data.get("gross_weight") or data.get("Gross_Weight_Kg")
 
     # If weights not directly passed, derive from dimensions if available
-    if raw_chargeable is None and raw_gross is None:
-        if any(k in data for k in ["dim_l", "dim_w", "dim_h"]) or ("dimensions" in data and isinstance(data["dimensions"], list)):
-            try:
-                if "dimensions" in data and isinstance(data["dimensions"], list):
-                    vol_calc = compute_volumetric_weight(data["dimensions"])
-                else:
-                    l_val = float(data.get("dim_l", 0))
-                    w_val = float(data.get("dim_w", 0))
-                    h_val = float(data.get("dim_h", 0))
-                    pcs_val = int(data.get("dim_pcs", 1))
-                    vol_calc = (l_val * w_val * h_val * pcs_val) / 6000.0 if (l_val > 0 and w_val > 0 and h_val > 0) else 0.0
-                if vol_calc > 0:
-                    raw_chargeable = max(0.5, np.ceil(vol_calc * 2.0) / 2.0)
-                    raw_gross = raw_chargeable
-            except (ValueError, TypeError):
-                pass
+    if raw_chargeable is None and raw_gross is None and (
+        any(k in data for k in ["dim_l", "dim_w", "dim_h"]) or ("dimensions" in data and isinstance(data["dimensions"], list))
+    ):
+        try:
+            if "dimensions" in data and isinstance(data["dimensions"], list):
+                vol_calc = compute_volumetric_weight(data["dimensions"])
+            else:
+                l_val = float(data.get("dim_l", 0))
+                w_val = float(data.get("dim_w", 0))
+                h_val = float(data.get("dim_h", 0))
+                pcs_val = int(data.get("dim_pcs", 1))
+                vol_calc = (l_val * w_val * h_val * pcs_val) / 6000.0 if (l_val > 0 and w_val > 0 and h_val > 0) else 0.0
+            if vol_calc > 0:
+                raw_chargeable = max(0.5, np.ceil(vol_calc * 2.0) / 2.0)
+                raw_gross = raw_chargeable
+        except (ValueError, TypeError):
+            pass
 
     if raw_chargeable is None and raw_gross is None:
         return jsonify({"status": "error", "message": "Invalid Gross Weight. Please provide a positive weight in kg."}), 400
@@ -634,13 +635,14 @@ def api_quote():
         }), 422
 
     # Robust Dual Buy Resolution: If both provided, but total buy implies < 10 while unit buy is valid, resolve total buy
-    if buy_cost is not None and unit_buy_rate is not None:
-        if (
-            chargeable_wt >= 30.0
-            and unit_buy_rate >= 10.0
-            and (abs(buy_cost - unit_buy_rate) < 1.0 or (buy_cost / chargeable_wt) < 10.0)
-        ):
-            buy_cost = round(unit_buy_rate * chargeable_wt, 2)
+    if (
+        buy_cost is not None
+        and unit_buy_rate is not None
+        and chargeable_wt >= 30.0
+        and unit_buy_rate >= 10.0
+        and (abs(buy_cost - unit_buy_rate) < 1.0 or (buy_cost / chargeable_wt) < 10.0)
+    ):
+        buy_cost = round(unit_buy_rate * chargeable_wt, 2)
 
     if buy_cost is None:
         if unit_buy_rate is not None:

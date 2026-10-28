@@ -23,7 +23,6 @@ logger = logging.getLogger("pricing_security")
 
 class SecurityIntegrityError(RuntimeError):
     """Raised when an artifact fails cryptographic integrity checks."""
-    pass
 
 
 def compute_sha256(filepath: str) -> str:

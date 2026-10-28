@@ -71,6 +71,14 @@ CORPORATE_SUFFIXES = [
     r"COMPANY",
 ]
 
+# Precompiled regex patterns for zero-recompilation O(L) normalizations
+_BRANCH_RE = re.compile(r"\((DELHI|CANADA|LONDON|EUROPE|INDIA|I|PROP|HUF)\b.*?\)")
+_AMP_RE = re.compile(r"&")
+_NON_ALPHANUM_RE = re.compile(r"[^A-Z0-9\s]")
+_WHITESPACE_RE = re.compile(r"\s+")
+_SLUG_RE = re.compile(r"[^A-Z0-9]+")
+_CORPORATE_SUFFIX_RE = re.compile(r"\b(?:" + "|".join(CORPORATE_SUFFIXES) + r")$")
+
 
 def normalize_customer_name(raw_name: Optional[str]) -> str:
     """
@@ -104,29 +112,24 @@ def normalize_customer_name(raw_name: Optional[str]) -> str:
         return CUSTOMER_ALIAS_MAP[s]
 
     # Strip branch qualifiers in parentheses e.g. (DELHI), (CANADA), (LONDON), (EUROPE), (HUF)
-    s = re.sub(r"\((DELHI|CANADA|LONDON|EUROPE|INDIA|I|PROP|HUF)\b.*?\)", "", s)
+    s = _BRANCH_RE.sub("", s)
 
     # Normalize ampersands
-    s = re.sub(r"&", " AND ", s)
+    s = _AMP_RE.sub(" AND ", s)
 
     # Remove non-alphanumeric punctuation and noise
-    s = re.sub(r"[^A-Z0-9\s]", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
+    s = _NON_ALPHANUM_RE.sub(" ", s)
+    s = _WHITESPACE_RE.sub(" ", s).strip()
 
     if s in CUSTOMER_ALIAS_MAP:
         return CUSTOMER_ALIAS_MAP[s]
 
-    # Iteratively strip corporate legal suffixes from end of string
-    changed = True
-    while changed:
-        changed = False
-        for suf in CORPORATE_SUFFIXES:
-            pattern = r"\b" + suf + r"$"
-            match = re.search(pattern, s)
-            if match:
-                s = re.sub(pattern, "", s).strip()
-                changed = True
-                break
+    # Iteratively strip corporate legal suffixes from end of string in single-pass DFA steps
+    while True:
+        new_s = _CORPORATE_SUFFIX_RE.sub("", s).strip()
+        if new_s == s:
+            break
+        s = new_s
 
     # Final lookup in alias dictionary after suffix removal
     if s in CUSTOMER_ALIAS_MAP:
@@ -152,5 +155,5 @@ def get_canonical_customer_id(raw_name: Optional[str]) -> str:
     if not normalized:
         return "CUST_UNKNOWN"
 
-    slug = re.sub(r"[^A-Z0-9]+", "_", normalized).strip("_")
+    slug = _SLUG_RE.sub("_", normalized).strip("_")
     return f"CUST_{slug}" if slug else "CUST_UNKNOWN"

@@ -47,17 +47,17 @@ LOSS_REASONS = ["price", "capacity", "schedule_transit", "customer_cancelled", "
 
 
 def migrate_outcome_columns(db_path: str):
-    """Ensure outcome tracking columns exist in the database."""
+    """Ensure outcome tracking columns and composite lane performance indexes exist in the database."""
     abs_path = os.path.abspath(db_path)
     with sqlite3.connect(abs_path, timeout=15.0) as conn:
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(recommendation_history)")
         have = {c[1] for c in cur.fetchall()}
         for col, typ in NEW_COLUMNS.items():
-            if col not in have:
-                # Validate against known column definitions to prevent any dynamic injection
-                if col in NEW_COLUMNS and typ in ("REAL", "TEXT", "INTEGER"):
-                    cur.execute(f"ALTER TABLE recommendation_history ADD COLUMN {col} {typ}")
+            # Validate against known column definitions to prevent any dynamic injection
+            if col not in have and col in NEW_COLUMNS and typ in ("REAL", "TEXT", "INTEGER"):
+                cur.execute(f"ALTER TABLE recommendation_history ADD COLUMN {col} {typ}")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_lane ON recommendation_history(origin_port, dest_port, is_deleted, timestamp DESC)")
         conn.commit()
 
 
@@ -271,16 +271,16 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
         }
 
         for col, col_type in col_defs.items():
-            if col not in existing_cols:
-                # Ensure column name and type match pre-declared dictionary exactly
-                if col in col_defs and any(col_type.startswith(t) for t in ("TEXT", "REAL", "INTEGER", "DATETIME")):
-                    cursor.execute(f"ALTER TABLE recommendation_history ADD COLUMN {col} {col_type}")
+            # Ensure column name and type match pre-declared dictionary exactly
+            if col not in existing_cols and col in col_defs and any(col_type.startswith(t) for t in ("TEXT", "REAL", "INTEGER", "DATETIME")):
+                cursor.execute(f"ALTER TABLE recommendation_history ADD COLUMN {col} {col_type}")
 
         # Performance indexes (created after all columns exist)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_time ON recommendation_history(timestamp DESC)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_status ON recommendation_history(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_id_desc ON recommendation_history(id DESC)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_active ON recommendation_history(is_deleted, is_preset)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_lane ON recommendation_history(origin_port, dest_port, is_deleted, timestamp DESC)")
 
         cursor.execute(f"PRAGMA user_version = {int(CURRENT_SCHEMA_VERSION)}")
         conn.commit()

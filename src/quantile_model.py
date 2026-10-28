@@ -268,16 +268,14 @@ class MarginQuantileModel:
             l_min, l_max = enforce_node(nodes, left_idx, lower, upper)
             r_min, r_max = enforce_node(nodes, right_idx, lower, upper)
 
-            if cst == -1:  # NEG: left should be >= right (r_max <= l_min)
-                if r_max > l_min:
-                    mid = (l_min + r_max) / 2.0
-                    l_min, l_max = enforce_node(nodes, left_idx, mid, upper)
-                    r_min, r_max = enforce_node(nodes, right_idx, lower, mid)
-            elif cst == 1:  # POS: left <= right (l_max <= r_min)
-                if l_max > r_min:
-                    mid = (l_max + r_min) / 2.0
-                    l_min, l_max = enforce_node(nodes, left_idx, lower, mid)
-                    r_min, r_max = enforce_node(nodes, right_idx, mid, upper)
+            if cst == -1 and r_max > l_min:  # NEG: left should be >= right (r_max <= l_min)
+                mid = (l_min + r_max) / 2.0
+                l_min, l_max = enforce_node(nodes, left_idx, mid, upper)
+                r_min, r_max = enforce_node(nodes, right_idx, lower, mid)
+            elif cst == 1 and l_max > r_min:  # POS: left <= right (l_max <= r_min)
+                mid = (l_max + r_min) / 2.0
+                l_min, l_max = enforce_node(nodes, left_idx, lower, mid)
+                r_min, r_max = enforce_node(nodes, right_idx, mid, upper)
 
             return min(l_min, r_min), max(l_max, r_max)
 

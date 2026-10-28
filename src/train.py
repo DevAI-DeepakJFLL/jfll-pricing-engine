@@ -449,7 +449,7 @@ def train_and_evaluate(
             str(df_all["Year_Month"].min()) if "Year_Month" in df_all.columns else "2026-01",
             str(df_all["Year_Month"].max()) if "Year_Month" in df_all.columns else "2026-09"
         ],
-        "n_unworked_lost_dropped": int(len(dropped)),
+        "n_unworked_lost_dropped": len(dropped),
         "sklearn_version": sklearn.__version__,
         "model_version": MODEL_VERSION,
         "trained_at": datetime.datetime.now().isoformat(),

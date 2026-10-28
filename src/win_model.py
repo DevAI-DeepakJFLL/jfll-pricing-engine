@@ -129,7 +129,7 @@ class WinModel:
             "auc": round(auc, 4),
             "brier": round(brier, 4),
             "ece": round(ece, 4),
-            "n_test": int(len(te)),
+            "n_test": len(te),
             "base_rate": round(float(y.mean()), 4),
         }
         return self

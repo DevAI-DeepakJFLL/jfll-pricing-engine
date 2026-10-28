@@ -345,17 +345,15 @@ class CustomerPITRegistry:
         # Insert customer record maintaining timestamp sort order
         cust_list = self._customers[str(customer_id)]
         cust_entry = (dt, won_int, margin_val, sell_val)
-        # Use bisect on timestamp
-        dts = [entry[0] for entry in cust_list]
-        ins_idx = bisect.bisect_right(dts, dt)
+        # Use bisect on timestamp with O(1) allocation key
+        ins_idx = bisect.bisect_right(cust_list, dt, key=lambda entry: entry[0])
         cust_list.insert(ins_idx, cust_entry)
 
         # Insert lane record if won with valid margin
         if won_int == 1 and not np.isnan(margin_val) and resolved_lane:
             lane_list = self._lanes[str(resolved_lane)]
             lane_entry = (dt, margin_val)
-            lane_dts = [entry[0] for entry in lane_list]
-            lane_ins_idx = bisect.bisect_right(lane_dts, dt)
+            lane_ins_idx = bisect.bisect_right(lane_list, dt, key=lambda entry: entry[0])
             lane_list.insert(lane_ins_idx, lane_entry)
 
     def get_features(
@@ -408,13 +406,12 @@ class CustomerPITRegistry:
         lane_median_margin_90d = np.nan
 
         if cust_list:
-            cust_dts = [entry[0] for entry in cust_list]
-            # Strict point-in-time: transactions where t < current_t
-            idx_right = bisect.bisect_left(cust_dts, current_t)
+            # Strict point-in-time: transactions where t < current_t using zero-allocation bisect key
+            idx_right = bisect.bisect_left(cust_list, current_t, key=lambda entry: entry[0])
 
             if idx_right > 0:
                 t_180 = current_t - pd.Timedelta(days=LOOKBACK_CUSTOMER_DAYS)
-                idx_left_180 = bisect.bisect_left(cust_dts, t_180)
+                idx_left_180 = bisect.bisect_left(cust_list, t_180, key=lambda entry: entry[0])
 
                 prior_slice = cust_list[:idx_right]
                 window_slice = cust_list[idx_left_180:idx_right]
@@ -446,12 +443,11 @@ class CustomerPITRegistry:
         # Lane 90d won margin
         if resolved_lane and str(resolved_lane) in self._lanes:
             lane_list = self._lanes[str(resolved_lane)]
-            lane_dts = [entry[0] for entry in lane_list]
-            idx_right_lane = bisect.bisect_left(lane_dts, current_t)
+            idx_right_lane = bisect.bisect_left(lane_list, current_t, key=lambda entry: entry[0])
 
             if idx_right_lane > 0:
                 t_90 = current_t - pd.Timedelta(days=LOOKBACK_LANE_DAYS)
-                idx_left_90 = bisect.bisect_left(lane_dts, t_90)
+                idx_left_90 = bisect.bisect_left(lane_list, t_90, key=lambda entry: entry[0])
                 lane_window = lane_list[idx_left_90:idx_right_lane]
                 lane_margins = [e[1] for e in lane_window if not np.isnan(e[1])]
                 if lane_margins:

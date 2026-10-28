@@ -1194,6 +1194,10 @@ EXACT_PORT_MAP: Dict[str, str] = {
     "DAY": "North America",
 }
 
+# Pre-computed uppercase mapping dictionaries for O(1) hash resolution
+COUNTRY_TO_REGION_UPPER: Dict[str, str] = {str(k).upper(): v for k, v in COUNTRY_TO_REGION.items()}
+EXACT_PORT_MAP_UPPER: Dict[str, str] = {str(k).upper(): v for k, v in EXACT_PORT_MAP.items()}
+
 
 # ------------------------------------------------------------------------------
 # REGIONAL WORD-BOUNDARY PATTERNS (KEYWORD FALLBACK)
@@ -1332,13 +1336,9 @@ def map_destination_region(port_name: str, country_name: str = "") -> str:
 
     # 1. Country-First Resolution
     if country_clean:
-        if country_clean in COUNTRY_TO_REGION:
-            return COUNTRY_TO_REGION[country_clean]
-        # Case-insensitive country lookup
-        c_upper = country_clean.upper()
-        for c_known, region in COUNTRY_TO_REGION.items():
-            if c_upper == c_known.upper():
-                return region
+        res = COUNTRY_TO_REGION.get(country_clean) or COUNTRY_TO_REGION_UPPER.get(country_clean.upper())
+        if res:
+            return res
 
     if not port_clean:
         return "Other Destination"
@@ -1356,30 +1356,23 @@ def map_destination_region(port_name: str, country_name: str = "") -> str:
             port_clean = prefix.strip()
             port_upper = port_clean.upper()
         else:
-            if sub_country_clean in COUNTRY_TO_REGION:
-                return COUNTRY_TO_REGION[sub_country_clean]
-            for c_known, region in COUNTRY_TO_REGION.items():
-                if sub_upper == c_known.upper():
-                    return region
+            res = COUNTRY_TO_REGION.get(sub_country_clean) or COUNTRY_TO_REGION_UPPER.get(sub_upper)
+            if res:
+                return res
 
     # 3. Disambiguation for 'Armenia' with Colombia vs Europe context
     if "ARMENIA" in port_upper and "COLOMBIA" in port_upper:
         return "Latin America"
 
     # 4. Exact Port / Code Lookup
-    if port_upper in EXACT_PORT_MAP:
-        return EXACT_PORT_MAP[port_upper]
-
-    for p_known, region in EXACT_PORT_MAP.items():
-        if port_upper == p_known.upper():
-            return region
+    port_res = EXACT_PORT_MAP.get(port_upper) or EXACT_PORT_MAP_UPPER.get(port_upper)
+    if port_res:
+        return port_res
 
     # 5. Check if port matches a country name directly (e.g. 'Armenia' -> Europe)
-    if port_clean in COUNTRY_TO_REGION:
-        return COUNTRY_TO_REGION[port_clean]
-    for c_known, region in COUNTRY_TO_REGION.items():
-        if port_upper == c_known.upper():
-            return region
+    country_as_port_res = COUNTRY_TO_REGION.get(port_clean) or COUNTRY_TO_REGION_UPPER.get(port_upper)
+    if country_as_port_res:
+        return country_as_port_res
 
     # 6. Regional Word-Boundary Patterns
     best_region = None
