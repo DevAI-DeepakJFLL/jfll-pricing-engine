@@ -53,10 +53,10 @@ def calibrate_conformal_band(residuals: Union[np.ndarray, pd.Series, list], alph
     if n == 0:
         return 0.0
 
-    sorted_res = np.sort(arr)
     k = int(np.ceil((n + 1) * (1.0 - alpha)))
     idx = min(max(k - 1, 0), n - 1)
-    return float(sorted_res[idx])
+    # O(N) Introselect (Quickselect) via np.partition replaces O(N log N) full sort
+    return float(np.partition(arr, idx)[idx])
 
 
 class ConformalCorridorCalibrator:

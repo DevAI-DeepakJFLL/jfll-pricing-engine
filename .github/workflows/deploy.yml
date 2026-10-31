@@ -62,7 +62,9 @@ jobs:
             tests/test_taxonomy.py \
             tests/test_tiers.py \
             tests/test_validation.py \
-            tests/test_win_model.py
+            tests/test_win_model.py \
+            tests/test_api_error_handlers.py \
+            tests/test_rate_limiter.py
 
   deploy-aws:
     name: Package & Deploy to AWS Free Tier

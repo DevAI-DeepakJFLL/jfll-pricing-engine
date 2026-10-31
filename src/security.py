@@ -11,11 +11,15 @@ Includes:
 
 import os
 import json
+import time
+import math
 import hmac
 import hashlib
 import logging
+import threading
+from collections import defaultdict
 from functools import wraps
-from typing import Optional
+from typing import Dict, List, Optional
 from flask import request, jsonify
 
 logger = logging.getLogger("pricing_security")
@@ -155,3 +159,112 @@ def require_admin_auth(f):
 
         return f(*args, **kwargs)
     return decorated
+
+
+# ------------------------------------------------------------------------------
+# SLIDING-WINDOW IN-MEMORY RATE LIMITER (CWE-400 / CWE-770)
+# ------------------------------------------------------------------------------
+_RATE_LIMIT_STORE: Dict[str, List[float]] = defaultdict(list)
+_RATE_LIMIT_LOCK = threading.Lock()
+_REQUEST_COUNTER = 0
+MAX_RATE_LIMIT_ENTRIES = 10000  # Hard boundary to prevent memory leakage (PonyTail #1)
+
+
+def reset_rate_limits():
+    """Resets the rate limiter store. Useful for testing."""
+    global _RATE_LIMIT_STORE, _REQUEST_COUNTER
+    with _RATE_LIMIT_LOCK:
+        _RATE_LIMIT_STORE.clear()
+        _REQUEST_COUNTER = 0
+
+
+def get_client_ip() -> str:
+    """
+    Safely resolves client IP address.
+    Defaults to request.remote_addr to prevent spoofing.
+    Only respects X-Forwarded-For if BEHIND_PROXY=1 is explicitly set (PonyTail #2).
+    """
+    if os.environ.get("BEHIND_PROXY") == "1":
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return request.remote_addr or "127.0.0.1"
+
+
+def _purge_expired_entries(now: float, window_seconds: float):
+    """Purges expired client IPs from _RATE_LIMIT_STORE to bound memory footprint."""
+    cutoff = now - window_seconds
+    to_delete = []
+    for ip, timestamps in _RATE_LIMIT_STORE.items():
+        active = [t for t in timestamps if t > cutoff]
+        if active:
+            _RATE_LIMIT_STORE[ip] = active
+        else:
+            to_delete.append(ip)
+    for ip in to_delete:
+        del _RATE_LIMIT_STORE[ip]
+
+    if len(_RATE_LIMIT_STORE) > MAX_RATE_LIMIT_ENTRIES:
+        excess = len(_RATE_LIMIT_STORE) - MAX_RATE_LIMIT_ENTRIES
+        oldest_ips = sorted(
+            _RATE_LIMIT_STORE.keys(),
+            key=lambda k: _RATE_LIMIT_STORE[k][-1] if _RATE_LIMIT_STORE[k] else 0.0
+        )[:excess]
+        for ip in oldest_ips:
+            del _RATE_LIMIT_STORE[ip]
+
+
+def rate_limit(max_requests: int = 60, window_seconds: int = 60):
+    """
+    Thread-safe, memory-bounded sliding-window rate limiting decorator.
+    - Limits requests to max_requests per window_seconds per client IP.
+    - Can be disabled in dev/test by setting RATE_LIMIT_ENABLED=0.
+    - Returns HTTP 429 Too Many Requests with standard Retry-After header.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if os.environ.get("RATE_LIMIT_ENABLED") == "0":
+                return f(*args, **kwargs)
+
+            client_ip = get_client_ip()
+            now = time.time()
+            cutoff = now - window_seconds
+
+            with _RATE_LIMIT_LOCK:
+                global _REQUEST_COUNTER
+                _REQUEST_COUNTER += 1
+
+                if _REQUEST_COUNTER % 100 == 0 or len(_RATE_LIMIT_STORE) >= 5000:
+                    _purge_expired_entries(now, window_seconds)
+
+                timestamps = _RATE_LIMIT_STORE[client_ip]
+                valid_timestamps = [t for t in timestamps if t > cutoff]
+
+                if len(valid_timestamps) >= max_requests:
+                    oldest_in_window = valid_timestamps[0]
+                    retry_after = max(1, int(math.ceil(window_seconds - (now - oldest_in_window))))
+                    logger.warning(
+                        f"Rate limit exceeded for client {client_ip} on {request.path}: "
+                        f"{len(valid_timestamps)}/{max_requests} requests in {window_seconds}s. "
+                        f"Retry-After: {retry_after}s."
+                    )
+                    resp = jsonify({
+                        "status": "error",
+                        "error_code": 429,
+                        "message": (
+                            f"Rate limit exceeded: maximum {max_requests} requests per {window_seconds} seconds. "
+                            f"Please retry in {retry_after} second(s)."
+                        ),
+                        "retry_after": retry_after
+                    })
+                    resp.headers["Retry-After"] = str(retry_after)
+                    return resp, 429
+
+                valid_timestamps.append(now)
+                _RATE_LIMIT_STORE[client_ip] = valid_timestamps
+
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+

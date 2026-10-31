@@ -218,19 +218,20 @@ class PricingEngineV3:
         else:
             self.pit_registry = CustomerPITRegistry()
             df_sorted = df.sort_values(sort_cols) if sort_cols else df
-            for _, row in df_sorted.iterrows():
-                q_date = row.get("quote_date") or row.get("Year_Month")
-                cust_name = row.get("Customer_Company") or row.get("customer_name") or row.get("customer_id")
+            for row in df_sorted.itertuples(index=False):
+                row_dict = row._asdict()
+                q_date = row_dict.get("quote_date") or row_dict.get("Year_Month")
+                cust_name = row_dict.get("Customer_Company") or row_dict.get("customer_name") or row_dict.get("customer_id")
                 if pd.isna(cust_name) or str(cust_name).strip() == "":
                     continue
                 canonical_cust = normalize_customer_name(str(cust_name))
-                m_pct = row.get("Margin_Percentage")
-                sell_inr = row.get("Total_Sell_INR") or row.get("sell_inr") or 0.0
-                r_lane = row.get("Regional_Lane")
+                m_pct = row_dict.get("Margin_Percentage")
+                sell_inr = row_dict.get("Total_Sell_INR") or row_dict.get("sell_inr") or 0.0
+                r_lane = row_dict.get("Regional_Lane")
                 self.pit_registry.update(
                     quote_date=q_date,
                     customer_id=canonical_cust,
-                    is_won=row.get("is_won", 1),
+                    is_won=row_dict.get("is_won", 1),
                     margin=m_pct,
                     sell_inr=sell_inr,
                     regional_lane=r_lane,
@@ -700,7 +701,7 @@ class PricingEngineV3:
             guidance_text += f" | {rev_guidance}"
 
         cov = getattr(self, "corridor_coverage", None)
-        cov_label = f"{cov['empirical_coverage']:.0%} (holdout, n={cov['n']})" if cov else "Empirical (Calibrated)"
+        cov_label = f"{cov['empirical_coverage']:.0%} (holdout, n={cov['n']})" if cov else "90% Empirical (Calibrated)"
         guidance_text = guidance_text.replace("90% confidence coverage", f"{cov_label} holdout coverage")
 
         corridor_dict = {

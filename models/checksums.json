@@ -1,7 +1,7 @@
 {
   "customer_pit_registry_2025.joblib": "2474cf5091f95db772fca56b4aa35548bdcfdcad4c33b85b05411a7e04d63fe8",
-  "engine_v3_bundle.joblib": "0ba6465788a94225af7b1fc7d2cfa12940f30d58d59eabd2ce0b2ebecd818758",
-  "engine_v3_bundle_prev.joblib": "6eea84be5bd905b7f7685515c1e93d61b2644634110c67248cce4cadf0629d82",
+  "engine_v3_bundle.joblib": "18a30e7805d9a3df391a1981f84c0b1de8fc14d2df40a4417e1bbb2c678de4dd",
+  "engine_v3_bundle_prev.joblib": "0e69432edb670333508c112187804c4a56e22b7d45bb3b22ed924cc7e1987a85",
   "freight_margin_recommender.joblib": "38289de22b666029deca086b6078ba70c2ca60776619cddcf410e8e97ff4c382",
   "win_model.joblib": "889075c5f2d85b99682eeb44acfb834f80c756706dc9e62111be4db05936ec3f"
 }

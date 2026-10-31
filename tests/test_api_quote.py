@@ -6,19 +6,23 @@ and markup vs gross margin calculations.
 """
 
 import os
+import time
 import unittest
 import json
 from src.app import app
 from src.constants import MODEL_VERSION
+from src.security import reset_rate_limits, _RATE_LIMIT_STORE, _RATE_LIMIT_LOCK
 
 
 class TestApiQuoteIntegration(unittest.TestCase):
     def setUp(self):
+        reset_rate_limits()
         app.config["TESTING"] = True
         self.client = app.test_client()
         os.environ["ALLOW_INSECURE_DEV"] = "1"
 
     def tearDown(self):
+        reset_rate_limits()
         os.environ.pop("ALLOW_INSECURE_DEV", None)
         os.environ.pop("ADMIN_API_KEY", None)
 
@@ -298,6 +302,30 @@ class TestApiQuoteIntegration(unittest.TestCase):
         lines = res.data.decode("utf-8").strip().splitlines()
         self.assertGreaterEqual(len(lines), 1)
         self.assertTrue(lines[0].startswith("ID,Timestamp,Origin,Destination"))
+
+
+    def test_api_quote_rate_limiting_burst(self):
+        """Verifies /api/quote enforces rate limiting and returns 429 when quota is reached."""
+        now = time.time()
+        # Seed rate limit store with quota entries (60 timestamps)
+        with _RATE_LIMIT_LOCK:
+            _RATE_LIMIT_STORE["127.0.0.1"] = [now - i * 0.1 for i in range(60)]
+
+        payload = {
+            "buy": 100000,
+            "chargeable_wt": 200,
+            "origin": "Bangalore",
+            "dest": "London",
+            "commodity": "General Cargo"
+        }
+        res = self.client.post("/api/quote", data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(res.status_code, 429)
+        self.assertTrue(res.is_json)
+        data = res.get_json()
+        self.assertEqual(data["status"], "error")
+        self.assertEqual(data["error_code"], 429)
+        self.assertIn("Rate limit exceeded", data["message"])
+        self.assertIn("Retry-After", res.headers)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
 ### *Enterprise ML Margin Optimization • Conformal Negotiation Corridors • Hard Commercial Guardrails*
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests Passing](https://img.shields.io/badge/Tests-344%20Passing%20(100%25)-2ea44f?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Tests Passing](https://img.shields.io/badge/Tests-356%20Passing%20(100%25)-2ea44f?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
 [![Architecture](https://img.shields.io/badge/Architecture-Quantile%20ML%20%2B%20Conformal-00A699?style=for-the-badge)](src/engine_v3.py)
 [![Latency](https://img.shields.io/badge/Inference%20Latency-%3C15ms-blueviolet?style=for-the-badge)](src/engine_v3.py)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](Dockerfile)
@@ -96,7 +96,10 @@ Rather than forcing a single rigid quote, Pricing Engine V3 provides an approved
 Optimized for real-time quotation serving and high-throughput batch dataset ingestion:
 - **$O(1)$ Hash Table Taxonomy Resolution:** Pre-computed uppercase hash maps in [`src/taxonomy.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/src/taxonomy.py) eliminate linear loop iterations over 686 airport codes and 216 countries.
 - **Single-Pass DFA Entity Normalization:** Pre-compiled regular expression state machines in [`src/customer_normalizer.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/src/customer_normalizer.py) strip 22 legal corporate entity suffixes in single-pass linear time without runtime regex recompilations.
+- **$O(N)$ Introselect Conformal Calibration:** Leverages Introselect (`np.partition`) in [`src/conformal_corridors.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/src/conformal_corridors.py) to achieve empirical quantile cutoffs in $O(N)$ linear time, replacing full $O(N \log N)$ sorting routines.
+- **LRU Memoization Caches:** Sub-microsecond `@lru_cache(maxsize=2048)` resolution on customer entity normalization ([`src/customer_normalizer.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/src/customer_normalizer.py)) and regional destination mappings ([`src/taxonomy.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/src/taxonomy.py)).
 - **Zero-Allocation Binary Search Streaming PIT:** `CustomerPITRegistry` in [`src/features_pit.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/src/features_pit.py) leverages zero-copy `bisect.bisect_left(..., key=...)` over sorted temporal arrays, eliminating list allocations on live inquiries.
+- **Vectorized C-Level Ingestion Iterators:** Replaced legacy Python `iterrows()` row-copy loops with zero-copy `itertuples(index=False)` and batch dictionary transforms, boosting evaluation throughput to 26+ quotes/sec.
 - **Composite B-Tree History Indexing:** Composite index `(origin_port, dest_port, is_deleted, timestamp DESC)` in [`src/db.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/src/db.py) ensures sub-millisecond SQLite queries for live competitor benchmarks and rate histories.
 
 ---
@@ -120,6 +123,21 @@ Evaluated on **4,078 holdout won quotes** spanning September 26 to December 31, 
 | **Courier / Small Parcel ($<45\text{ kg}$)** | $\le 4.00\text{ pp}$ cap | **4.00 pp max (mean: 3.90 pp)** | ✅ PASS | Courier spreads bounded within approved commercial tier limits |
 | **Mathematical Quantile Invariance** | $P_{10} \le P_{50} \le P_{90}$ | **100.0% satisfied** | ✅ PASS | Enforces non-crossing quantile guarantees across full test volume |
 | **Sub-Cost Bidding Protection** | 0 quotes below cost floor | **0 violations** | ✅ PASS | Decoupled guardrails protect all recommended sell rates against negative gross margins |
+
+### 📈 Pan-India Recent 2 Weeks Live Benchmark (N=3,985 Inquiries)
+
+Out-of-sample benchmark executed against recent operational RFQs across all 10 forwarder gateway branches:
+
+| Evaluation Dimension | Human Coordinator Actuals | Model Balanced (V3) | Net Impact & Opportunity |
+| :--- | :---: | :---: | :--- |
+| **Median Quoted Margin** | **3.02%** | **6.43%** | **+3.41 pp margin expansion** |
+| **Cost Floor Breaches** | **833 quotes (22.6%)** | **0 quotes (0.0%)** | **Eliminates ₹25.15 L below-floor deficit** |
+| **Won Deals Underquoted** | 640 of 984 (65.0%) | — | **₹40.56 Lakhs revenue left on table** |
+| **Small Parcel Margin (<45kg)**| 11.55% actual | 19.15% model | **₹21.12 L upside (52% of total uncaptured)** |
+| **Heavy Bulk Margin (>1000kg)**| 3.96% actual | 4.08% model | **Aligned with market while guarding floors** |
+| **Quarantined Inquiries** | 307 records (7.7%) | Pre-screened | **Zero-buy shells & rate bounds violations isolated** |
+
+Full 8-sheet Excel discrepancy analysis generated at `data/processed/Recent_2_Weeks_Model_vs_Actual_Discrepancy_Analysis.xlsx`.
 
 ---
 
@@ -160,12 +178,13 @@ air_export_pricing_engine/
 │       ├── index.html                        # Pricing engine web UI with authentic styling & clean manual entry
 │       └── history.html                      # Historical quotes & CRM lead management
 │
-├── tests/                                    # 45 test suites (348 automated tests: 344 passing, 4 skipped)
+├── tests/                                    # 47 test suites (360 automated tests: 356 passing, 4 skipped)
 │
 ├── scripts/
 │   ├── ingest_and_split_2025.py              # Ingests and splits temporal training/test sets
 │   ├── train_v3_2025.py                      # Trains PricingEngineV3 bundle
 │   ├── evaluate_2025_test_set.py             # Holdout test set evaluator & scorecard
+│   ├── evaluate_recent_2_weeks.py            # Multi-sheet Recent 2 Weeks discrepancy benchmark
 │   ├── run_rolling_backtest.py               # Expanding-window backtest harness
 │   ├── monitor_market_drift.py               # Offline Market & Concept Drift Watchdog
 │   ├── verify_vocab_alignment.py             # UI vs. model encoder vocabulary alignment gate
@@ -195,7 +214,7 @@ All tasks are managed through `./run.sh`:
 # 3. Train Pricing Engine V3 and build conformal corridor tables
 ./run.sh train
 
-# 4. Run full unit and scenario test suite (344 passing)
+# 4. Run full unit and scenario test suite (356 passing)
 ./run.sh test
 
 # 5. Run Offline Market & Concept Drift Watchdog
@@ -296,5 +315,10 @@ curl -X POST http://127.0.0.1:5050/api/quote \
 ## 🔒 Security & Governance
 
 - **Zero External Telemetry:** All model inference, hyperparameter optimization, and drift monitoring run 100% locally and offline.
-- **Strict Data Isolation:** All proprietary operational datasets (`data/raw/*.xlsx`, `data/processed/*.csv`) and serialized model binaries are explicitly untracked in `.gitignore`.
+- **Strict Data Isolation:** All proprietary operational datasets (`data/raw/*.xlsx`, `data/processed/*.csv`) are strictly quarantined and excluded via `.gitignore`.
+- **In-Memory Sliding-Window Rate Limiting:** Enforces bounded request throttling (default 60 requests/min on `/api/quote`) with bounded memory (`MAX_RATE_LIMIT_ENTRIES = 10,000` via LRU eviction to prevent memory exhaustion / CWE-400) and spoof-resistant IP resolution (`request.remote_addr` by default; `BEHIND_PROXY=1` opt-in for reverse proxies).
+- **Uniform Content-Negotiated Error Handlers:** Centralized handlers for HTTP 400, 404, 405, 413, 429, and 500 returning standardized RFC-compliant JSON payloads `{ "error": ..., "message": ..., "status_code": ... }` across all `/api/*` endpoints.
+- **Cryptographic Model Verification (SHA-256):** Every serialized bundle is validated against [`models/checksums.json`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/models/checksums.json) before deserialization to defeat arbitrary code execution (CWE-502).
+- **Constant-Time Admin Authentication:** Admin endpoints require Bearer tokens validated via `hmac.compare_digest` to prevent timing side-channel leaks (CWE-208), with strict query-string token rejection (CWE-598).
+- **CSV Formula Injection Sanitization:** All exported audit ledgers sanitize formula triggers (`=`, `+`, `-`, `@`, `\t`, `\r`) with leading single quotes to prevent spreadsheet execution vulnerabilities (CWE-1236).
 - **UI Governance:** The user interface adheres strictly to established typography (`Outfit`, `Mulish`) and brand palettes (`#23c2f2`, `#a7cf45`). Clean form input defaults are loaded on start to enable fresh manual quote entry while preserving 15 one-click realistic test scenarios for instant demonstration.

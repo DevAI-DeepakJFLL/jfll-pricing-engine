@@ -18,7 +18,7 @@ IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 MIN_RATE: float = 10.0     # INR/kg minimum plausible buy rate
 MAX_RATE: float = 8000.0   # INR/kg maximum plausible buy rate (express / chartered)
 MAX_WEIGHT_KG: float = 25000.0  # Max commercial air freight parcel weight
-HEAVY_CONSOL_MIN_WEIGHT_KG: float = 30.0  # Weight threshold for unit-rate vs total-buy disambiguation
+HEAVY_CONSOL_MIN_WEIGHT_KG: float = 2.0  # Weight threshold for unit-rate vs total-buy disambiguation
 BULK_TARIFF_MIN_WEIGHT_KG: float = 45.0   # Standard IATA bulk general cargo breakpoint
 MAX_COURIER_RATE: float = 250000.0        # Max allowable implied unit rate for small parcels (<45kg)
 
@@ -65,12 +65,18 @@ def validate_inquiry(inq: Dict[str, Any]) -> Dict[str, Any]:
     wt = _num(wt, "Chargeable weight (kg)", 0.0, MAX_WEIGHT_KG)
 
     # 2. Airline Buy Cost Validation
-    buy = _first(inq, ("Total_Buy_INR", "buy", "airline_buy_price", "buy_cost"))
-    unit = _first(inq, ("Unit_Buy_INR", "unit_buy", "buy_rate"))
+    # For commercial bulk freight (>= 45kg), enforce standard tariff bounds [MIN_RATE, MAX_RATE]
+    # For small/courier parcels (< 45kg), minimum AWB documentation & handling fees allow higher effective per-kg rates
+    max_allowed_rate = MAX_RATE if wt >= BULK_TARIFF_MIN_WEIGHT_KG else MAX_COURIER_RATE
+
+    buy_keys = ("Total_Buy_INR", "buy", "airline_buy_price", "buy_cost", "Total Buy", "total_buy")
+    unit_keys = ("Unit_Buy_INR", "unit_buy", "buy_rate", "Unit Freight Buy", "unit_freight_buy")
+    buy = _first(inq, buy_keys)
+    unit = _first(inq, unit_keys)
     if buy is not None:
         buy = _num(buy, "Total buy (INR)", 0.0, 1e9)
         if unit is not None:
-            unit_val = _num(unit, "Unit buy (INR/kg)", 0.0, MAX_RATE)
+            unit_val = _num(unit, "Unit buy (INR/kg)", 0.0, max_allowed_rate)
             if (
                 wt >= HEAVY_CONSOL_MIN_WEIGHT_KG
                 and unit_val >= MIN_RATE
@@ -80,13 +86,12 @@ def validate_inquiry(inq: Dict[str, Any]) -> Dict[str, Any]:
     else:
         if unit is None:
             raise QuoteValidationError("Total buy or unit buy rate is required")
-        unit_val = _num(unit, "Unit buy (INR/kg)", 0.0, MAX_RATE)
+        unit_val = _num(unit, "Unit buy (INR/kg)", 0.0, max_allowed_rate)
         buy = round(unit_val * wt, 2)
 
     implied_rate = buy / wt
-    # For commercial bulk freight (>= 45kg), enforce standard tariff bounds [MIN_RATE, MAX_RATE]
-    # For small/courier parcels (< 45kg), minimum AWB documentation & handling fees allow higher effective per-kg rates
-    max_allowed_rate = MAX_RATE if wt >= BULK_TARIFF_MIN_WEIGHT_KG else MAX_COURIER_RATE
+    out["Total_Buy_INR"] = buy
+    out["Unit_Buy_INR"] = round(implied_rate, 2)
     if not (MIN_RATE <= implied_rate <= max_allowed_rate):
         raise QuoteValidationError(
             f"Implied buy rate {implied_rate:.2f} INR/kg outside plausible range "

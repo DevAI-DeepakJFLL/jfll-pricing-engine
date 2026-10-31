@@ -123,6 +123,22 @@ def train_v3_pipeline(
 
     # 4. Train Stage 1A MarginQuantileModel
     print("\n[*] 4. Fitting MarginQuantileModel (P10, P50, P90) with Monotonic Constraints...")
+    # Robust outlier winsorization at 45% (eliminates 10,000% anomalies)
+    y_raw = fit_df["Margin_Percentage"].values
+    n_clipped = int((y_raw > 45.0).sum())
+    y_fit = np.clip(y_raw, 0.5, 45.0)
+    print(f"       Winsorized {n_clipped} extreme margin outliers (>45%) to stabilize quantile boundaries.")
+
+    # Time-decay recency sample weights (lambda = 0.005/day prioritizes recent market conditions)
+    if "quote_date" in fit_df.columns:
+        dates = pd.to_datetime(fit_df["quote_date"], errors="coerce")
+        max_date = dates.max()
+        days_ago = (max_date - dates).dt.days.fillna(0).values
+        weights = np.exp(-0.005 * days_ago)
+        print(f"       Applied exponential time-decay sample weights (lambda=0.005, recency range {days_ago.min():.0f}d - {days_ago.max():.0f}d).")
+    else:
+        weights = None
+
     model = MarginQuantileModel(
         learning_rate=0.08,
         max_iter=80,
@@ -130,7 +146,7 @@ def train_v3_pipeline(
         l2_regularization=10.0,
         random_state=42,
     )
-    model.fit(fit_df, fit_df["Margin_Percentage"])
+    model.fit(fit_df, y_fit, sample_weight=weights)
     print(f"       Model fitted successfully with {len(model.feature_cols)} features.")
     print(f"       Features: {model.feature_cols}")
 
@@ -218,6 +234,21 @@ def train_v3_pipeline(
     joblib.dump(bundle, bundle_path)
     bundle_size = os.path.getsize(bundle_path)
     print(f"       Bundle successfully saved ({bundle_size:,} bytes).")
+
+    # Update cryptographic checksum registry (CWE-502 compliance)
+    checksums_path = os.path.join(os.path.dirname(bundle_path), "checksums.json")
+    if os.path.exists(checksums_path):
+        import json
+        from security import compute_sha256
+        with open(checksums_path, "r", encoding="utf-8") as f:
+            cdata = json.load(f)
+        cdata[os.path.basename(bundle_path)] = compute_sha256(bundle_path)
+        if os.path.exists(prev_bundle_path):
+            cdata[os.path.basename(prev_bundle_path)] = compute_sha256(prev_bundle_path)
+        with open(checksums_path, "w", encoding="utf-8") as f:
+            json.dump(cdata, f, indent=2)
+            f.write("\n")
+        print(f"       Cryptographic checksum registry updated ({checksums_path}).")
 
     # 9. Statistical Evaluation on Calibration and Holdout Test Sets
     print("\n[*] 9. Evaluating Model Performance & Coverage...")

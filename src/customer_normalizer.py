@@ -8,6 +8,7 @@ air export pricing dataset (collapsing 1,073 raw names into <= 1,030 canonical e
 """
 
 import re
+from functools import lru_cache
 from typing import Dict, Optional
 
 # Known multi-alias mappings for accounts in data/processed/Air_Export_Pricing_Combined_ML.csv
@@ -80,6 +81,7 @@ _SLUG_RE = re.compile(r"[^A-Z0-9]+")
 _CORPORATE_SUFFIX_RE = re.compile(r"\b(?:" + "|".join(CORPORATE_SUFFIXES) + r")$")
 
 
+@lru_cache(maxsize=2048)
 def normalize_customer_name(raw_name: Optional[str]) -> str:
     """
     Normalizes a customer company name by:

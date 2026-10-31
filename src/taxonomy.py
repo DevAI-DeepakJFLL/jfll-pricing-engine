@@ -9,6 +9,7 @@ Fixes:
 """
 
 import re
+from functools import lru_cache
 from typing import Any, Dict, List
 
 
@@ -1321,6 +1322,7 @@ def _is_isolated_token(text: str, start: int, end: int) -> bool:
     return False
 
 
+@lru_cache(maxsize=2048)
 def map_destination_region(port_name: str, country_name: str = "") -> str:
     """
     Map destination airport / port name and optional country name to canonical

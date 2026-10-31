@@ -39,6 +39,18 @@ class TestInquiryValidation(unittest.TestCase):
         validated = validate_inquiry(raw)
         self.assertEqual(validated["Total_Buy_INR"], 20000.0)
 
+    def test_unit_rate_dumped_into_total_buy_reconciliation(self):
+        """When ERP dumps unit rate (e.g. 311 INR/kg) into Total Buy for 25kg, it is reconciled to 7,775 INR."""
+        raw = {
+            "chargeable_wt": 25.0,
+            "Total Buy": 311.0,
+            "Unit Freight Buy": 311.0,
+            "dest": "Shanghai Pudong International Apt",
+        }
+        validated = validate_inquiry(raw)
+        self.assertEqual(validated["Total_Buy_INR"], 7775.0)
+        self.assertEqual(validated["Unit_Buy_INR"], 311.0)
+
     def test_missing_weight_raises_error(self):
         """Missing or null chargeable weight must raise QuoteValidationError."""
         raw = {"buy": 10000.0, "dest": "London"}

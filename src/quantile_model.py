@@ -158,12 +158,15 @@ class MarginQuantileModel:
         self,
         X: Union[pd.DataFrame, np.ndarray],
         y: Union[pd.Series, np.ndarray],
+        sample_weight: Optional[Union[pd.Series, np.ndarray]] = None,
     ) -> "MarginQuantileModel":
         """
         Fits Quantile Regressors for P10, P50, and P90 markups.
+        Supports sample_weight for time-decay recency weighting.
         """
         X_mat, cat_mask = self._prepare_features(X, is_fit=True)
         y_arr = np.asarray(y, dtype=float)
+        sw_arr = np.asarray(sample_weight, dtype=float) if sample_weight is not None else None
 
         # Monotonic decreasing constraints: -1 on buy cost, unit buy rate, and weight
         n_features = X_mat.shape[1]
@@ -198,7 +201,7 @@ class MarginQuantileModel:
             monotonic_cst=monotonic_cst,
             random_state=self.random_state,
         )
-        self.model_p10.fit(X_mat, y_log)
+        self.model_p10.fit(X_mat, y_log, sample_weight=sw_arr)
 
         # Model P50 (true median margin / L1 loss)
         self.model_p50 = HistGradientBoostingRegressor(
@@ -212,7 +215,7 @@ class MarginQuantileModel:
             monotonic_cst=monotonic_cst,
             random_state=self.random_state,
         )
-        self.model_p50.fit(X_mat, y_log)
+        self.model_p50.fit(X_mat, y_log, sample_weight=sw_arr)
 
         # Model P90 (90th percentile margin)
         self.model_p90 = HistGradientBoostingRegressor(
@@ -226,7 +229,7 @@ class MarginQuantileModel:
             monotonic_cst=monotonic_cst,
             random_state=self.random_state,
         )
-        self.model_p90.fit(X_mat, y_log)
+        self.model_p90.fit(X_mat, y_log, sample_weight=sw_arr)
 
         # Enforce exact monotonic constraints on all tree predictors
         self._enforce_tree_monotonicity(monotonic_cst, cat_mask)

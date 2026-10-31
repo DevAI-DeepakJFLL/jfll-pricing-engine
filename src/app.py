@@ -46,7 +46,10 @@ from preprocess import (
     validate_shipment_physics,
     compute_volumetric_weight
 )
-from security import require_admin_auth
+try:
+    from src.security import require_admin_auth, rate_limit
+except ImportError:
+    from security import require_admin_auth, rate_limit
 from db import (
     init_history_db,
     log_recommendation,
@@ -88,6 +91,91 @@ def add_security_and_cache_headers(response):
         "connect-src 'self';"
     )
     return response
+
+
+# ------------------------------------------------------------------------------
+# CONTENT-NEGOTIATED GLOBAL HTTP ERROR HANDLERS (CWE-209 / CWE-770)
+# ------------------------------------------------------------------------------
+def _is_api_request() -> bool:
+    """Returns True if the request is destined for an API route or expects JSON."""
+    if request.path.startswith("/api/"):
+        return True
+    if request.is_json:
+        return True
+    accept = request.headers.get("Accept", "")
+    if "application/json" in accept and "text/html" not in accept:
+        return True
+    return False
+
+
+@app.errorhandler(400)
+def handle_bad_request(err):
+    if _is_api_request():
+        desc = getattr(err, "description", str(err))
+        return jsonify({
+            "status": "error",
+            "error_code": 400,
+            "message": f"Bad Request: {desc}"
+        }), 400
+    return (f"<h1>400 Bad Request</h1><p>{err}</p>", 400)
+
+
+@app.errorhandler(404)
+def handle_not_found(err):
+    if _is_api_request():
+        return jsonify({
+            "status": "error",
+            "error_code": 404,
+            "message": "The requested API endpoint was not found on this server."
+        }), 404
+    return ("<h1>404 Not Found</h1><p>The requested URL was not found on the server.</p>", 404)
+
+
+@app.errorhandler(405)
+def handle_method_not_allowed(err):
+    if _is_api_request():
+        return jsonify({
+            "status": "error",
+            "error_code": 405,
+            "message": f"HTTP method {request.method} is not allowed for endpoint {request.path}."
+        }), 405
+    return ("<h1>405 Method Not Allowed</h1><p>Method not allowed.</p>", 405)
+
+
+@app.errorhandler(413)
+def handle_payload_too_large(err):
+    if _is_api_request():
+        return jsonify({
+            "status": "error",
+            "error_code": 413,
+            "message": "Request payload exceeds maximum allowed size (1MB)."
+        }), 413
+    return ("<h1>413 Request Entity Too Large</h1><p>Request payload exceeds maximum allowed size of 1MB.</p>", 413)
+
+
+@app.errorhandler(429)
+def handle_too_many_requests(err):
+    if _is_api_request():
+        desc = getattr(err, "description", "Rate limit exceeded. Please retry later.")
+        return jsonify({
+            "status": "error",
+            "error_code": 429,
+            "message": str(desc)
+        }), 429
+    return ("<h1>429 Too Many Requests</h1><p>Rate limit exceeded. Please retry later.</p>", 429)
+
+
+@app.errorhandler(500)
+def handle_internal_server_error(err):
+    logger.error(f"Internal server error on {request.path}: {err}", exc_info=True)
+    if _is_api_request():
+        return jsonify({
+            "status": "error",
+            "error_code": 500,
+            "message": "An internal server error occurred while processing your request."
+        }), 500
+    return ("<h1>500 Internal Server Error</h1><p>An internal server error occurred.</p>", 500)
+
 
 
 # ------------------------------------------------------------------------------
@@ -513,9 +601,23 @@ def index():
     )
 
 
+QUOTE_RATE_LIMIT = int(os.environ.get("QUOTE_RATE_LIMIT", "60"))
+
+
 @app.route("/api/quote", methods=["POST"])
+@rate_limit(max_requests=QUOTE_RATE_LIMIT, window_seconds=60)
 def api_quote():
-    data = request.get_json(force=True, silent=True) or {}
+    try:
+        data = request.get_json(force=True, silent=False) or {}
+    except Exception as e:
+        if not request.data or not request.data.strip():
+            data = {}
+        else:
+            return jsonify({
+                "status": "error",
+                "error_code": 400,
+                "message": f"Malformed JSON request payload: {e}"
+            }), 400
 
     # Weights validation (§2.2, §5.2) - Supports direct Airline Chargeable Weight as primary
     raw_chargeable = data.get("chargeable_wt") or data.get("chargeable_weight") or data.get("Chargeable_Weight_Kg")
