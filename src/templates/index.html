@@ -17,8 +17,8 @@
             --border: #e2e8f0;
             --border-subtle: #f1f5f9;
             --text-dark: #0f172a;
-            --text-muted: #64748b;
-            --text-light: #94a3b8;
+            --text-muted: #475569;
+            --text-light: #475569;
             --pill-dark: #0f172a;
             --pill-hover: #1e293b;
             --radius-window: 24px;
@@ -142,7 +142,7 @@
         .engine-tag {
             background: #f1f5f9;
             color: var(--text-dark);
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 600;
             padding: 5px 12px;
             border-radius: var(--radius-pill);
@@ -232,7 +232,7 @@
             flex-wrap: wrap;
         }
         .presets-title {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             color: var(--text-dark);
             text-transform: uppercase;
@@ -310,7 +310,7 @@
             height: 20px;
             border-radius: 50%;
             background: #f1f5f9;
-            font-size: 10px;
+            font-size: 11.5px;
             font-weight: 700;
             display: flex;
             align-items: center;
@@ -349,7 +349,7 @@
             letter-spacing: -0.2px;
         }
         .col-badge {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-muted);
             background: #f1f5f9;
@@ -369,7 +369,7 @@
             margin-bottom: 12px;
         }
         .section-label {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             color: var(--text-dark);
             text-transform: uppercase;
@@ -487,7 +487,7 @@
             text-align: left;
         }
         .select-trigger-arrow {
-            font-size: 9px;
+            font-size: 11px;
             color: var(--text-muted);
             transition: transform 0.2s;
             flex-shrink: 0;
@@ -546,7 +546,8 @@
         }
         .select-option:hover { background: #f8fafc; }
         .select-option.selected { background: #f1f5f9; font-weight: 700; color: #0f172a; }
-        .select-option.selected::after { content: "✓"; font-size: 11px; }
+        .select-option.selected::after { content: "✓"; font-size: 12px; }
+        .select-option.active-option { background: #f1f5f9; color: #0f172a; font-weight: 700; }
 
         /* Item Details & Dimensions (Restored Clean 4-Column Box Design) */
         .weight-mode-toggle {
@@ -564,7 +565,7 @@
             background: transparent;
             padding: 8px 12px;
             border-radius: var(--radius-pill);
-            font-size: clamp(11px, 2.8vw, 12.5px);
+            font-size: clamp(12px, 2.8vw, 12.5px);
             font-weight: 700;
             font-family: 'Outfit', sans-serif;
             color: var(--text-muted);
@@ -593,11 +594,12 @@
         .dim-unit-btn {
             border: none;
             background: transparent;
-            color: var(--text-muted);
-            font-size: 11px;
+            color: #334155;
+            font-size: 12px;
             font-weight: 700;
             font-family: 'Outfit', sans-serif;
-            padding: 2px 8px;
+            padding: 4px 10px;
+            min-height: 24px;
             border-radius: var(--radius-pill);
             cursor: pointer;
             transition: all 0.15s ease;
@@ -627,7 +629,7 @@
             .dim-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
         }
         .dim-grid label {
-            font-size: 10.5px;
+            font-size: 12px;
             color: var(--text-muted);
             font-weight: 700;
             text-transform: uppercase;
@@ -638,7 +640,7 @@
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 6px;
-            font-size: 11.5px;
+            font-size: 12px;
             font-weight: 600;
             margin-top: 10px;
             color: var(--text-muted);
@@ -677,17 +679,17 @@
             color: var(--text-muted);
         }
 
-        /* Card Containers: Minimalist, Cohesive White Surfaces */
+        /* Column Containers: Clean, flat structure without container nesting slop */
         .left-display-card, .right-display-card {
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-card);
-            padding: 24px;
-            box-shadow: var(--shadow-card);
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+            box-shadow: none;
         }
         @media (max-width: 640px) {
             .left-display-card, .right-display-card {
-                padding: 18px 14px;
+                padding: 0;
             }
         }
 
@@ -700,7 +702,6 @@
             text-align: center;
             margin-bottom: 16px;
             position: relative;
-            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
         }
         .hero-label-row {
             display: flex;
@@ -711,7 +712,7 @@
             flex-wrap: wrap;
         }
         .hero-label {
-            font-size: 11px;
+            font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 0.8px;
             color: #94a3b8;
@@ -719,7 +720,7 @@
             font-family: 'Outfit', sans-serif;
         }
         .hero-corridor-badge {
-            font-size: 10px;
+            font-size: 11.5px;
             font-weight: 700;
             padding: 2px 9px;
             border-radius: var(--radius-pill);
@@ -763,7 +764,7 @@
             text-align: center;
         }
         .metric-title {
-            font-size: 10.5px;
+            font-size: 12px;
             color: var(--text-muted);
             font-weight: 700;
             text-transform: uppercase;
@@ -824,7 +825,7 @@
                 flex-wrap: wrap;
                 gap: 4px 6px;
                 margin-top: 4px;
-                font-size: 11px;
+                font-size: 12px;
             }
             .strat-card-right {
                 width: 100%;
@@ -839,7 +840,7 @@
                 font-size: 18px;
             }
             .strat-price-unit {
-                font-size: 11px;
+                font-size: 12px;
                 margin-top: 0;
             }
         }
@@ -880,7 +881,7 @@
             color: var(--text-dark);
         }
         .strat-meta-chips {
-            font-size: 11.5px;
+            font-size: 12px;
             color: var(--text-muted);
             display: flex;
             align-items: center;
@@ -897,7 +898,7 @@
             line-height: 1.1;
         }
         .strat-price-unit {
-            font-size: 11px;
+            font-size: 12px;
             color: var(--text-muted);
             margin-top: 1px;
         }
@@ -906,7 +907,7 @@
         .badge {
             padding: 2px 8px;
             border-radius: var(--radius-pill);
-            font-size: 10px;
+            font-size: 11.5px;
             font-weight: 700;
             display: inline-block;
             font-family: 'Outfit', sans-serif;
@@ -920,10 +921,8 @@
             width: 100%;
             overflow-x: auto;
             max-height: 280px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-control);
-            background: #ffffff;
-            margin-bottom: 18px;
+            margin-bottom: 0;
+            scrollbar-width: thin;
         }
         table {
             width: 100%;
@@ -1066,7 +1065,7 @@
                 <svg class="ui-icon" style="color: var(--text-dark);" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 Quick Historical Test Presets
             </span>
-            <span style="font-size: 11px; color: var(--text-light);">One-click high-volume inquiry scenarios</span>
+            <span style="font-size: 12px; color: var(--text-light);">One-click high-volume inquiry scenarios</span>
         </div>
         <div class="presets-grid-row">
             <button type="button" id="preset_btn_pharma_uk" class="preset-chip-btn" onclick="applyPreset('pharma_uk')">
@@ -1091,7 +1090,7 @@
     <!-- 50/50 Workspace Grid -->
     <div class="workspace-grid">
         <!-- Left Column: Inquiry Details Form -->
-        <div class="workspace-col-left left-display-card">
+        <div class="workspace-col-left">
             <div class="col-header">
                 <span class="col-title">Inquiry Details</span>
                 <span class="col-badge">Commercial Inputs</span>
@@ -1106,7 +1105,7 @@
                             <label for="origin_display_text">Source Airport (POL) <span class="req">*</span></label>
                             <input type="hidden" id="origin" value="Indira Gandhi International Airport">
                             <div class="searchable-select" id="searchable_origin">
-                                <div class="select-trigger" onclick="toggleDropdown('origin')">
+                                <div class="select-trigger" id="trigger_origin" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" onclick="toggleDropdown('origin')" onkeydown="handleTriggerKeydown(event, 'origin')">
                                     <span class="select-trigger-text" id="origin_display_text">Delhi (DEL) - Indira Gandhi</span>
                                     <span class="select-trigger-arrow">▼</span>
                                 </div>
@@ -1127,7 +1126,7 @@
                             <label for="dest_display_text">Destination Airport (POD) <span class="req">*</span></label>
                             <input type="hidden" id="dest" value="Heathrow Apt/London">
                             <div class="searchable-select" id="searchable_dest">
-                                <div class="select-trigger" onclick="toggleDropdown('dest')">
+                                <div class="select-trigger" id="trigger_dest" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" onclick="toggleDropdown('dest')" onkeydown="handleTriggerKeydown(event, 'dest')">
                                     <span class="select-trigger-text" id="dest_display_text">London Heathrow (LHR)</span>
                                     <span class="select-trigger-arrow">▼</span>
                                 </div>
@@ -1157,7 +1156,7 @@
                             <input type="number" id="unit_buy" class="clean-input" value="" min="0.1" step="any" placeholder="e.g. 150.00" oninput="onUnitBuyInput()">
                         </div>
                         <div class="field-group">
-                            <label for="buy">Total Airline Buy (₹ INR) <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">(Auto-calculated)</span></label>
+                            <label for="buy">Total Airline Buy (₹ INR) <span style="font-size: 12px; font-weight: 500; color: var(--text-muted);">(Auto-calculated)</span></label>
                             <input type="number" id="buy" class="clean-input" value="" min="1" step="any" placeholder="e.g. 50000" oninput="onTotalBuyInput()">
                         </div>
                     </div>
@@ -1198,10 +1197,10 @@
                         </div>
                         <div class="dim-box">
                             <div class="dim-grid">
-                                <div><label id="dim_l_label">Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="120" style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_w_label">Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="80" style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_h_label">Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="90" style="padding: 7px 10px; min-height: 38px;"></div>
-                                <div><label id="dim_pcs_label">Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="1" min="1" step="1" oninput="updateDimensions()" placeholder="1" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_l_label" for="dim_l">Length (cm)</label><input type="number" id="dim_l" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="120" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_w_label" for="dim_w">Width (cm)</label><input type="number" id="dim_w" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="80" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_h_label" for="dim_h">Height (cm)</label><input type="number" id="dim_h" class="clean-input" value="" min="0.01" step="any" oninput="updateDimensions()" placeholder="90" style="padding: 7px 10px; min-height: 38px;"></div>
+                                <div><label id="dim_pcs_label" for="dim_pcs">Pieces</label><input type="number" id="dim_pcs" class="clean-input" value="1" min="1" step="1" oninput="updateDimensions()" placeholder="1" style="padding: 7px 10px; min-height: 38px;"></div>
                             </div>
                             <div class="dim-info" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
                                 <span id="vol_wt_display">Volumetric: — kg (Formula: L × W × H × Pcs ÷ 6000)</span>
@@ -1234,7 +1233,7 @@
                             <label>Customer Category <span class="req">*</span></label>
                             <input type="hidden" id="client" value="Shipper / Consignee">
                             <div class="searchable-select" id="custom_client">
-                                <div class="select-trigger" onclick="toggleDropdown('client')">
+                                <div class="select-trigger" id="trigger_client" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" onclick="toggleDropdown('client')" onkeydown="handleTriggerKeydown(event, 'client')">
                                     <span class="select-trigger-text" id="client_display_text">Direct Shipper / Consignee</span>
                                     <span class="select-trigger-arrow">▼</span>
                                 </div>
@@ -1255,7 +1254,7 @@
                             <label>Customer Activity <span class="req">*</span></label>
                             <input type="hidden" id="frequency" value="10">
                             <div class="searchable-select" id="custom_frequency">
-                                <div class="select-trigger" onclick="toggleDropdown('frequency')">
+                                <div class="select-trigger" id="trigger_frequency" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" onclick="toggleDropdown('frequency')" onkeydown="handleTriggerKeydown(event, 'frequency')">
                                     <span class="select-trigger-text" id="frequency_display_text">Active / Regular Customer</span>
                                     <span class="select-trigger-arrow">▼</span>
                                 </div>
@@ -1273,7 +1272,7 @@
                             <label>Commodity Group <span class="req">*</span></label>
                             <input type="hidden" id="commodity" value="General Cargo">
                             <div class="searchable-select" id="custom_commodity">
-                                <div class="select-trigger" onclick="toggleDropdown('commodity')">
+                                <div class="select-trigger" id="trigger_commodity" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" onclick="toggleDropdown('commodity')" onkeydown="handleTriggerKeydown(event, 'commodity')">
                                     <span class="select-trigger-text" id="commodity_display_text">General Cargo</span>
                                     <span class="select-trigger-arrow">▼</span>
                                 </div>
@@ -1294,7 +1293,7 @@
                             <label>Quote Revision <span class="req">*</span></label>
                             <input type="hidden" id="revision" value="1">
                             <div class="searchable-select" id="custom_revision">
-                                <div class="select-trigger" onclick="toggleDropdown('revision')">
+                                <div class="select-trigger" id="trigger_revision" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" onclick="toggleDropdown('revision')" onkeydown="handleTriggerKeydown(event, 'revision')">
                                     <span class="select-trigger-text" id="revision_display_text">Rev 1 — Initial Quote (Standard Benchmark)</span>
                                     <span class="select-trigger-arrow">▼</span>
                                 </div>
@@ -1321,7 +1320,7 @@
         </div>
 
         <!-- Right Column: Recommended Commercial Terms -->
-        <div class="workspace-col-right right-display-card">
+        <div class="workspace-col-right">
             <div class="col-header">
                 <span class="col-title">Recommended Commercial Terms</span>
                 <span class="col-badge">Optimal Recommendation</span>
@@ -1330,7 +1329,7 @@
             <!-- Ready / Placeholder State -->
             <div id="placeholder" class="placeholder-box">
                 <svg class="ui-icon" style="width: 44px; height: 44px; stroke: var(--text-muted); margin-bottom: 12px;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                <h3 style="font-size: 16px; font-weight: 700; color: var(--text-dark);">Quotation Engine Ready</h3>
+                <h2 style="font-size: 18px; font-weight: 700; color: var(--text-dark); font-family: 'Outfit', sans-serif;">Quotation Engine Ready</h2>
                 <p style="font-size: 12.5px; margin-top: 6px; color: var(--text-muted);">Enter shipment parameters on the left or click a Quick Scenario Preset to calculate optimal sell rates and probability sensitivity.</p>
             </div>
 
@@ -1344,6 +1343,48 @@
                     </div>
                     <div class="hero-value" id="res_margin_pct">0.0%</div>
                     <div class="hero-sub" id="res_hero_sub" style="margin-top: 6px; font-size: 13px; color: #cbd5e1;">Quoted Rate: ₹0 / kg</div>
+                </div>
+
+                <!-- Visual Negotiation Corridor Spectrum Bar -->
+                <div id="corridorSpectrumBox" style="margin-bottom: 16px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-control); padding: 14px 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-dark); text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 6px;">
+                            <svg class="ui-icon" style="width: 14px; height: 14px; stroke: var(--text-dark);" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                            Visual Negotiation Corridor
+                        </span>
+                        <span id="spectrumCoverageBadge" style="font-size: 12px; font-weight: 700; color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 2px 8px; border-radius: var(--radius-pill); font-family: 'Outfit', sans-serif;">Pre-Approved Green Zone</span>
+                    </div>
+
+                    <!-- Top Pin Labels -->
+                    <div style="position: relative; height: 20px; margin: 10px 14px 4px;">
+                        <div id="pinFloor" style="position: absolute; left: 0%; transform: translateX(-50%); font-size: 12px; font-weight: 700; color: #991b1b; white-space: nowrap; font-family: 'Outfit', sans-serif;">
+                            <span id="labelFloorRate">Floor ₹0</span>
+                        </div>
+                        <div id="pinCorridorMax" style="position: absolute; left: 70%; transform: translateX(-50%); font-size: 12px; font-weight: 700; color: #166534; white-space: nowrap; font-family: 'Outfit', sans-serif;">
+                            <span id="labelCorridorMaxRate">Max ₹0</span>
+                        </div>
+                        <div id="pinPremiumCap" style="position: absolute; left: 100%; transform: translateX(-50%); font-size: 12px; font-weight: 700; color: #475569; white-space: nowrap; font-family: 'Outfit', sans-serif;">
+                            <span id="labelPremiumCapRate">Cap ₹0</span>
+                        </div>
+                    </div>
+
+                    <!-- Clean Spectrum Visual Track (No text children) -->
+                    <div style="position: relative; height: 12px; background: #e2e8f0; border-radius: 6px; margin: 6px 14px 6px;">
+                        <div id="spectrumGreenZone" style="position: absolute; top: 0; bottom: 0; left: 20%; width: 50%; background: #86efac; border-radius: 4px;"></div>
+                        <div id="pinActiveQuote" style="position: absolute; left: 45%; top: -3px; width: 18px; height: 18px; background: #0f172a; border: 2.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.25); border-radius: 50%; transform: translateX(-50%); z-index: 5;"></div>
+                    </div>
+
+                    <!-- Bottom Pin Label for Active Quote -->
+                    <div style="position: relative; height: 22px; margin: 0 14px 10px;">
+                        <div id="pinActiveQuoteLabel" style="position: absolute; left: 45%; transform: translateX(-50%); text-align: center;">
+                            <span style="font-size: 12px; font-weight: 800; color: #0f172a; white-space: nowrap; font-family: 'Outfit', sans-serif; background: #ffffff; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); font-variant-numeric: tabular-nums;" id="labelQuotePin">Quote: ₹0/kg</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); padding-top: 8px; border-top: 1px dashed var(--border); flex-wrap: wrap; gap: 6px;">
+                        <span id="spectrumRangeDesc">Pre-Approved Band: ₹0 – ₹0 / kg (No Approval Needed)</span>
+                        <span style="font-weight: 600; color: #166534;">Safe Margin Corridor</span>
+                    </div>
                 </div>
 
                 <!-- 3 Supporting Commercial Metric Tiles -->
@@ -1368,6 +1409,67 @@
                 </div>
                 <div id="strategic_tiers" class="strategic-tiers-container"></div>
 
+                <!-- 15-Step Market Sensitivity Rate Ladder -->
+                <div id="sensitivityAccordion" style="margin-top: 16px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius-control); background: #ffffff; overflow: hidden;">
+                    <button type="button" id="sensitivityToggleBtn" onclick="toggleSensitivityLadder()" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #f8fafc; border: none; cursor: pointer; text-align: left; font-family: 'Outfit', sans-serif; min-height: 44px;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span style="font-size: 13px; font-weight: 700; color: var(--text-dark);">15-Step Market Sensitivity Rate Ladder</span>
+                            <span style="font-size: 12px; font-weight: 600; color: var(--text-muted); background: #f1f5f9; padding: 2px 8px; border-radius: var(--radius-pill); border: 1px solid var(--border);">Elasticity Frontier</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span id="sensitivityChevron" style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Show Ladder ▼</span>
+                        </div>
+                    </button>
+                    <div id="sensitivityBody" style="display: none; padding: 12px; border-top: 1px solid var(--border);">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+                            Discrete pricing frontier simulated across market win probability percentiles. Click any row to test-quote that rate.
+                        </p>
+                        <div class="table-wrap" style="max-height: 300px; margin-bottom: 0;">
+                            <table id="sensitivityTable">
+                                <thead>
+                                    <tr>
+                                        <th>Sell Rate (₹/kg)</th>
+                                        <th>Total Quote (₹)</th>
+                                        <th>Target Markup</th>
+                                        <th>Win Probability</th>
+                                        <th>Est. Profit</th>
+                                        <th>Historical %ile</th>
+                                        <th style="text-align: right;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sensitivityTableBody">
+                                    <!-- Populated dynamically via renderSensitivityLadder() -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inline 1-Click Deal Outcome Logging Widget -->
+                <div id="outcomeCaptureBox" style="margin-top: 16px; margin-bottom: 16px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-control); padding: 14px 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                        <div>
+                            <div style="font-size: 12.5px; font-weight: 700; color: var(--text-dark); font-family: 'Outfit', sans-serif;">Log Commercial Deal Outcome</div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" id="outcomeQuoteIdLabel">Quote #— • Logged in System History</div>
+                        </div>
+                        <div id="outcomeStatusFeedback" style="display: none; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-pill); font-family: 'Outfit', sans-serif;"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                        <button type="button" class="btn-outcome" id="btnOutcomeWon" onclick="logQuoteOutcome('Won')" style="padding: 8px 12px; min-height: 38px; border-radius: var(--radius-control); border: 1px solid #86efac; background: #f0fdf4; color: #166534; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                            <svg class="ui-icon" style="width: 14px; height: 14px; stroke: #166534;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                            Deal Won
+                        </button>
+                        <button type="button" class="btn-outcome" id="btnOutcomeNegotiating" onclick="logQuoteOutcome('Negotiating')" style="padding: 8px 12px; min-height: 38px; border-radius: var(--radius-control); border: 1px solid #cbd5e1; background: #ffffff; color: #334155; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                            <svg class="ui-icon" style="width: 14px; height: 14px; stroke: #334155;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            Negotiating
+                        </button>
+                        <button type="button" class="btn-outcome" id="btnOutcomeLost" onclick="logQuoteOutcome('Lost')" style="padding: 8px 12px; min-height: 38px; border-radius: var(--radius-control); border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                            <svg class="ui-icon" style="width: 14px; height: 14px; stroke: #991b1b;" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            Deal Lost
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Bottom Commercial Actions -->
                 <div class="actions-split">
                     <button type="button" class="btn-copy-action" onclick="copyQuoteSummary()">
@@ -1377,6 +1479,17 @@
                     <button type="button" class="btn-pill btn-white" onclick="resetFormForNewQuote()" style="width: 100%;">
                         Create New Quote
                     </button>
+                </div>
+
+                <!-- Power-User Keyboard Shortcuts Legend Strip -->
+                <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap;">
+                    <span><kbd style="background: #f1f5f9; border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 11.5px;">Ctrl/Cmd+Enter</kbd> Calculate</span>
+                    <span>•</span>
+                    <span><kbd style="background: #f1f5f9; border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 11.5px;">1/2/3</kbd> Switch Tier</span>
+                    <span>•</span>
+                    <span><kbd style="background: #f1f5f9; border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 11.5px;">Alt+C</kbd> Copy</span>
+                    <span>•</span>
+                    <span><kbd style="background: #f1f5f9; border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 11.5px;">Esc</kbd> Close</span>
                 </div>
             </div>
         </div>
@@ -2004,9 +2117,14 @@
             currentStrategies = stratDict;
             currentChargeableWeight = weights.chargeable_wt || 100;
             currentCorridor = body.negotiation_corridor || (opt && opt.negotiation_corridor) || null;
+            currentSensitivity = body.sensitivity || (opt && opt.sensitivity) || [];
+            currentQuoteId = body.quote_id || null;
 
             renderStrategicCards(currentStrategies, 'balanced', currentChargeableWeight, currentCorridor);
             updateHeroMetrics(opt, currentCorridor);
+            renderCorridorSpectrum(currentCorridor, opt, currentChargeableWeight);
+            renderSensitivityLadder(currentSensitivity, currentChargeableWeight);
+            setupOutcomeWidget(currentQuoteId);
 
             // Smooth scroll into results view
             results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2155,6 +2273,10 @@
         });
     }
 
+    let currentSensitivity = [];
+    let currentQuoteId = null;
+    let isSensitivityOpen = false;
+
     function selectStrategyCard(key) {
         if (!currentStrategies[key]) return;
         selectedStrategyKey = key;
@@ -2169,7 +2291,359 @@
         });
 
         updateHeroMetrics(strat, currentCorridor);
+        updateCorridorActivePin(strat, currentChargeableWeight);
+        renderSensitivityLadder(currentSensitivity, currentChargeableWeight);
     }
+
+    function renderCorridorSpectrum(corridor, currentStrat, chWt) {
+        if (!corridor) return;
+        const box = document.getElementById('corridorSpectrumBox');
+        if (!box) return;
+
+        const wt = Math.max(1, Number(chWt) || currentChargeableWeight || 1);
+        const buyVal = parseFloat(document.getElementById('buy')?.value) || 0;
+        const costFloorRate = buyVal > 0 ? Math.round(buyVal / wt) : (corridor.cost_floor_rate_per_kg || 0);
+
+        const minRate = corridor.min_rate_per_kg || Math.round((corridor.min_sell_price_inr || 0) / wt) || costFloorRate;
+        const targetRate = corridor.target_rate_per_kg || Math.round((corridor.target_sell_price_inr || 0) / wt) || minRate;
+        const maxRate = corridor.max_rate_per_kg || Math.round((corridor.max_sell_price_inr || 0) / wt) || targetRate;
+
+        // Premium cap is max corridor rate + margin headroom
+        const premiumCapRate = Math.round(Math.max(maxRate * 1.08, maxRate + 15));
+
+        // Coordinate scaling
+        const scaleMin = Math.max(0, costFloorRate * 0.95);
+        const scaleMax = premiumCapRate * 1.02;
+        const scaleRange = Math.max(1, scaleMax - scaleMin);
+
+        function toPct(val) {
+            return Math.max(2, Math.min(98, ((val - scaleMin) / scaleRange) * 100));
+        }
+
+        const floorPct = toPct(costFloorRate);
+        const minPct = toPct(minRate);
+        const maxPct = toPct(maxRate);
+        const capPct = toPct(premiumCapRate);
+
+        // Position green zone
+        const greenZone = document.getElementById('spectrumGreenZone');
+        if (greenZone) {
+            greenZone.style.left = `${minPct}%`;
+            greenZone.style.width = `${Math.max(5, maxPct - minPct)}%`;
+        }
+
+        // Position pins
+        const pinFloor = document.getElementById('pinFloor');
+        const pinCorridorMax = document.getElementById('pinCorridorMax');
+        const pinPremiumCap = document.getElementById('pinPremiumCap');
+        if (pinFloor) pinFloor.style.left = `${floorPct}%`;
+        if (pinCorridorMax) pinCorridorMax.style.left = `${maxPct}%`;
+        if (pinPremiumCap) pinPremiumCap.style.left = `${capPct}%`;
+
+        // Update text labels
+        const lblFloor = document.getElementById('labelFloorRate');
+        const lblCorridorMax = document.getElementById('labelCorridorMaxRate');
+        const lblPremiumCap = document.getElementById('labelPremiumCapRate');
+        const lblDesc = document.getElementById('spectrumRangeDesc');
+
+        if (lblFloor) lblFloor.innerText = `Floor ₹${formatINR(costFloorRate)}`;
+        if (lblCorridorMax) lblCorridorMax.innerText = `Max ₹${formatINR(maxRate)}`;
+        if (lblPremiumCap) lblPremiumCap.innerText = `Cap ₹${formatINR(premiumCapRate)}`;
+        if (lblDesc) {
+            lblDesc.innerText = `Pre-Approved Band: ₹${formatINR(minRate)} – ₹${formatINR(maxRate)} / kg (${(corridor.min_margin_pct || 0).toFixed(1)}% – ${(corridor.max_margin_pct || 0).toFixed(1)}% markup)`;
+        }
+
+        updateCorridorActivePin(currentStrat, wt, scaleMin, scaleRange);
+    }
+
+    function updateCorridorActivePin(strat, chWt, sMin, sRange) {
+        if (!strat) return;
+        const wt = Math.max(1, Number(chWt) || currentChargeableWeight || 1);
+        const sellPrice = strat.Quoted_Sell_Price_INR || 0;
+        const ratePerKg = Math.round(sellPrice / wt);
+
+        let scaleMin = sMin;
+        let scaleRange = sRange;
+        if (scaleMin === undefined || scaleRange === undefined) {
+            const buyVal = parseFloat(document.getElementById('buy')?.value) || 0;
+            const costFloor = buyVal > 0 ? (buyVal / wt) : 0;
+            const maxRate = (currentCorridor && currentCorridor.max_rate_per_kg) ? currentCorridor.max_rate_per_kg : (ratePerKg * 1.15);
+            scaleMin = Math.max(0, costFloor * 0.95);
+            scaleRange = Math.max(1, (maxRate * 1.1) - scaleMin);
+        }
+
+        const pct = Math.max(2, Math.min(98, ((ratePerKg - scaleMin) / scaleRange) * 100));
+        const activePin = document.getElementById('pinActiveQuote');
+        const activeLabel = document.getElementById('pinActiveQuoteLabel');
+        const pinLabel = document.getElementById('labelQuotePin');
+
+        if (activePin) activePin.style.left = `${pct}%`;
+        if (activeLabel) activeLabel.style.left = `${pct}%`;
+        if (pinLabel) pinLabel.innerText = `Quote: ₹${formatINR(ratePerKg)}/kg`;
+    }
+
+    function toggleSensitivityLadder() {
+        const body = document.getElementById('sensitivityBody');
+        const chevron = document.getElementById('sensitivityChevron');
+        if (!body) return;
+        isSensitivityOpen = !isSensitivityOpen;
+        body.style.display = isSensitivityOpen ? 'block' : 'none';
+        if (chevron) chevron.innerText = isSensitivityOpen ? 'Hide Ladder ▲' : 'Show Ladder ▼';
+    }
+
+    function renderSensitivityLadder(sensitivityList, chWt) {
+        currentSensitivity = Array.isArray(sensitivityList) ? sensitivityList : [];
+        const tbody = document.getElementById('sensitivityTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!currentSensitivity.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 16px;">Sensitivity frontier data unavailable for this inquiry.</td></tr>';
+            return;
+        }
+
+        const wt = Math.max(1, Number(chWt) || currentChargeableWeight || 1);
+        const currentActivePrice = (currentStrategies[selectedStrategyKey]?.Quoted_Sell_Price_INR) || 0;
+        const currentActiveRate = Math.round(currentActivePrice / wt);
+
+        currentSensitivity.forEach((step, idx) => {
+            const tr = document.createElement('tr');
+            const rateKg = step.Rate_Per_Kg || Math.round((step.Quoted_Sell_Price_INR || 0) / wt);
+            const totalQuote = step.Quoted_Sell_Price_INR || Math.round(rateKg * wt);
+            const markup = (step.Margin_Percentage !== undefined) ? step.Margin_Percentage : 0;
+            const winProb = (step.Win_Probability !== undefined && step.Win_Probability !== null) ? (step.Win_Probability * 100) : 75;
+            const expProfit = step.Expected_Profit_INR !== undefined ? step.Expected_Profit_INR : (step.Margin_Amount_INR || 0);
+            const pctl = (step.Percentile !== undefined && step.Percentile !== null) ? `${step.Percentile}th` : '—';
+
+            const isMatch = Math.abs(rateKg - currentActiveRate) <= 1;
+            if (isMatch) tr.className = 'row-tier-selected';
+
+            const probWidth = Math.max(5, Math.min(100, Math.round(winProb)));
+            const probColor = winProb >= 70 ? '#166534' : (winProb >= 45 ? '#0f172a' : '#b91c1c');
+
+            tr.innerHTML = `
+                <td style="font-weight: 700; font-variant-numeric: tabular-nums;">₹${formatINR(rateKg)}</td>
+                <td style="font-variant-numeric: tabular-nums;">₹${formatINR(totalQuote)}</td>
+                <td style="font-variant-numeric: tabular-nums;">${markup.toFixed(1)}%</td>
+                <td>
+                    <div style="width: 50px; height: 6px; background: #e2e8f0; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 6px; overflow: hidden;">
+                        <div style="width: ${probWidth}%; height: 100%; background: ${probColor}; border-radius: 3px;"></div>
+                    </div>
+                    <span style="font-weight: 600; font-variant-numeric: tabular-nums;">${winProb.toFixed(0)}%</span>
+                </td>
+                <td style="font-variant-numeric: tabular-nums; font-weight: 600;">₹${formatINR(expProfit)}</td>
+                <td style="font-variant-numeric: tabular-nums; color: var(--text-muted);">${pctl}</td>
+                <td style="text-align: right;">
+                    <button type="button" class="btn-pill" style="padding: 3px 10px; min-height: 28px; font-size: 11.5px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: #ffffff; cursor: pointer;" onclick="event.stopPropagation(); applySensitivityRate(${rateKg}, ${markup}, ${totalQuote});">
+                        Select
+                    </button>
+                </td>
+            `;
+
+            tr.onclick = function() {
+                applySensitivityRate(rateKg, markup, totalQuote);
+            };
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    function applySensitivityRate(rateKg, markup, totalQuote) {
+        // Highlight in hero metrics
+        const marginEl = document.getElementById('res_margin_pct');
+        const heroLabelEl = document.getElementById('res_hero_label');
+        const badgeEl = document.getElementById('res_corridor_badge');
+        const subEl = document.getElementById('res_hero_sub');
+        const priceEl = document.getElementById('res_selling_price');
+
+        if (marginEl) marginEl.innerText = `${markup.toFixed(1)}%`;
+        if (heroLabelEl) heroLabelEl.innerText = 'Custom Sensitivity Ladder Rate';
+        if (badgeEl) badgeEl.innerText = `Frontier Rate: ₹${formatINR(rateKg)}/kg`;
+        if (subEl) subEl.innerText = `Quoted Total: ₹${formatINR(totalQuote)} (₹${formatINR(rateKg)} / kg)`;
+        if (priceEl) priceEl.innerText = `₹${formatINR(rateKg)} / kg`;
+
+        // Update pin on corridor spectrum bar
+        const simulatedStrat = {
+            Quoted_Sell_Price_INR: totalQuote,
+            Margin_Percentage: markup
+        };
+        updateCorridorActivePin(simulatedStrat, currentChargeableWeight);
+
+        // Highlight row in table
+        const tbody = document.getElementById('sensitivityTableBody');
+        if (tbody) {
+            Array.from(tbody.children).forEach(r => {
+                const rowRateTxt = r.children[0]?.innerText || '';
+                if (rowRateTxt.includes(formatINR(rateKg))) {
+                    r.className = 'row-tier-selected';
+                } else {
+                    r.className = '';
+                }
+            });
+        }
+
+        showToast(`Selected Rate: ₹${formatINR(rateKg)}/kg (${markup.toFixed(1)}% Markup)`);
+    }
+
+    function setupOutcomeWidget(quoteId) {
+        currentQuoteId = quoteId;
+        const label = document.getElementById('outcomeQuoteIdLabel');
+        const feedback = document.getElementById('outcomeStatusFeedback');
+        if (label) {
+            label.innerText = quoteId ? `Quote #${quoteId} • Logged in System History` : 'Quote Logged in Session';
+        }
+        if (feedback) {
+            feedback.style.display = 'none';
+            feedback.innerText = '';
+        }
+    }
+
+    function logQuoteOutcome(status) {
+        if (!currentQuoteId) {
+            showToast(`Outcome recorded in session: ${status}`);
+            return;
+        }
+
+        const feedback = document.getElementById('outcomeStatusFeedback');
+
+        fetch('/api/history/update_status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentQuoteId, status: status })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (feedback) {
+                    feedback.style.display = 'inline-block';
+                    feedback.innerText = `Recorded: ${status} ✓`;
+                    if (status === 'Won') {
+                        feedback.style.background = '#f0fdf4';
+                        feedback.style.color = '#166534';
+                        feedback.style.border = '1px solid #bbf7d0';
+                    } else if (status === 'Lost') {
+                        feedback.style.background = '#fef2f2';
+                        feedback.style.color = '#991b1b';
+                        feedback.style.border = '1px solid #fecaca';
+                    } else {
+                        feedback.style.background = '#f8fafc';
+                        feedback.style.color = '#334155';
+                        feedback.style.border = '1px solid #cbd5e1';
+                    }
+                }
+                showToast(`Deal outcome logged as "${status}" for Quote #${currentQuoteId}!`);
+            } else {
+                showToast(`Outcome update: ${data.message || 'Updated'}`);
+            }
+        })
+        .catch(err => {
+            showToast(`Outcome recorded locally: ${status}`);
+        });
+    }
+
+    function handleTriggerKeydown(e, fieldId) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            toggleDropdown(fieldId);
+        }
+    }
+
+    function setupDropdownKeyboardNav(fieldId) {
+        const input = document.getElementById(`${fieldId}_search`);
+        const list = document.getElementById(`${fieldId}_options_list`);
+        const trigger = document.getElementById(`trigger_${fieldId}`) || document.querySelector(`#searchable_${fieldId} .select-trigger`) || document.querySelector(`#custom_${fieldId} .select-trigger`);
+
+        const handler = function(e) {
+            if (!list) return;
+            const visibleOptions = Array.from(list.children).filter(li => li.style.display !== 'none');
+            if (!visibleOptions.length) return;
+
+            let activeIdx = visibleOptions.findIndex(li => li.classList.contains('active-option'));
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (activeIdx < 0 || activeIdx >= visibleOptions.length - 1) {
+                    activeIdx = 0;
+                } else {
+                    activeIdx++;
+                }
+                visibleOptions.forEach((li, i) => {
+                    if (i === activeIdx) {
+                        li.classList.add('active-option');
+                        li.scrollIntoView({ block: 'nearest' });
+                    } else {
+                        li.classList.remove('active-option');
+                    }
+                });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (activeIdx <= 0) {
+                    activeIdx = visibleOptions.length - 1;
+                } else {
+                    activeIdx--;
+                }
+                visibleOptions.forEach((li, i) => {
+                    if (i === activeIdx) {
+                        li.classList.add('active-option');
+                        li.scrollIntoView({ block: 'nearest' });
+                    } else {
+                        li.classList.remove('active-option');
+                    }
+                });
+            } else if (e.key === 'Enter') {
+                if (activeIdx >= 0 && activeIdx < visibleOptions.length) {
+                    e.preventDefault();
+                    const li = visibleOptions[activeIdx];
+                    const val = li.getAttribute('data-value');
+                    const label = (li.querySelector('span') ? li.querySelector('span').innerText : li.innerText).trim();
+                    selectSearchableOption(fieldId, val, label);
+                    if (trigger) trigger.focus();
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeDropdown(fieldId);
+                if (trigger) trigger.focus();
+            }
+        };
+
+        if (input) input.addEventListener('keydown', handler);
+    }
+
+    document.addEventListener('keydown', function(e) {
+        const targetTag = e.target.tagName ? e.target.tagName.toLowerCase() : '';
+        const isInput = targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || e.target.isContentEditable;
+
+        // 1. Ctrl+Enter or Cmd+Enter: Calculate quote
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            runInference();
+            return;
+        }
+
+        // 2. Alt+C: Copy Quote Summary
+        if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+            e.preventDefault();
+            copyQuoteSummary();
+            return;
+        }
+
+        // 3. Escape: Close any open dropdowns
+        if (e.key === 'Escape') {
+            ALL_DROPDOWN_IDS.forEach(id => closeDropdown(id));
+            return;
+        }
+
+        // 4. Quick Strategy Switcher (1, 2, 3) when results are visible and NOT typing in input
+        if (!isInput && (e.key === '1' || e.key === '2' || e.key === '3')) {
+            const results = document.getElementById('results');
+            if (results && results.style.display !== 'none') {
+                e.preventDefault();
+                if (e.key === '1') selectStrategyCard('floor');
+                else if (e.key === '2') selectStrategyCard('balanced');
+                else if (e.key === '3') selectStrategyCard('premium');
+            }
+        }
+    });
 
     function copyQuoteSummary() {
         const originTxt = document.getElementById('origin_display_text')?.innerText || 'Delhi';
@@ -2213,6 +2687,7 @@ Revision: ${document.getElementById('revision_display_text')?.innerText || 'Rev 
 
     window.onload = function() {
         updateDimensions();
+        ALL_DROPDOWN_IDS.forEach(id => setupDropdownKeyboardNav(id));
     };
 </script>
 </body>

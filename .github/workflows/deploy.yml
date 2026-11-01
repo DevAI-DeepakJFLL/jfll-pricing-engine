@@ -2,7 +2,7 @@ name: Deploy Air Export Pricing Engine to AWS Free Tier
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/audit-remediation-and-dsa ]
   workflow_dispatch:
 
 concurrency:
@@ -34,37 +34,9 @@ jobs:
 
       - name: Run Production Serving & Model Test Suite
         env:
-          ALLOW_LEGACY_ENGINE: "1"
           PYTHONPATH: ".:src"
         run: |
-          python -m unittest \
-            tests/test_api_quote.py \
-            tests/test_api_v3_quote.py \
-            tests/test_audit_remediation.py \
-            tests/test_aws_client.py \
-            tests/test_benchmark_integrity.py \
-            tests/test_cohort_lookup.py \
-            tests/test_conformal_calibration.py \
-            tests/test_db_and_strategy.py \
-            tests/test_db_audit.py \
-            tests/test_engine_determinism.py \
-            tests/test_evaluator.py \
-            tests/test_feature_engineering.py \
-            tests/test_guardrails.py \
-            tests/test_label_purity.py \
-            tests/test_oof_benchmark.py \
-            tests/test_pit_features.py \
-            tests/test_policy_guardrails.py \
-            tests/test_preprocess_validation.py \
-            tests/test_scenarios_t1_t15.py \
-            tests/test_security_integrity.py \
-            tests/test_strategy_tiers.py \
-            tests/test_taxonomy.py \
-            tests/test_tiers.py \
-            tests/test_validation.py \
-            tests/test_win_model.py \
-            tests/test_api_error_handlers.py \
-            tests/test_rate_limiter.py
+          pytest tests/ -v
 
   deploy-aws:
     name: Package & Deploy to AWS Free Tier

@@ -15,8 +15,8 @@
             --border: #e2e8f0;
             --border-subtle: #f1f5f9;
             --text-dark: #0f172a;
-            --text-muted: #64748b;
-            --text-light: #94a3b8;
+            --text-muted: #475569;
+            --text-light: #475569;
             --pill-dark: #0f172a;
             --radius-window: 24px;
             --radius-card: 16px;
@@ -203,7 +203,7 @@
         .btn-white { background: #ffffff; border: 1px solid var(--border); color: var(--text-dark); }
         .btn-white:hover { background: #f8fafc; }
         .btn-danger { background: #ffffff; border: 1px solid #fecaca; color: #dc2626; }
-        .btn-danger:hover { background: #fef2f2; }
+        .btn-danger:hover { background: #fef2f2; color: #b91c1c; }
 
         .stats-grid {
             display: grid;
@@ -397,6 +397,21 @@
         </div>
     </div>
 
+    <!-- Real-time Filter & Search Toolbar -->
+    <div class="filter-toolbar" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+        <div style="position: relative; flex: 1; min-width: 260px; max-width: 440px;">
+            <svg class="ui-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: #64748b; pointer-events: none;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="historySearch" placeholder="Filter by ID, route, commodity, branch..." oninput="filterHistoryTable()" style="width: 100%; padding: 8px 12px 8px 36px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: 'Mulish', sans-serif; background: #ffffff; color: var(--text-dark); outline: none;">
+        </div>
+        <div class="filter-chips" style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="chip-filter active" data-status="all" onclick="setStatusFilter('all', this)" style="padding: 5px 12px; border-radius: 100px; border: 1px solid var(--border); background: var(--text-dark); color: #ffffff; font-size: 12px; font-weight: 600; cursor: pointer;">All</button>
+            <button type="button" class="chip-filter" data-status="won" onclick="setStatusFilter('won', this)" style="padding: 5px 12px; border-radius: 100px; border: 1px solid var(--border); background: #ffffff; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">Won</button>
+            <button type="button" class="chip-filter" data-status="pending" onclick="setStatusFilter('pending', this)" style="padding: 5px 12px; border-radius: 100px; border: 1px solid var(--border); background: #ffffff; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">Pending</button>
+            <button type="button" class="chip-filter" data-status="lost" onclick="setStatusFilter('lost', this)" style="padding: 5px 12px; border-radius: 100px; border: 1px solid var(--border); background: #ffffff; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">Lost</button>
+            <button type="button" class="chip-filter" data-status="negotiating" onclick="setStatusFilter('negotiating', this)" style="padding: 5px 12px; border-radius: 100px; border: 1px solid var(--border); background: #ffffff; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">Negotiating</button>
+        </div>
+    </div>
+
     <div class="table-card">
         <div class="table-wrap">
             <table>
@@ -460,7 +475,7 @@
     </div>
     {% else %}
     <div style="text-align: center; padding: 60px 20px; color: var(--text-muted); background: #f8fafc; border-radius: 16px; border: 1px solid var(--border);">
-        <h3 style="font-size: 16px; font-weight: 700; color: var(--text-dark);">No Quotations Recorded Yet</h3>
+        <h2 style="font-size: 18px; font-weight: 700; color: var(--text-dark); font-family: 'Outfit', sans-serif;">No Quotations Recorded Yet</h2>
         <p style="font-size: 13px; margin: 6px 0 16px;">Create your first freight quotation to start tracking leads.</p>
         <a href="/" class="btn-pill btn-white">Create First Margin Recommendation</a>
     </div>
@@ -499,6 +514,32 @@
         fetch('/api/history/clear', { method: 'POST' })
             .then(res => res.json())
             .then(data => { if (data.status === 'success') window.location.reload(); });
+    }
+
+    let currentStatusFilter = 'all';
+
+    function setStatusFilter(status, btn) {
+        currentStatusFilter = status;
+        document.querySelectorAll('.chip-filter').forEach(b => {
+            b.style.background = '#ffffff';
+            b.style.color = 'var(--text-muted)';
+        });
+        btn.style.background = 'var(--text-dark)';
+        btn.style.color = '#ffffff';
+        filterHistoryTable();
+    }
+
+    function filterHistoryTable() {
+        const query = (document.getElementById('historySearch')?.value || '').toLowerCase().trim();
+        const rows = document.querySelectorAll('.table-wrap tbody tr');
+        rows.forEach(tr => {
+            const text = tr.innerText.toLowerCase();
+            const select = tr.querySelector('select.status-badge');
+            const rowStatus = select ? (statusMap[select.value] || select.value).toLowerCase() : '';
+            const matchesQuery = !query || text.includes(query);
+            const matchesStatus = (currentStatusFilter === 'all') || rowStatus.includes(currentStatusFilter);
+            tr.style.display = (matchesQuery && matchesStatus) ? '' : 'none';
+        });
     }
 </script>
 </body>

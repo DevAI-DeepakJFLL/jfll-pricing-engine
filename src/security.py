@@ -15,11 +15,12 @@ import time
 import math
 import hmac
 import hashlib
+import heapq
 import logging
 import threading
-from collections import defaultdict
+from collections import defaultdict, deque
 from functools import wraps
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Deque
 from flask import request, jsonify
 
 logger = logging.getLogger("pricing_security")
@@ -164,7 +165,7 @@ def require_admin_auth(f):
 # ------------------------------------------------------------------------------
 # SLIDING-WINDOW IN-MEMORY RATE LIMITER (CWE-400 / CWE-770)
 # ------------------------------------------------------------------------------
-_RATE_LIMIT_STORE: Dict[str, List[float]] = defaultdict(list)
+_RATE_LIMIT_STORE: Dict[str, Deque[float]] = defaultdict(deque)
 _RATE_LIMIT_LOCK = threading.Lock()
 _REQUEST_COUNTER = 0
 MAX_RATE_LIMIT_ENTRIES = 10000  # Hard boundary to prevent memory leakage (PonyTail #1)
@@ -196,20 +197,24 @@ def _purge_expired_entries(now: float, window_seconds: float):
     cutoff = now - window_seconds
     to_delete = []
     for ip, timestamps in _RATE_LIMIT_STORE.items():
-        active = [t for t in timestamps if t > cutoff]
-        if active:
-            _RATE_LIMIT_STORE[ip] = active
-        else:
+        if not isinstance(timestamps, deque):
+            timestamps = deque(sorted(timestamps))
+            _RATE_LIMIT_STORE[ip] = timestamps
+        while timestamps and timestamps[0] <= cutoff:
+            timestamps.popleft()
+        if not timestamps:
             to_delete.append(ip)
     for ip in to_delete:
         del _RATE_LIMIT_STORE[ip]
 
     if len(_RATE_LIMIT_STORE) > MAX_RATE_LIMIT_ENTRIES:
         excess = len(_RATE_LIMIT_STORE) - MAX_RATE_LIMIT_ENTRIES
-        oldest_ips = sorted(
+        # O(M log K) bounded heap selection instead of O(M log M) full sort
+        oldest_ips = heapq.nsmallest(
+            excess,
             _RATE_LIMIT_STORE.keys(),
             key=lambda k: _RATE_LIMIT_STORE[k][-1] if _RATE_LIMIT_STORE[k] else 0.0
-        )[:excess]
+        )
         for ip in oldest_ips:
             del _RATE_LIMIT_STORE[ip]
 
@@ -239,14 +244,20 @@ def rate_limit(max_requests: int = 60, window_seconds: int = 60):
                     _purge_expired_entries(now, window_seconds)
 
                 timestamps = _RATE_LIMIT_STORE[client_ip]
-                valid_timestamps = [t for t in timestamps if t > cutoff]
+                if not isinstance(timestamps, deque):
+                    timestamps = deque(sorted(timestamps))
+                    _RATE_LIMIT_STORE[client_ip] = timestamps
 
-                if len(valid_timestamps) >= max_requests:
-                    oldest_in_window = valid_timestamps[0]
+                # O(1) amortized queue eviction
+                while timestamps and timestamps[0] <= cutoff:
+                    timestamps.popleft()
+
+                if len(timestamps) >= max_requests:
+                    oldest_in_window = timestamps[0]
                     retry_after = max(1, int(math.ceil(window_seconds - (now - oldest_in_window))))
                     logger.warning(
                         f"Rate limit exceeded for client {client_ip} on {request.path}: "
-                        f"{len(valid_timestamps)}/{max_requests} requests in {window_seconds}s. "
+                        f"{len(timestamps)}/{max_requests} requests in {window_seconds}s. "
                         f"Retry-After: {retry_after}s."
                     )
                     resp = jsonify({
@@ -261,8 +272,7 @@ def rate_limit(max_requests: int = 60, window_seconds: int = 60):
                     resp.headers["Retry-After"] = str(retry_after)
                     return resp, 429
 
-                valid_timestamps.append(now)
-                _RATE_LIMIT_STORE[client_ip] = valid_timestamps
+                timestamps.append(now)
 
             return f(*args, **kwargs)
         return wrapper

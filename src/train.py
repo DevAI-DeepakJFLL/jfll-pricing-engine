@@ -71,10 +71,8 @@ from constants import (
 )
 
 try:
-    import margin_framework as mf
     from preprocess import filter_worked_quotes
 except ImportError:
-    from src import margin_framework as mf
     from src.preprocess import filter_worked_quotes
 
 # Feature definitions adhering to commercial representation standards
@@ -444,7 +442,7 @@ def train_and_evaluate(
         "global_median": global_median,
         "port_frequencies": port_frequencies,
         "cohort_table": cohort_table,
-        "margin_tables": mf.build_tables(won_worked),
+        "margin_tables": {},
         "training_window": [
             str(df_all["Year_Month"].min()) if "Year_Month" in df_all.columns else "2026-01",
             str(df_all["Year_Month"].max()) if "Year_Month" in df_all.columns else "2026-09"

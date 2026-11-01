@@ -293,6 +293,26 @@ class TestTaxonomyConstants(unittest.TestCase):
         self.assertEqual(DESTINATION_REGIONS, expected_regions)
         self.assertEqual(len(DESTINATION_REGIONS), 7)
 
+    def test_offline_transshipment_destination_classification(self):
+        from src.taxonomy import is_offline_transshipment_destination
+        # Offline destinations
+        self.assertTrue(is_offline_transshipment_destination("LAD", "Africa"))
+        self.assertTrue(is_offline_transshipment_destination("Luanda", "Africa"))
+        self.assertTrue(is_offline_transshipment_destination("TAS", "Asia-Pacific"))
+        self.assertTrue(is_offline_transshipment_destination("Tashkent", "Asia-Pacific"))
+        self.assertTrue(is_offline_transshipment_destination("Baku", "Europe"))
+        self.assertTrue(is_offline_transshipment_destination("EBB", "Africa"))
+        self.assertTrue(is_offline_transshipment_destination("Bogota", "Latin America"))
+
+        # Direct gateways
+        self.assertFalse(is_offline_transshipment_destination("DXB", "Middle East"))
+        self.assertFalse(is_offline_transshipment_destination("FRA", "Europe"))
+        self.assertFalse(is_offline_transshipment_destination("LHR", "Europe"))
+        self.assertFalse(is_offline_transshipment_destination("JFK", "North America"))
+        self.assertFalse(is_offline_transshipment_destination("SIN", "Asia-Pacific"))
+        self.assertFalse(is_offline_transshipment_destination("NBO", "Africa"))
+
+
 
 if __name__ == "__main__":
     unittest.main()

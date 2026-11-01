@@ -33,6 +33,8 @@ STRATEGY_THRESHOLDS: Dict[str, float] = {
 MIN_MARGIN_PER_AWB_INR: float = 1500.0   # Fixed documentation, screening, AWB issuance cost floor
 MIN_MARGIN_PER_KG_INR: float = 3.0       # Minimum unit operational contribution margin per kg
 OPS_HANDLING_FEE_AWB_INR: float = 850.0  # Baseline origin handling & terminal documentation fee
+MAX_HEAVY_CONSOL_UNIT_MARGIN_INR: float = 4.50  # Unit margin ceiling for >= 5000kg bulk consolidations
+HEAVY_CONSOL_SCALE_WEIGHT_KG: float = 5000.0    # Bulk consolidation scale threshold
 
 # ------------------------------------------------------------------------------
 # COMMODITY RISK BUFFERS TABLE (P-7, F-10, Section 10.1)
@@ -51,8 +53,8 @@ COMMODITY_RISK_BUFFERS: Dict[str, float] = {
     "Live Animals": 0.050,
     "perishable_cold_chain": 0.035,     # +3.5% for temperature tracking & transit time urgency
     "Perishable Foodstuff": 0.035,
-    "pharmaceuticals": 0.040,           # +4.0% for GDP compliance, validated passive packaging
-    "Pharmaceuticals": 0.040,
+    "pharmaceuticals": 0.070,           # +7.0% for active cold-chain GDP compliance, validated passive packaging
+    "Pharmaceuticals": 0.070,
     "valuable_cargo": 0.050,            # +5.0% for vaulting, tarmac escort, high-liability cover
     "Valuables": 0.050,
     "dangerous_goods": 0.060,           # +6.0% for IATA DGR inspection, checklist, hazard segregation
@@ -69,7 +71,7 @@ def resolve_risk_buffer(commodity_group: str, company_group: str = "Subagent") -
     risk_buffer = COMMODITY_RISK_BUFFERS.get(key, 0.0)
     if risk_buffer == 0.0:
         if "pharma" in key or "vaccine" in key:
-            risk_buffer = COMMODITY_RISK_BUFFERS.get("pharmaceuticals", 0.04)
+            risk_buffer = COMMODITY_RISK_BUFFERS.get("pharmaceuticals", 0.070)
         elif "perish" in key or "food" in key:
             risk_buffer = COMMODITY_RISK_BUFFERS.get("perishable_cold_chain", 0.035)
         elif "danger" in key or "dgr" in key or "haz" in key:

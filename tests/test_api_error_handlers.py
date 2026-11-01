@@ -3,7 +3,15 @@ tests/test_api_error_handlers.py
 Tests for content-negotiated uniform error handlers in src/app.py.
 """
 
+import os
+import sys
+from pathlib import Path
 import unittest
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from src.app import app
 
 

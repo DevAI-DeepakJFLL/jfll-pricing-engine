@@ -19,7 +19,7 @@ import sys
 import math
 import logging
 import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import joblib
 import numpy as np
 import pandas as pd
@@ -38,7 +38,7 @@ try:
     from quantile_model import MarginQuantileModel
     from conformal_corridors import ConformalCorridorCalibrator
     from policy_guardrails import apply_commercial_guardrails
-    from taxonomy import classify_commodity, map_destination_region
+    from taxonomy import classify_commodity, map_destination_region, is_offline_transshipment_destination
     from customer_normalizer import normalize_customer_name
     from features_pit import CustomerPITRegistry
     from tiers import get_weight_tier, map_account_tier
@@ -52,7 +52,7 @@ except ImportError:
     from src.quantile_model import MarginQuantileModel
     from src.conformal_corridors import ConformalCorridorCalibrator
     from src.policy_guardrails import apply_commercial_guardrails
-    from src.taxonomy import classify_commodity, map_destination_region
+    from src.taxonomy import classify_commodity, map_destination_region, is_offline_transshipment_destination
     from src.customer_normalizer import normalize_customer_name
     from src.features_pit import CustomerPITRegistry
     from src.tiers import get_weight_tier, map_account_tier
@@ -165,6 +165,26 @@ class PricingEngineV3:
         train_df, cal_df = temporal_split(df)
 
         # 1. Fit Stage 1A MarginQuantileModel
+        # Label Purity: Stage 1A must only train on verified Won deals
+        if "Quote Status" in train_df.columns:
+            train_won_df = train_df[train_df["Quote Status"] == "Won"].copy()
+        elif "status" in train_df.columns:
+            train_won_df = train_df[train_df["status"] == "Won"].copy()
+        else:
+            train_won_df = train_df.copy()
+
+        y_raw = train_won_df["Margin_Percentage"].values
+        y_fit = np.clip(y_raw, 0.5, 45.0)
+
+        # Exponential recency sample weights (lambda = 0.005, half-life ~138 days)
+        if "quote_date" in train_won_df.columns:
+            dates = pd.to_datetime(train_won_df["quote_date"], errors="coerce")
+            max_date = dates.max()
+            days_ago = (max_date - dates).dt.days.fillna(0).values
+            sample_weights = np.exp(-0.005 * days_ago)
+        else:
+            sample_weights = None
+
         self.model = MarginQuantileModel(
             learning_rate=0.08,
             max_iter=80,
@@ -172,7 +192,7 @@ class PricingEngineV3:
             l2_regularization=10.0,
             random_state=42,
         )
-        self.model.fit(train_df, train_df["Margin_Percentage"])
+        self.model.fit(train_won_df, y_fit, sample_weight=sample_weights)
 
         # 2. Fit ConformalCorridorCalibrator (alpha=0.10 => 90% coverage)
         cal_preds = self.model.predict(cal_df)
@@ -297,6 +317,16 @@ class PricingEngineV3:
         self.model = bundle["model"]
         self.calibrator = bundle["calibrator"]
         self.win_model = bundle.get("win_model")
+        if self.win_model is None:
+            win_path = os.path.join(os.path.dirname(os.path.abspath(target)), "win_model.joblib")
+            if os.path.exists(win_path):
+                from src.win_model import WinModel
+                try:
+                    verify_artifact_integrity(win_path)
+                    self.win_model = WinModel().load(win_path)
+                    logger.info("Auxiliary WinModel loaded successfully from %s", win_path)
+                except Exception as e:
+                    logger.warning("Could not load auxiliary win_model from %s: %s", win_path, e)
         self.corridor_coverage = bundle.get("corridor_coverage")
         self.pit_registry = bundle.get("pit_registry", CustomerPITRegistry())
         self.slab_quantiles = bundle.get("slab_quantiles", {})
@@ -305,21 +335,42 @@ class PricingEngineV3:
         self.is_fitted = True
         return self
 
+    def _get_slab_arrays(self, slab_str: str) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """Cached fast-path for static float64 quantile arrays and percentage linspace."""
+        if not hasattr(self, "_slab_arr_cache"):
+            self._slab_arr_cache = {}
+        cached = self._slab_arr_cache.get(slab_str)
+        if cached is not None:
+            return cached
+        qv = self.slab_quantiles.get(slab_str)
+        if not qv and self.slab_quantiles:
+            qv = next(iter(self.slab_quantiles.values()))
+        if not qv:
+            return None
+        qv_arr = np.ascontiguousarray(qv, dtype=np.float64)
+        pcts = np.linspace(0.0, 100.0, len(qv_arr), dtype=np.float64)
+        res = (qv_arr, pcts)
+        self._slab_arr_cache[slab_str] = res
+        return res
+
     def compute_history_percentile(self, slab: str, margin_per_kg: float) -> float:
         """
         Returns empirical share (0-100%) of historically won deals in weight slab
         whose INR/kg margin was <= margin_per_kg.
         """
-        slab_str = str(slab)
-        qv = self.slab_quantiles.get(slab_str)
-        if not qv and self.slab_quantiles:
-            qv = next(iter(self.slab_quantiles.values()))
-        if not qv:
+        arrs = self._get_slab_arrays(str(slab))
+        if arrs is None:
             return 50.0
+        return float(np.interp(margin_per_kg, arrs[0], arrs[1]))
 
-        qv_arr = np.array(qv)
-        pcts = np.linspace(0.0, 100.0, len(qv_arr))
-        return float(np.interp(margin_per_kg, qv_arr, pcts))
+    def compute_history_percentile_vec(self, slab: str, margin_per_kg_arr: np.ndarray) -> np.ndarray:
+        """
+        Vectorized empirical share computation across an array of INR/kg margins in a single C call.
+        """
+        arrs = self._get_slab_arrays(str(slab))
+        if arrs is None:
+            return np.full(margin_per_kg_arr.shape, 50.0, dtype=np.float64)
+        return np.interp(margin_per_kg_arr, arrs[0], arrs[1])
 
     def _counterfactual_signals(self, feat_df: pd.DataFrame, why: dict) -> dict:
         """Computes true counterfactual feature attributions from the underlying tree ensemble."""
@@ -396,6 +447,7 @@ class PricingEngineV3:
 
         raw_dest = str(inq.get("Destination_Port") or inq.get("dest") or inq.get("Destination_Region") or "")
         dest_region = map_destination_region(raw_dest) if raw_dest else str(inq.get("Destination_Region") or "Europe")
+        is_offline_lane = is_offline_transshipment_destination(raw_dest, dest_region)
 
         regional_lane = f"{origin_region} -> {dest_region}"
         client_cat = str(inq.get("Company_Group") or inq.get("client") or "Subagent")
@@ -508,6 +560,8 @@ class PricingEngineV3:
             chargeable_wt=chargeable_wt,
             commodity=canonical_comm,
             client_cat=client_cat,
+            density_ratio=density_ratio,
+            is_offline_destination=is_offline_lane,
         )
         guard_bal = apply_commercial_guardrails(
             raw_margin_pct=raw_p50,
@@ -515,6 +569,8 @@ class PricingEngineV3:
             chargeable_wt=chargeable_wt,
             commodity=canonical_comm,
             client_cat=client_cat,
+            density_ratio=density_ratio,
+            is_offline_destination=is_offline_lane,
         )
         guard_prem = apply_commercial_guardrails(
             raw_margin_pct=raw_p90,
@@ -522,6 +578,8 @@ class PricingEngineV3:
             chargeable_wt=chargeable_wt,
             commodity=canonical_comm,
             client_cat=client_cat,
+            density_ratio=density_ratio,
+            is_offline_destination=is_offline_lane,
         )
 
         # 5. Distinct Strategic Tiers Enforcement (margin_floor < margin_balanced < margin_premium)
@@ -737,21 +795,36 @@ class PricingEngineV3:
 
         # 7. Real Calibrated Monotonic Win Probability Model
         # Modulates calibrated logit anchors using WinModel features (lane, customer, commodity, scale)
+        # and dynamic spread between quoted margin and unconstrained market median (raw_p50).
         clf_bias = 0.0
         if getattr(self, "win_model", None) and getattr(self.win_model, "is_fitted", False):
             try:
-                base_prob = float(self.win_model.predict_df(feat_df.assign(Margin_Percentage=m_bal))[0])
-                # Center around training median (~0.83) to produce a [-0.15, +0.15] logit shift
-                clf_bias = float(np.clip((base_prob - 0.83) * 1.5, -0.15, 0.15))
+                base_prob = float(self.win_model.predict_df(feat_df.assign(Margin_Percentage=raw_p50))[0])
+                # Center around win model calibration median (~0.67) to produce a [-0.30, +0.30] logit shift
+                clf_bias = float(np.clip((base_prob - 0.67) * 1.5, -0.30, 0.30))
             except Exception as e:
                 logger.debug(f"WinModel feature modulation failed: {e}")
 
-        z_floor = 0.84729786 + clf_bias
-        z_bal = -0.20067070 + clf_bias
-        z_prem = -1.09861229 + clf_bias
+        # Account activity prior baseline
+        TIER_BASE_LOGITS = {
+            "Key Account": 0.35,        # ~58% base
+            "Regular": -0.20067,        # ~45% base
+            "Occasional": -0.42,        # ~40% base
+            "Spot / One-Off": -0.62,    # ~35% base
+        }
+        z_base = TIER_BASE_LOGITS.get(account_tier, -0.20067) + clf_bias
 
-        slope_lo = (z_floor - z_bal) / max(0.15, m_bal - m_floor)
-        slope_hi = (z_bal - z_prem) / max(0.15, m_prem - m_bal)
+        # Dynamic sensitivity slope per percentage point margin divergence from corridor median (raw_p50)
+        # Quoting above market median degrades win probability, quoting below enhances conversion.
+        # Enforce realistic bounds for balanced tier logit [-0.60, 0.40] (approx 35% to 60% win prob)
+        z_bal = z_base - 0.15 * (m_bal - raw_p50)
+        z_bal = max(-0.6190, min(0.4055, z_bal))
+
+        # Anchor distinct tier margins: floor wins more (+1.05 logit), premium wins less (-0.90 logit)
+        span_lo = max(0.20, m_bal - m_floor)
+        span_hi = max(0.20, m_prem - m_bal)
+        slope_lo = max(0.12, 1.05 / span_lo)
+        slope_hi = max(0.12, 0.90 / span_hi)
 
         def compute_win_probability(margin_pct: float) -> float:
             m = float(margin_pct)
@@ -800,29 +873,40 @@ class PricingEngineV3:
                 "Is_Clamped_By_Cap": guard_obj.is_cap_clamped,
             }
 
-        # 9. Sensitivity Ladder (15 steps spanning strategic tiers)
+        # 9. Sensitivity Ladder (15 steps spanning strategic tiers - Vectorized)
         n_cohort = self.slab_counts.get(str(weight_tier), 30)
-        sensitivity_rows = []
-        for pct in grid_steps:
-            s_inr = round(buy_cost * (1.0 + pct / 100.0), 2)
-            m_inr = round(s_inr - buy_cost, 2)
-            r_pkg = round(s_inr / chargeable_wt, 2)
-            m_pkg = round(m_inr / chargeable_wt, 2)
-            w_p = round(compute_win_probability(pct), 4)
-            e_p = round(m_inr * w_p, 2)
-            h_p = round(self.compute_history_percentile(weight_tier, m_pkg), 1)
+        grid_arr = np.asarray(grid_steps, dtype=np.float64)
+        s_inr_arr = np.round(buy_cost * (1.0 + grid_arr / 100.0), 2)
+        m_inr_arr = np.round(s_inr_arr - buy_cost, 2)
+        r_pkg_arr = np.round(s_inr_arr / chargeable_wt, 2)
+        m_pkg_arr = np.round(m_inr_arr / chargeable_wt, 2)
 
-            sensitivity_rows.append({
-                "Margin_Percentage": pct,
-                "Quoted_Sell_Price_INR": s_inr,
-                "Margin_Amount_INR": m_inr,
-                "Rate_Per_Kg": r_pkg,
-                "Margin_Per_Kg": m_pkg,
-                "Win_Probability": w_p,
-                "Expected_Profit_INR": e_p,
-                "History_Percentile": h_p,
+        # Vectorized win probability computation
+        z_arr = np.where(
+            grid_arr <= m_bal,
+            z_bal + (m_bal - grid_arr) * slope_lo,
+            z_bal - (grid_arr - m_bal) * slope_hi
+        )
+        z_arr = np.clip(z_arr, -5.0, 5.0)
+        p_arr = 1.0 / (1.0 + np.exp(-z_arr))
+        w_p_arr = np.round(np.clip(p_arr, 0.05, 0.95), 4)
+        e_p_arr = np.round(m_inr_arr * w_p_arr, 2)
+        h_p_arr = np.round(self.compute_history_percentile_vec(weight_tier, m_pkg_arr), 1)
+
+        sensitivity_rows = [
+            {
+                "Margin_Percentage": float(grid_arr[i]),
+                "Quoted_Sell_Price_INR": float(s_inr_arr[i]),
+                "Margin_Amount_INR": float(m_inr_arr[i]),
+                "Rate_Per_Kg": float(r_pkg_arr[i]),
+                "Margin_Per_Kg": float(m_pkg_arr[i]),
+                "Win_Probability": float(w_p_arr[i]),
+                "Expected_Profit_INR": float(e_p_arr[i]),
+                "History_Percentile": float(h_p_arr[i]),
                 "Cohort_N": n_cohort,
-            })
+            }
+            for i in range(len(grid_arr))
+        ]
 
         # 10. Governance Approvals & Warnings
         approvals = list(guard_bal.approval_required)

@@ -5,7 +5,7 @@ risk buffers, and governance approval rules. (Issue M1, Fix 4)
 """
 
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from constants import (
@@ -13,6 +13,8 @@ try:
         MIN_MARGIN_PER_AWB_INR,
         MIN_MARGIN_PER_KG_INR,
         OPS_HANDLING_FEE_AWB_INR,
+        MAX_HEAVY_CONSOL_UNIT_MARGIN_INR,
+        HEAVY_CONSOL_SCALE_WEIGHT_KG,
         compute_cost_floor_price,
         get_commodity_max_margin,
         get_client_category_max_margin,
@@ -25,6 +27,8 @@ except ImportError:
         MIN_MARGIN_PER_AWB_INR,
         MIN_MARGIN_PER_KG_INR,
         OPS_HANDLING_FEE_AWB_INR,
+        MAX_HEAVY_CONSOL_UNIT_MARGIN_INR,
+        HEAVY_CONSOL_SCALE_WEIGHT_KG,
         compute_cost_floor_price,
         get_commodity_max_margin,
         get_client_category_max_margin,
@@ -66,6 +70,8 @@ def apply_commercial_guardrails(
     chargeable_wt: float,
     commodity: str = "General Cargo",
     client_cat: str = "Subagent",
+    density_ratio: Optional[float] = None,
+    is_offline_destination: bool = False,
 ) -> GuardrailResult:
     """
     Applies deterministic commercial profitability floors, risk buffers, and margin
@@ -82,7 +88,8 @@ def apply_commercial_guardrails(
         GuardrailResult: Frozen dataclass with final margin, prices, clamping flags,
                          limiting factor, and required governance approvals.
     """
-    raw_m = float(raw_margin_pct)
+    raw_margin_input = float(raw_margin_pct)
+    raw_m = raw_margin_input
     buy = max(0.0, float(buy_cost))
     wt = max(1.0, float(chargeable_wt))
     comm_str = str(commodity or "General Cargo").strip()
@@ -92,6 +99,16 @@ def apply_commercial_guardrails(
     comm_cap = float(get_commodity_max_margin(comm_str))
     cat_cap = float(get_client_category_max_margin(client_str))
     effective_cap = round(min(comm_cap, cat_cap), 2)
+    is_consol_capped = False
+    consol_cap_margin = 999.0
+
+    # Bulk heavy consolidation unit margin ceiling (<= 4.50 INR/kg on >= 5000 kg shipments)
+    if wt >= HEAVY_CONSOL_SCALE_WEIGHT_KG and buy > 0.0:
+        max_consol_margin_inr = MAX_HEAVY_CONSOL_UNIT_MARGIN_INR * wt
+        consol_cap_margin = round((max_consol_margin_inr / buy) * 100.0, 2)
+        if consol_cap_margin < effective_cap:
+            effective_cap = max(MIN_CANDIDATE_MARGIN, consol_cap_margin)
+            is_consol_capped = True
 
     # 2. Compute Cost Floor Price & Margin %
     cost_floor_price = round(
@@ -109,6 +126,20 @@ def apply_commercial_guardrails(
     else:
         cost_floor_margin = 0.0
 
+    # Volumetric high-cube yield penalty: low-density bulky cargo consumes aircraft cubic capacity
+    density_surcharge = 0.0
+    if density_ratio is not None and float(density_ratio) > 1.25:
+        density_surcharge = round(min(6.0, (float(density_ratio) - 1.25) * 1.5), 2)
+        raw_m += density_surcharge
+        cost_floor_margin = round(max(cost_floor_margin, MIN_CANDIDATE_MARGIN + density_surcharge), 2)
+
+    # Offline / transshipment transit risk buffer: remote destinations require interline re-forwarding
+    offline_surcharge = 0.0
+    if is_offline_destination:
+        offline_surcharge = 4.0
+        raw_m += offline_surcharge
+        cost_floor_margin = round(max(cost_floor_margin, MIN_CANDIDATE_MARGIN + offline_surcharge), 2)
+
     # 3. Determine Cost Floor Limiting Factor Breakdown
     rate = buy / wt if wt > 0.0 else 0.0
     if wt <= 45.0:
@@ -121,6 +152,11 @@ def apply_commercial_guardrails(
         ops_fee = min(OPS_HANDLING_FEE_AWB_INR, max(200.0, 0.010 * buy))
 
     risk_buffer = _resolve_risk_buffer(comm_str, client_str)
+    if risk_buffer > 0.0:
+        special_cargo_surcharge = round(risk_buffer * 100.0, 2)
+        raw_m += special_cargo_surcharge
+        cost_floor_margin = round(max(cost_floor_margin, MIN_CANDIDATE_MARGIN + special_cargo_surcharge), 2)
+
     pct_floor_price = (buy * (1.0 + (MIN_CANDIDATE_MARGIN / 100.0) + risk_buffer)) + ops_fee
     abs_floor_price = buy + awb_min + (unit_min * wt)
 
@@ -145,6 +181,9 @@ def apply_commercial_guardrails(
     elif any(x in comm_str.lower() for x in ["animal", "avi", "livestock"]):
         approvals.append("special cargo: Live Animals")
 
+    if is_offline_destination:
+        approvals.append("offline transshipment route")
+
     # Conflicting bounds: Cost floor exceeds maximum ceiling
     is_conflicting_bounds = bool(cost_floor_margin > effective_cap)
     if is_conflicting_bounds:
@@ -166,7 +205,9 @@ def apply_commercial_guardrails(
         final_margin_pct = effective_cap
         is_floor_clamped = False
         is_cap_clamped = True
-        if comm_cap <= cat_cap:
+        if is_consol_capped and effective_cap == consol_cap_margin:
+            limiting_factor = "heavy_consol_unit_cap"
+        elif comm_cap <= cat_cap:
             limiting_factor = "commodity_cap"
         else:
             limiting_factor = "client_category_cap"
@@ -187,7 +228,7 @@ def apply_commercial_guardrails(
     rate_per_kg_inr = round(sell_price_inr / wt, 2)
 
     return GuardrailResult(
-        raw_margin_pct=round(raw_m, 2),
+        raw_margin_pct=round(raw_margin_input, 2),
         final_margin_pct=round(final_margin_pct, 2),
         margin_amount_inr=margin_amount_inr,
         sell_price_inr=sell_price_inr,

@@ -342,12 +342,24 @@ class CustomerPITRegistry:
 
         resolved_lane = regional_lane if regional_lane is not None else lane
 
-        # Insert customer record maintaining timestamp sort order
-        cust_list = self._customers[str(customer_id)]
-        cust_entry = (dt, won_int, margin_val, sell_val)
-        # Use bisect on timestamp with O(1) allocation key
-        ins_idx = bisect.bisect_right(cust_list, dt, key=lambda entry: entry[0])
-        cust_list.insert(ins_idx, cust_entry)
+        # Insert customer record maintaining timestamp sort order across canonical alias keys
+        keys_to_update = {str(customer_id), str(customer_id).strip().upper()}
+        try:
+            from src.customer_normalizer import get_canonical_customer_id, normalize_customer_name
+            c_norm = normalize_customer_name(str(customer_id))
+            c_id = get_canonical_customer_id(str(customer_id))
+            if c_norm:
+                keys_to_update.add(c_norm)
+            if c_id:
+                keys_to_update.add(c_id)
+        except Exception:
+            pass
+
+        for k in keys_to_update:
+            cust_list = self._customers[k]
+            cust_entry = (dt, won_int, margin_val, sell_val)
+            ins_idx = bisect.bisect_right(cust_list, dt, key=lambda entry: entry[0])
+            cust_list.insert(ins_idx, cust_entry)
 
         # Insert lane record if won with valid margin
         if won_int == 1 and not np.isnan(margin_val) and resolved_lane:
@@ -413,7 +425,6 @@ class CustomerPITRegistry:
                 t_180 = current_t - pd.Timedelta(days=LOOKBACK_CUSTOMER_DAYS)
                 idx_left_180 = bisect.bisect_left(cust_list, t_180, key=lambda entry: entry[0])
 
-                prior_slice = cust_list[:idx_right]
                 window_slice = cust_list[idx_left_180:idx_right]
 
                 inquiry_count_180d = len(window_slice)
@@ -426,16 +437,21 @@ class CustomerPITRegistry:
                 else:
                     win_rate_180d = DEFAULT_WIN_RATE
 
-                # Lifetime prior won deals strictly before current_t
-                all_prior_wons = [e for e in prior_slice if e[1] == 1]
-                if all_prior_wons:
-                    # Most recent won booking
-                    last_won_dt = all_prior_wons[-1][0]
+                # Reverse pointer scan: find most recent won deal in O(1) expected time without full slicing
+                last_won_dt = None
+                for i in range(idx_right - 1, -1, -1):
+                    if cust_list[i][1] == 1:
+                        last_won_dt = cust_list[i][0]
+                        break
+
+                if last_won_dt is not None:
                     recency_delta = (current_t - last_won_dt) / pd.Timedelta(days=1)
                     recency_days = max(float(recency_delta), 0.0)
 
                     valid_margins = [
-                        e[2] for e in all_prior_wons if not np.isnan(e[2])
+                        cust_list[i][2]
+                        for i in range(idx_right)
+                        if cust_list[i][1] == 1 and not np.isnan(cust_list[i][2])
                     ]
                     if valid_margins:
                         median_margin_won = float(np.median(valid_margins))
@@ -461,6 +477,16 @@ class CustomerPITRegistry:
             "cust_pit_total_spend_inr_180d": total_spend_180d,
             "cust_pit_win_rate_180d": win_rate_180d,
             "lane_pit_median_margin_won_90d": lane_median_margin_90d,
+        }
+
+    def lookup_customer(self, customer_id: str, as_of: Optional[Any] = None) -> Dict[str, Any]:
+        """Convenience query for customer point-in-time state."""
+        dt = as_of if as_of is not None else (pd.Timestamp.now() + pd.Timedelta(days=1))
+        feats = self.get_features(quote_date=dt, customer_id=customer_id)
+        return {
+            "won_count_180d": feats.get("cust_pit_won_count_180d", 0),
+            "win_rate_180d": feats.get("cust_pit_win_rate_180d", 0.0),
+            "features": feats
         }
 
     def load_dataframe(

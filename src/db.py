@@ -112,7 +112,8 @@ def get_recent_competitor_rate_benchmark(
     abs_path = os.path.abspath(db_path)
     if not os.path.exists(abs_path):
         return None
-    migrate_outcome_columns(abs_path)
+    if abs_path not in _INITIALIZED_DBS:
+        init_history_db(abs_path)
 
     with sqlite3.connect(abs_path, timeout=5.0) as conn:
         conn.row_factory = sqlite3.Row
@@ -281,6 +282,7 @@ def init_history_db(db_path: str = "data/recommendations_history.db", force: boo
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_id_desc ON recommendation_history(id DESC)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_active ON recommendation_history(is_deleted, is_preset)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_lane ON recommendation_history(origin_port, dest_port, is_deleted, timestamp DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rec_history_lane_comp ON recommendation_history(origin_port, dest_port, competitor_rate_per_kg, is_deleted)")
 
         cursor.execute(f"PRAGMA user_version = {int(CURRENT_SCHEMA_VERSION)}")
         conn.commit()
@@ -389,7 +391,7 @@ def log_recommendation(
                 sales_person
             ))
             conn.commit()
-            return True
+            return cursor.lastrowid
     except Exception as err:
         logger.error(f"Audit History Logging Failed: {err}", exc_info=True)
         return False
@@ -467,30 +469,59 @@ def get_history_paginated(
     db_path: str,
     page: int = 1,
     per_page: int = 15,
-    include_presets: bool = False
+    include_presets: bool = False,
+    cursor_id: Optional[int] = None
 ) -> Dict[str, Any]:
-    """Retrieve a paginated slice of active recommendation history records with consistent filtering."""
-    init_history_db(db_path)
-    migrate_outcome_columns(db_path)
+    """Retrieve a paginated slice of active recommendation history records with consistent filtering and optional keyset cursor."""
+    abs_path = os.path.abspath(db_path)
+    if abs_path not in _INITIALIZED_DBS:
+        init_history_db(abs_path)
     page = max(1, page)
     per_page = max(5, min(100, per_page))
 
-    with sqlite3.connect(db_path, timeout=15.0) as conn:
+    with sqlite3.connect(abs_path, timeout=15.0) as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        if include_presets:
-            total = cur.execute("SELECT COUNT(*) FROM recommendation_history WHERE is_deleted = 0").fetchone()[0]
-        else:
-            total = cur.execute("SELECT COUNT(*) FROM recommendation_history WHERE is_deleted = 0 AND is_preset = 0").fetchone()[0]
+
+        # Single-pass stats + total count calculation on the same open connection
+        stats_where = "is_deleted = 0" if include_presets else "is_deleted = 0 AND is_preset = 0"
+        stats_query = f"""
+            SELECT
+                COUNT(*),
+                SUM(CASE WHEN status = 'Won' THEN 1 ELSE 0 END),
+                SUM(COALESCE(selling_price_inr, 0))
+            FROM recommendation_history
+            WHERE {stats_where}
+        """
+        stat_row = cur.execute(stats_query).fetchone()
+        total = stat_row[0] if stat_row and stat_row[0] is not None else 0
+        won_count = stat_row[1] if stat_row and stat_row[1] is not None else 0
+        total_pipeline = float(stat_row[2]) if stat_row and stat_row[2] is not None else 0.0
+        win_rate = (won_count / total * 100) if total > 0 else 0.0
+
+        stats = {
+            "total_count": total,
+            "total_quotes": total,
+            "won_count": won_count,
+            "total_pipeline": total_pipeline,
+            "win_rate": win_rate
+        }
+
         pages = max(1, (total + per_page - 1) // per_page)
-        page = min(page, pages)
-        off = (page - 1) * per_page
         recs = []
-        if include_presets:
-            query = "SELECT * FROM recommendation_history WHERE is_deleted = 0 ORDER BY id DESC LIMIT ? OFFSET ?"
+
+        if cursor_id is not None:
+            # O(log N) Keyset / cursor pagination using indexed (id DESC)
+            query = f"SELECT * FROM recommendation_history WHERE {stats_where} AND id < ? ORDER BY id DESC LIMIT ?"
+            params = (cursor_id, per_page)
+            off = 0
         else:
-            query = "SELECT * FROM recommendation_history WHERE is_deleted = 0 AND is_preset = 0 ORDER BY id DESC LIMIT ? OFFSET ?"
-        for r in cur.execute(query, (per_page, off)):
+            page = min(page, pages)
+            off = (page - 1) * per_page
+            query = f"SELECT * FROM recommendation_history WHERE {stats_where} ORDER BY id DESC LIMIT ? OFFSET ?"
+            params = (per_page, off)
+
+        for r in cur.execute(query, params):
             d = dict(r)
             d["status"] = d.get("status") or "Draft / Quoted"
             d["status_class"] = get_status_class(d["status"])
@@ -501,6 +532,8 @@ def get_history_paginated(
                 else:
                     d["margin_range"] = f"{d['margin_pct']:.1f}%"
             recs.append(d)
+
+    next_cursor = recs[-1]["id"] if (recs and len(recs) == per_page) else None
 
     return {
         "records": recs,
@@ -514,7 +547,8 @@ def get_history_paginated(
         "next_page": page + 1,
         "start_idx": off + 1 if total else 0,
         "end_idx": min(off + per_page, total),
-        "stats": get_history_stats(db_path, include_presets=include_presets)
+        "next_cursor": next_cursor,
+        "stats": stats
     }
 
 

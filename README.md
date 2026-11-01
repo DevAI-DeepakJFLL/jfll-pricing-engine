@@ -4,7 +4,7 @@
 ### *Enterprise ML Margin Optimization • Conformal Negotiation Corridors • Hard Commercial Guardrails*
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests Passing](https://img.shields.io/badge/Tests-356%20Passing%20(100%25)-2ea44f?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Tests Passing](https://img.shields.io/badge/Tests-330%20Passing%20(100%25)-2ea44f?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
 [![Architecture](https://img.shields.io/badge/Architecture-Quantile%20ML%20%2B%20Conformal-00A699?style=for-the-badge)](src/engine_v3.py)
 [![Latency](https://img.shields.io/badge/Inference%20Latency-%3C15ms-blueviolet?style=for-the-badge)](src/engine_v3.py)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](Dockerfile)
@@ -178,18 +178,19 @@ air_export_pricing_engine/
 │       ├── index.html                        # Pricing engine web UI with authentic styling & clean manual entry
 │       └── history.html                      # Historical quotes & CRM lead management
 │
-├── tests/                                    # 47 test suites (360 automated tests: 356 passing, 4 skipped)
+├── tests/                                    # 42 test suites (334 automated tests: 330 passing, 4 skipped)
 │
 ├── scripts/
 │   ├── ingest_and_split_2025.py              # Ingests and splits temporal training/test sets
+│   ├── compute_pit_2025.py                   # Computes point-in-time features & customer registry
 │   ├── train_v3_2025.py                      # Trains PricingEngineV3 bundle
 │   ├── evaluate_2025_test_set.py             # Holdout test set evaluator & scorecard
 │   ├── evaluate_recent_2_weeks.py            # Multi-sheet Recent 2 Weeks discrepancy benchmark
 │   ├── run_rolling_backtest.py               # Expanding-window backtest harness
+│   ├── stress_test_12_archetypes.py          # 12 buyer archetype commercial stress testing
 │   ├── monitor_market_drift.py               # Offline Market & Concept Drift Watchdog
 │   ├── verify_vocab_alignment.py             # UI vs. model encoder vocabulary alignment gate
-│   ├── deploy_aws.py                         # Cloud resource provisioning & deployment
-│   └── test_runner.py                        # Standalone regression test runner
+│   └── deploy_aws.py                         # Cloud resource provisioning & deployment
 │
 ├── requirements.txt                          # Locked dependencies
 ├── run.sh                                    # Unified project CLI runner
@@ -214,7 +215,7 @@ All tasks are managed through `./run.sh`:
 # 3. Train Pricing Engine V3 and build conformal corridor tables
 ./run.sh train
 
-# 4. Run full unit and scenario test suite (356 passing)
+# 4. Run full unit and scenario test suite (330 passing, 4 skipped)
 ./run.sh test
 
 # 5. Run Offline Market & Concept Drift Watchdog
@@ -238,7 +239,7 @@ The web application is available at:
 
 ## 🧪 Automated Realistic Scenarios (T1–T15)
 
-The automated scenario suite ([`tests/test_scenarios_t1_t15.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/tests/test_scenarios_t1_t15.py)) validates critical commercial edge cases:
+The automated realistic scenario suite ([`tests/test_api_v3_quote.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/tests/test_api_v3_quote.py), [`tests/test_audit_remediation.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/tests/test_audit_remediation.py), [`tests/test_policy_guardrails.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/tests/test_policy_guardrails.py)) and stress test harness ([`scripts/stress_test_12_archetypes.py`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/scripts/stress_test_12_archetypes.py)) validate critical commercial edge cases:
 
 | Scenario | Focus | Verified Commercial Behavior |
 |:---|:---|:---|
@@ -321,4 +322,4 @@ curl -X POST http://127.0.0.1:5050/api/quote \
 - **Cryptographic Model Verification (SHA-256):** Every serialized bundle is validated against [`models/checksums.json`](file:///Users/deepak/Development/Jet%20Freight%20Logistics/Air%20Cargo%20Pricing%20Engine/models/checksums.json) before deserialization to defeat arbitrary code execution (CWE-502).
 - **Constant-Time Admin Authentication:** Admin endpoints require Bearer tokens validated via `hmac.compare_digest` to prevent timing side-channel leaks (CWE-208), with strict query-string token rejection (CWE-598).
 - **CSV Formula Injection Sanitization:** All exported audit ledgers sanitize formula triggers (`=`, `+`, `-`, `@`, `\t`, `\r`) with leading single quotes to prevent spreadsheet execution vulnerabilities (CWE-1236).
-- **UI Governance:** The user interface adheres strictly to established typography (`Outfit`, `Mulish`) and brand palettes (`#23c2f2`, `#a7cf45`). Clean form input defaults are loaded on start to enable fresh manual quote entry while preserving 15 one-click realistic test scenarios for instant demonstration.
+- **UI Governance:** The user interface adheres strictly to established typography (`Outfit`, `Mulish`) and the approved Notion-inspired minimalist slate palette (slate canvas `#edf1f5`, card surface `#ffffff`, deep text `#0f172a`, and brand blue accents `#2563eb`). Clean form input defaults are loaded on start to enable fresh manual quote entry while preserving one-click preset scenarios for instant demonstration.

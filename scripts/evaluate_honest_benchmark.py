@@ -170,36 +170,34 @@ def evaluate_models(
         raise FileNotFoundError(f"Model bundle not found at: {bundle_path}")
     bundle = joblib.load(bundle_path)
 
-    # 3. Current Production Model (src/margin_framework.py)
+    # 3. Historical Legacy V2 Model (if archive exists)
     try:
-        from src import margin_framework as mf
+        from legacy.v2.src import margin_framework as mf
         tables = bundle.get("margin_tables")
-        if not tables:
-            raise KeyError("margin_tables not found in bundle")
+        if tables:
+            pred_mf = []
+            min_corr = []
+            max_corr = []
+            for row in benchmark_df.to_dict(orient="records"):
+                rec = mf.recommend(row, tables)
+                legacy = mf.to_legacy_response(row, rec, tables)
+                pred_mf.append(legacy["optimal"]["Margin_Percentage"])
+                corr = legacy.get("negotiation_corridor", {})
+                min_corr.append(corr.get("min_margin_pct", np.nan))
+                max_corr.append(corr.get("max_margin_pct", np.nan))
 
-        pred_mf = []
-        min_corr = []
-        max_corr = []
-        for _, row in benchmark_df.iterrows():
-            rec = mf.recommend(row.to_dict(), tables)
-            legacy = mf.to_legacy_response(row.to_dict(), rec, tables)
-            pred_mf.append(legacy["optimal"]["Margin_Percentage"])
-            corr = legacy.get("negotiation_corridor", {})
-            min_corr.append(corr.get("min_margin_pct", np.nan))
-            max_corr.append(corr.get("max_margin_pct", np.nan))
+            pred_mf_s = pd.Series(pred_mf, index=benchmark_df.index)
+            min_corr_s = pd.Series(min_corr, index=benchmark_df.index)
+            max_corr_s = pd.Series(max_corr, index=benchmark_df.index)
 
-        pred_mf_s = pd.Series(pred_mf, index=benchmark_df.index)
-        min_corr_s = pd.Series(min_corr, index=benchmark_df.index)
-        max_corr_s = pd.Series(max_corr, index=benchmark_df.index)
-
-        results["Current Production Model (margin_framework.py)"] = compute_evaluation_metrics(
-            actual, pred_mf_s, buy, min_margin=min_corr_s, max_margin=max_corr_s
-        )
-        results["Current Production Model (margin_framework.py)"]["notes"] = (
-            "Current live serving engine in app.py (cohort bands + signal adjusters)"
-        )
-    except Exception as e:
-        print(f"Warning: Could not evaluate margin_framework.py: {e}", file=sys.stderr)
+            results["Historical V2 Baseline (margin_framework.py)"] = compute_evaluation_metrics(
+                actual, pred_mf_s, buy, min_margin=min_corr_s, max_margin=max_corr_s
+            )
+            results["Historical V2 Baseline (margin_framework.py)"]["notes"] = (
+                "Historical cohort engine baseline for comparison"
+            )
+    except Exception:
+        pass
 
     # 4. Stage 1A Market Benchmark Regressor
     try:

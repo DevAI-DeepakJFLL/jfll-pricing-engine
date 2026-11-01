@@ -500,6 +500,8 @@ EXACT_PORT_MAP: Dict[str, str] = {
     "YAOUNDE": "Africa",
     "NSI": "Africa",
     "NSIMALEN": "Africa",
+    "LUANDA": "Africa",
+    "LAD": "Africa",
 
     "YAO": "Asia-Pacific",
 
@@ -1395,3 +1397,64 @@ def map_destination_region(port_name: str, country_name: str = "") -> str:
         return best_region
 
     return "Other Destination"
+
+
+# ------------------------------------------------------------------------------
+# DIRECT GATEWAYS & OFFLINE TRANSSHIPMENT RESOLUTION
+# ------------------------------------------------------------------------------
+
+# Direct international gateway airports connected by direct/widebody flights from India
+DIRECT_GATEWAY_IATA_CODES = {
+    # Middle East
+    "DXB", "DWC", "AUH", "SHJ", "DOH", "MCT", "BAH", "KWI", "RUH", "JED", "DMM",
+    # Europe
+    "LHR", "LGW", "FRA", "MUC", "CDG", "AMS", "ZRH", "VIE", "MXP", "FCO", "MAD", "BCN", "HEL", "WAW", "IST",
+    # North America
+    "JFK", "EWR", "ORD", "SFO", "LAX", "IAD", "DFW", "ATL", "MIA", "YYZ", "YVR",
+    # Asia-Pacific
+    "SIN", "BKK", "DMK", "KUL", "HKG", "ICN", "NRT", "HND", "PVG", "CAN", "PEK", "TPE", "SYD", "MEL", "KIX", "HAN", "SGN",
+    # Indian Subcontinent
+    "CMB", "DAC", "KTM", "MLE",
+    # Africa (direct hubs only)
+    "NBO", "ADD", "JNB", "MRU", "SEZ",
+}
+
+# Known offline / secondary destinations requiring multi-leg transshipment or interline transfer
+KNOWN_OFFLINE_DESTINATIONS = {
+    "LAD", "LUANDA", "TAS", "TASHKENT", "GYD", "BAK", "BAKU", "EBB", "ENTEBBE",
+    "ALA", "ALMATY", "MPM", "MAPUTO", "BKO", "BAMAKO", "NKC", "NOUAKCHOTT",
+    "DKR", "DAKAR", "LOS", "LAGOS", "ACC", "ACCRA", "ABJ", "ABIDJAN",
+    "KGL", "KIGALI", "DAR", "DAR ES SALAAM", "LUN", "LUSAKA", "HRE", "HARARE",
+    "FRU", "BISHKEK", "TBS", "TBILISI", "DYU", "DUSHANBE", "ASB", "ASHGABAT",
+    "EVN", "YEREVAN", "ASU", "ASUNCION", "MVD", "MONTEVIDEO", "UBN", "ULAANBAATAR",
+    "BOG", "BOGOTA", "SCL", "SANTIAGO", "LIM", "LIMA", "EZE", "BUENOS AIRES",
+}
+
+
+def is_offline_transshipment_destination(port_name: str, region_name: str = "") -> bool:
+    """
+    Identifies whether a destination airport or city requires multi-leg transshipment
+    or interline re-forwarding (non-direct gateway from Indian origin hubs).
+    """
+    clean_port = str(port_name or "").strip().upper()
+    if not clean_port:
+        return False
+
+    if clean_port in KNOWN_OFFLINE_DESTINATIONS:
+        return True
+
+    for offline_name in KNOWN_OFFLINE_DESTINATIONS:
+        if len(offline_name) > 3 and offline_name in clean_port:
+            return True
+
+    if clean_port in DIRECT_GATEWAY_IATA_CODES:
+        return False
+
+    clean_region = str(region_name or "").strip()
+    if clean_region == "Latin America":
+        return True
+
+    if clean_region == "Africa" and clean_port not in DIRECT_GATEWAY_IATA_CODES:
+        return True
+
+    return False

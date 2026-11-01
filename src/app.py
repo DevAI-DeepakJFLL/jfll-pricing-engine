@@ -203,9 +203,9 @@ except ImportError:
     from src.engine_v3 import PricingEngineV3
 
 try:
-    from validation import QuoteValidationError
+    from validation import QuoteValidationError, HEAVY_CONSOL_MIN_WEIGHT_KG, MIN_RATE
 except ImportError:
-    from src.validation import QuoteValidationError
+    from src.validation import QuoteValidationError, HEAVY_CONSOL_MIN_WEIGHT_KG, MIN_RATE
 
 _engine: Optional[PricingEngineV3] = None
 _engine_lock = threading.Lock()
@@ -623,19 +623,25 @@ def api_quote():
     raw_chargeable = data.get("chargeable_wt") or data.get("chargeable_weight") or data.get("Chargeable_Weight_Kg")
     raw_gross = data.get("gross_wt") or data.get("gross_weight") or data.get("Gross_Weight_Kg")
 
-    # If weights not directly passed, derive from dimensions if available
-    if raw_chargeable is None and raw_gross is None and (
-        any(k in data for k in ["dim_l", "dim_w", "dim_h"]) or ("dimensions" in data and isinstance(data["dimensions"], list))
-    ):
+    # Unified volumetric dimensions extraction (§2.2, §5.2)
+    dimensions = None
+    if "dimensions" in data and isinstance(data["dimensions"], list):
+        dimensions = data["dimensions"]
+    elif any(k in data for k in ["dim_l", "dim_w", "dim_h"]):
         try:
-            if "dimensions" in data and isinstance(data["dimensions"], list):
-                vol_calc = compute_volumetric_weight(data["dimensions"])
-            else:
-                l_val = float(data.get("dim_l", 0))
-                w_val = float(data.get("dim_w", 0))
-                h_val = float(data.get("dim_h", 0))
-                pcs_val = int(data.get("dim_pcs", 1))
-                vol_calc = (l_val * w_val * h_val * pcs_val) / 6000.0 if (l_val > 0 and w_val > 0 and h_val > 0) else 0.0
+            dim_l = float(data.get("dim_l", 0))
+            dim_w = float(data.get("dim_w", 0))
+            dim_h = float(data.get("dim_h", 0))
+            pcs = int(data.get("dim_pcs", 1))
+            if dim_l > 0 and dim_w > 0 and dim_h > 0:
+                dimensions = [{"length": dim_l, "width": dim_w, "height": dim_h, "pieces": pcs}]
+        except (ValueError, TypeError):
+            pass
+
+    # If weights not directly passed, derive from unified compute_volumetric_weight
+    if raw_chargeable is None and raw_gross is None and dimensions:
+        try:
+            vol_calc = compute_volumetric_weight(dimensions)
             if vol_calc > 0:
                 raw_chargeable = max(0.5, np.ceil(vol_calc * 2.0) / 2.0)
                 raw_gross = raw_chargeable
@@ -668,21 +674,6 @@ def api_quote():
     except (ValueError, TypeError):
         gross_wt = chargeable_wt
 
-    # Volumetric dimensions handling (§2.2, §5.2)
-    dimensions = None
-    if "dimensions" in data and isinstance(data["dimensions"], list):
-        dimensions = data["dimensions"]
-    elif any(k in data for k in ["dim_l", "dim_w", "dim_h"]):
-        try:
-            dim_l = float(data.get("dim_l", 0))
-            dim_w = float(data.get("dim_w", 0))
-            dim_h = float(data.get("dim_h", 0))
-            pcs = int(data.get("dim_pcs", 1))
-            if dim_l > 0 and dim_w > 0 and dim_h > 0:
-                dimensions = [{"length": dim_l, "width": dim_w, "height": dim_h, "pieces": pcs}]
-        except (ValueError, TypeError):
-            pass
-
     # Physical plausibility & IATA validation (§2.2, §5.2)
     is_valid, eff_chargeable, density_ratio, err_reason = validate_shipment_physics(
         gross_wt=gross_wt,
@@ -695,7 +686,7 @@ def api_quote():
     chargeable_wt = eff_chargeable
 
     # Dual Buy Rate Resolution (unit_buy * chargeable_wt <-> total buy)
-    raw_buy = data.get("buy")
+    raw_buy = data.get("buy") or data.get("total_buy") or data.get("Total_Buy_INR") or data.get("buy_cost")
     raw_unit_buy = data.get("unit_buy") or data.get("unit_buy_rate") or data.get("unit_freight_buy")
 
     buy_cost = None
@@ -723,8 +714,8 @@ def api_quote():
     if (
         buy_cost is not None
         and unit_buy_rate is None
-        and chargeable_wt >= 30.0
-        and (buy_cost / chargeable_wt) < 10.0
+        and chargeable_wt >= HEAVY_CONSOL_MIN_WEIGHT_KG
+        and (buy_cost / chargeable_wt) < MIN_RATE
         and not data.get("confirm_total_buy")
     ):
         implied_unit_rate = buy_cost / chargeable_wt
@@ -740,9 +731,9 @@ def api_quote():
     if (
         buy_cost is not None
         and unit_buy_rate is not None
-        and chargeable_wt >= 30.0
-        and unit_buy_rate >= 10.0
-        and (abs(buy_cost - unit_buy_rate) < 1.0 or (buy_cost / chargeable_wt) < 10.0)
+        and chargeable_wt >= HEAVY_CONSOL_MIN_WEIGHT_KG
+        and unit_buy_rate >= MIN_RATE
+        and (abs(buy_cost - unit_buy_rate) < 1.0 or (buy_cost / chargeable_wt) < MIN_RATE)
     ):
         buy_cost = round(unit_buy_rate * chargeable_wt, 2)
 
@@ -757,6 +748,13 @@ def api_quote():
 
     if unit_buy_rate is None and buy_cost is not None:
         unit_buy_rate = round(buy_cost / max(0.1, chargeable_wt), 2)
+
+    implied_buy_rate = buy_cost / max(0.1, chargeable_wt)
+    if implied_buy_rate < MIN_RATE:
+        return jsonify({
+            "status": "error",
+            "message": f"Implied buy rate ₹{implied_buy_rate:.2f}/kg is below minimum operating threshold ₹{MIN_RATE:.2f}/kg.",
+        }), 422
 
     raw_freq = data.get("frequency", 10)
     try:
@@ -969,6 +967,8 @@ def api_quote():
             "quote_date": quote_date,
             "unit_buy": unit_buy_rate,
             "buy": buy_cost,
+            "chargeable_wt": chargeable_wt,
+            "gross_wt": gross_wt,
             "optimal": optimal_quote,
             "strategic_recommendations": strategic_recommendations,
             "negotiation_corridor": negotiation_corridor,
@@ -981,7 +981,8 @@ def api_quote():
             "pricing_mode": quote_res.get("pricing_mode", "standard"),
             "is_spot_tender": is_spot_tender,
             "competitor_intelligence": comp_intel,
-            "history_logged": history_logged,
+            "history_logged": bool(history_logged),
+            "quote_id": history_logged if isinstance(history_logged, int) else None,
             "model_version": MODEL_VERSION,
         })
     except QuoteValidationError as err:

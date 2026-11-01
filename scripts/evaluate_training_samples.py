@@ -141,7 +141,7 @@ def evaluate_model_on_training_samples(
 
     eval_rows: List[Dict[str, Any]] = []
 
-    for _, row in samples_df.iterrows():
+    for row in samples_df.to_dict(orient="records"):
         # Construct inquiry payload
         inquiry = {
             "Total_Buy_INR": float(row["Total_Buy_INR"]),

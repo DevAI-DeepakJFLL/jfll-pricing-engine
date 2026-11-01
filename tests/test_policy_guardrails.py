@@ -264,6 +264,93 @@ class TestPolicyGuardrails(unittest.TestCase):
         self.assertEqual(res.limiting_factor, "none")
         self.assertEqual(res.approval_required, ())
 
+    def test_volumetric_high_cube_density_surcharge(self):
+        """Verify low-density volumetric cargo receives a cubic capacity penalty."""
+        res_nominal = apply_commercial_guardrails(
+            raw_margin_pct=8.0,
+            buy_cost=50000.0,
+            chargeable_wt=250.0,
+            commodity="General Cargo",
+            client_cat="Subagent",
+            density_ratio=1.0,
+        )
+        # Ratio 2.5: surcharge = (2.5 - 1.25) * 1.5 = +1.88%
+        res_high_cube = apply_commercial_guardrails(
+            raw_margin_pct=8.0,
+            buy_cost=50000.0,
+            chargeable_wt=250.0,
+            commodity="General Cargo",
+            client_cat="Subagent",
+            density_ratio=2.5,
+        )
+        self.assertEqual(res_nominal.final_margin_pct, 8.0)
+        self.assertEqual(res_high_cube.final_margin_pct, 9.88)
+        self.assertGreater(res_high_cube.final_margin_pct, res_nominal.final_margin_pct)
+
+    def test_offline_transshipment_risk_buffer(self):
+        """Verify remote offline destinations receive +4.0% transit risk buffer and governance flag."""
+        res_direct = apply_commercial_guardrails(
+            raw_margin_pct=7.0,
+            buy_cost=60000.0,
+            chargeable_wt=300.0,
+            commodity="General Cargo",
+            client_cat="Subagent",
+            is_offline_destination=False,
+        )
+        res_offline = apply_commercial_guardrails(
+            raw_margin_pct=7.0,
+            buy_cost=60000.0,
+            chargeable_wt=300.0,
+            commodity="General Cargo",
+            client_cat="Subagent",
+            is_offline_destination=True,
+        )
+        self.assertEqual(res_direct.final_margin_pct, 7.0)
+        self.assertEqual(res_offline.final_margin_pct, 11.0)
+        self.assertIn("offline transshipment route", res_offline.approval_required)
+        self.assertNotIn("offline transshipment route", res_direct.approval_required)
+
+    def test_pharma_cold_chain_active_target_surcharge(self):
+        """Verify cold-chain pharmaceuticals receive +7.0% risk buffer and active yield markup."""
+        res_general = apply_commercial_guardrails(
+            raw_margin_pct=8.0,
+            buy_cost=100000.0,
+            chargeable_wt=500.0,
+            commodity="General Cargo",
+            client_cat="Direct Shipper",
+        )
+        res_pharma = apply_commercial_guardrails(
+            raw_margin_pct=8.0,
+            buy_cost=100000.0,
+            chargeable_wt=500.0,
+            commodity="Pharmaceuticals",
+            client_cat="Direct Shipper",
+        )
+        # Direct Shipper risk buffer for Pharma is +7.0% (undiscounted)
+        self.assertEqual(res_general.final_margin_pct, 8.0)
+        self.assertEqual(res_pharma.final_margin_pct, 15.0)
+        self.assertGreaterEqual(res_pharma.final_margin_pct - res_general.final_margin_pct, 7.0)
+
+    def test_bulk_heavy_consolidation_unit_margin_ceiling(self):
+        """Verify >= 5,000 kg heavy consolidations are capped at <= 4.50 INR/kg unit margin."""
+        res_heavy = apply_commercial_guardrails(
+            raw_margin_pct=6.0,
+            buy_cost=2000000.0,
+            chargeable_wt=14000.0,
+            commodity="General Cargo",
+            client_cat="Direct Shipper",
+        )
+        # Without cap, 6% on 2,000,000 INR = 120,000 INR = 8.57 INR/kg
+        # With 4.50 INR/kg cap: 4.50 * 14000 = 63,000 INR (3.15% margin)
+        self.assertEqual(res_heavy.final_margin_pct, 3.15)
+        self.assertAlmostEqual(res_heavy.rate_per_kg_inr - (2000000.0 / 14000.0), 4.50, places=2)
+        self.assertTrue(res_heavy.is_cap_clamped)
+        self.assertEqual(res_heavy.limiting_factor, "heavy_consol_unit_cap")
+
+
+
+
+
 
 if __name__ == "__main__":
     unittest.main()

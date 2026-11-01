@@ -368,6 +368,31 @@ class TestPhase2FinancialAndDimensionSafeguards(unittest.TestCase):
         self.assertEqual(res.status_code, 422)
         self.assertIn("confirm_total_buy=true", res.get_json()["message"])
 
+    def test_ambiguous_buy_rate_2_to_30kg_requires_confirmation_422(self):
+        """A 15 kg parcel with buy=50.0 (implied 3.33 INR/kg) must return 422 and not bypass safeguard."""
+        payload = {
+            "buy": 50.0,
+            "chargeable_wt": 15.0,
+            "origin": "Bangalore",
+            "dest": "Frankfurt am Main"
+        }
+        res = self.client.post("/api/quote", json=payload)
+        self.assertEqual(res.status_code, 422)
+        self.assertIn("confirm_total_buy=true", res.get_json()["message"])
+
+    def test_sub_minimum_implied_buy_rate_returns_422(self):
+        """Inquiry with implied buy rate < 10.0 INR/kg returns HTTP 422."""
+        payload = {
+            "buy": 15.0,
+            "chargeable_wt": 2.0,
+            "confirm_total_buy": True,
+            "origin": "Bangalore",
+            "dest": "Frankfurt am Main"
+        }
+        res = self.client.post("/api/quote", json=payload)
+        self.assertEqual(res.status_code, 422)
+        self.assertIn("below minimum operating threshold", res.get_json()["message"])
+
     def test_strict_dimensions_validation(self):
         """Invalid physical dimensions must raise ValueError / return 400 or 422."""
         from src.preprocess import compute_volumetric_weight
@@ -466,6 +491,7 @@ class TestPhase3MachineLearningRigor(unittest.TestCase):
             self.assertTrue(any("Strategic tiers have collapsed" in w for w in rec.get("warnings", [])))
 
     def test_closed_loop_outcome_feedback(self):
+        os.environ["ADMIN_API_KEY"] = "dev_test_key"
         from src.app import app, get_engine
         app.config["TESTING"] = True
         client = app.test_client()
@@ -499,15 +525,78 @@ class TestPhase3MachineLearningRigor(unittest.TestCase):
             self.assertGreaterEqual(c_mem["won_count_180d"], 1)
 
     def test_legacy_engine_shielded_without_env_var(self):
-        """Verifies legacy modules raise RuntimeError if imported outside ALLOW_LEGACY_ENGINE."""
+        """Verifies legacy v2 engine is removed from active src package and raises ImportError."""
         import subprocess, sys, os
         env = dict(os.environ)
-        env.pop("ALLOW_LEGACY_ENGINE", None)
-        env.pop("PYTEST_CURRENT_TEST", None)
         cmd = [sys.executable, "-c", "from src import engine"]
         res = subprocess.run(cmd, env=env, capture_output=True, text=True)
         self.assertNotEqual(res.returncode, 0)
-        self.assertIn("RuntimeError: Legacy engine (v2.x). Superseded by engine_v3.py", res.stderr)
+        self.assertTrue("cannot import name 'engine' from 'src'" in res.stderr or "No module named" in res.stderr)
+
+    def test_vectorized_sensitivity_ladder_and_quantile_cache(self):
+        """Verifies engine_v3 fast-path quantile caching and vectorized ladder interpolation."""
+        import numpy as np
+        from src.engine_v3 import PricingEngineV3
+        engine = PricingEngineV3()
+        # Ensure test quantile data exists
+        engine.slab_quantiles = {"100-300kg": [5.0, 10.0, 20.0, 30.0, 50.0]}
+        engine.slab_counts = {"100-300kg": 42}
+
+        # 1. Test cache retrieval
+        arrs1 = engine._get_slab_arrays("100-300kg")
+        self.assertIsNotNone(arrs1)
+        arrs2 = engine._get_slab_arrays("100-300kg")
+        self.assertIs(arrs1, arrs2)  # Identical cached object
+
+        # 2. Test vectorized computation
+        margins = np.array([5.0, 20.0, 50.0])
+        vec_pcts = engine.compute_history_percentile_vec("100-300kg", margins)
+        self.assertEqual(len(vec_pcts), 3)
+        self.assertAlmostEqual(vec_pcts[0], 0.0, places=1)
+        self.assertAlmostEqual(vec_pcts[1], 50.0, places=1)
+        self.assertAlmostEqual(vec_pcts[2], 100.0, places=1)
+
+    def test_dynamic_win_probability_varies_with_account_and_market_spread(self):
+        from src.app import get_engine
+        engine = get_engine()
+        self.assertIsNotNone(engine.win_model, "WinModel must be loaded into engine")
+
+        quote_key = {
+            "buy": 25000.0,
+            "chargeable_wt": 200.0,
+            "origin": "BOM",
+            "dest": "DXB",
+            "commodity": "General Cargo",
+            "frequency": 50,  # Key Account
+        }
+        quote_spot = {
+            "buy": 25000.0,
+            "chargeable_wt": 200.0,
+            "origin": "BOM",
+            "dest": "DXB",
+            "commodity": "General Cargo",
+            "frequency": 1,   # Spot One-Off
+        }
+
+        rec_key = engine.recommend_quote(quote_key)
+        rec_spot = engine.recommend_quote(quote_spot)
+
+        strat_key = rec_key["strategic_recommendations"]
+        strat_spot = rec_spot["strategic_recommendations"]
+
+        # Verify monotonicity on both
+        self.assertGreater(strat_key["floor"]["Win_Probability"], strat_key["balanced"]["Win_Probability"])
+        self.assertGreater(strat_key["balanced"]["Win_Probability"], strat_key["premium"]["Win_Probability"])
+
+        self.assertGreater(strat_spot["floor"]["Win_Probability"], strat_spot["balanced"]["Win_Probability"])
+        self.assertGreater(strat_spot["balanced"]["Win_Probability"], strat_spot["premium"]["Win_Probability"])
+
+        # Key Account conversion should exceed Spot conversion
+        self.assertGreater(strat_key["balanced"]["Win_Probability"], strat_spot["balanced"]["Win_Probability"])
+
+        # Dynamic variation check (no flatlining at 0.4500)
+        self.assertNotEqual(strat_key["balanced"]["Win_Probability"], strat_spot["balanced"]["Win_Probability"])
+
 
 
 

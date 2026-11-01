@@ -6,6 +6,7 @@ Unit tests for the enriched SQLite audit schema, strategy logging, soft delete, 
 import unittest
 import os
 import sqlite3
+import tempfile
 from src.db import (
     init_history_db,
     log_recommendation,
@@ -19,14 +20,12 @@ from src.constants import MODEL_VERSION
 
 class TestDBAuditEnhancements(unittest.TestCase):
     def setUp(self):
-        self.test_db = "data/test_audit_history.db"
-        if os.path.exists(self.test_db):
-            os.remove(self.test_db)
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.test_db = os.path.join(self.temp_dir.name, "test_audit_history.db")
         init_history_db(self.test_db, force=True)
 
     def tearDown(self):
-        if os.path.exists(self.test_db):
-            os.remove(self.test_db)
+        self.temp_dir.cleanup()
 
     def test_schema_has_enriched_columns(self):
         with sqlite3.connect(self.test_db) as conn:
