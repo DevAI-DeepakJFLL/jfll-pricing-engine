@@ -34,14 +34,13 @@ class TestQuantileModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Train standard model on Jan-Jul 2026 won deals for test reuse."""
-        if os.path.exists(DATA_PATH):
-            df_all = pd.read_csv(DATA_PATH)
-            cls.train_df = df_all[df_all["Year_Month"] < "2026-08"].copy()
-            cls.model = MarginQuantileModel()
-            cls.model.fit(cls.train_df, cls.train_df["Margin_Percentage"])
-        else:
-            cls.train_df = None
-            cls.model = None
+        if not os.path.exists(DATA_PATH):
+            raise unittest.SkipTest(f"Data not present at {DATA_PATH} (data excluded from git repo).")
+
+        df_all = pd.read_csv(DATA_PATH)
+        cls.train_df = df_all[df_all["Year_Month"] < "2026-08"].copy()
+        cls.model = MarginQuantileModel()
+        cls.model.fit(cls.train_df, cls.train_df["Margin_Percentage"])
 
         if os.path.exists(BENCHMARK_PATH):
             bench_df = pd.read_csv(BENCHMARK_PATH)

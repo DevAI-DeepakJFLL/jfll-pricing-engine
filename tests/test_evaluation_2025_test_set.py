@@ -51,8 +51,8 @@ class TestEvaluation2025TestSet(unittest.TestCase):
         cls.bundle_path = DEFAULT_BUNDLE_PATH
 
         if not os.path.exists(cls.test_path) or not os.path.exists(cls.bundle_path):
-            raise FileNotFoundError(
-                f"Required test fixtures not found: test={cls.test_path}, bundle={cls.bundle_path}"
+            raise unittest.SkipTest(
+                f"Required test fixtures not found: test={cls.test_path}, bundle={cls.bundle_path} (data excluded from git repo)."
             )
 
         cls.df_test = pd.read_csv(cls.test_path, low_memory=False)

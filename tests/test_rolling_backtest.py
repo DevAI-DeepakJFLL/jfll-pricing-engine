@@ -35,8 +35,7 @@ class TestRollingBacktest(unittest.TestCase):
     def setUpClass(cls):
         """Execute rolling backtest across the standard 2026 holdout folds once for reuse."""
         if not os.path.exists(DATA_PATH):
-            cls.results = None
-            return
+            raise unittest.SkipTest(f"Data not present at {DATA_PATH} (data excluded from git repo).")
 
         cls.results = execute_backtest_folds(data_path=DATA_PATH)
 

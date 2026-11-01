@@ -33,6 +33,8 @@ CRITICAL_COLUMNS = [
 class TestTrainingEvalSampling(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if not os.path.exists(DATA_PATH):
+            raise unittest.SkipTest(f"Data not present at {DATA_PATH} (data excluded from git repo).")
         # Generate samples for test suite
         cls.df = generate_stratified_training_samples(
             data_path=DATA_PATH,
