@@ -244,10 +244,10 @@
         }
         .presets-grid-row {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
         }
-        @media (max-width: 900px) {
+        @media (max-width: 1080px) {
             .presets-grid-row { grid-template-columns: repeat(2, 1fr); }
         }
         @media (max-width: 640px) {
@@ -272,24 +272,22 @@
         .preset-chip-btn {
             background: #ffffff;
             border: 1px solid var(--border);
-            border-radius: var(--radius-pill);
-            padding: 9px 14px;
+            border-radius: var(--radius-card);
+            padding: 8px 12px;
             font-size: 12px;
-            font-weight: 600;
             color: var(--text-dark);
             cursor: pointer;
             transition: all 0.2s;
             text-align: left;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             width: 100%;
-            min-height: 44px;
+            min-height: 48px;
         }
         .preset-chip-btn:hover {
             border-color: #cbd5e1;
             background: #f8fafc;
-            color: var(--text-dark);
             transform: translateY(-1px);
         }
         .preset-chip-btn:hover .preset-num-badge {
@@ -304,6 +302,36 @@
         .preset-chip-btn.active .preset-num-badge {
             background: rgba(255, 255, 255, 0.2);
             color: #ffffff;
+        }
+        .preset-btn-text {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .preset-btn-main {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dark);
+            line-height: 1.25;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .preset-btn-sub {
+            font-size: 10.5px;
+            font-weight: 400;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .preset-chip-btn.active .preset-btn-main {
+            color: #ffffff;
+        }
+        .preset-chip-btn.active .preset-btn-sub {
+            color: rgba(255, 255, 255, 0.75);
         }
         .preset-num-badge {
             width: 20px;
@@ -1058,31 +1086,57 @@
     <!-- Alert Messages -->
     <div id="errorAlert" style="display: none; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 18px;"></div>
 
-    <!-- Presets Bar (Single Full-Width Row Restored) -->
+    <!-- Presets Bar (Operational Edge-Case Scenarios) -->
     <div class="presets-bar">
         <div class="presets-header">
             <span class="presets-title">
                 <svg class="ui-icon" style="color: var(--text-dark);" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                Quick Historical Test Presets
+                Edge-Case & Operational Test Presets
             </span>
-            <span style="font-size: 12px; color: var(--text-light);">One-click high-volume inquiry scenarios</span>
+            <span style="font-size: 12px; color: var(--text-light);">One-click operational stress-test scenarios for commercial air freight forwarders</span>
         </div>
         <div class="presets-grid-row">
-            <button type="button" id="preset_btn_pharma_uk" class="preset-chip-btn" onclick="applyPreset('pharma_uk')">
+            <button type="button" id="preset_btn_pharma_cold_chain" class="preset-chip-btn" onclick="applyPreset('pharma_cold_chain')">
                 <span class="preset-num-badge">1</span>
-                <span>Pharma Cold-Chain (DEL → LHR)</span>
+                <div class="preset-btn-text">
+                    <span class="preset-btn-main">Pharma Cold-Chain (+7% Buffer)</span>
+                    <span class="preset-btn-sub">DEL → LHR • 450 kg Active GDP</span>
+                </div>
             </button>
-            <button type="button" id="preset_btn_perishable_uae" class="preset-chip-btn" onclick="applyPreset('perishable_uae')">
+            <button type="button" id="preset_btn_volumetric_high_cube" class="preset-chip-btn" onclick="applyPreset('volumetric_high_cube')">
                 <span class="preset-num-badge">2</span>
-                <span>Perishables (BOM → DXB)</span>
+                <div class="preset-btn-text">
+                    <span class="preset-btn-main">Volumetric High-Cube (3.5x Density)</span>
+                    <span class="preset-btn-sub">BOM → FRA • 180 kg Gross / 640 kg Chg</span>
+                </div>
             </button>
-            <button type="button" id="preset_btn_heavy_subagent" class="preset-chip-btn" onclick="applyPreset('heavy_subagent')">
+            <button type="button" id="preset_btn_heavy_consol" class="preset-chip-btn" onclick="applyPreset('heavy_consol')">
                 <span class="preset-num-badge">3</span>
-                <span>Heavy Machinery / Subagent (BOM → FRA)</span>
+                <div class="preset-btn-text">
+                    <span class="preset-btn-main">Bulk Heavy Consol (₹4.50/kg Cap)</span>
+                    <span class="preset-btn-sub">BOM → FRA • 7,500 kg Bulk RFQ</span>
+                </div>
             </button>
-            <button type="button" id="preset_btn_courier_us" class="preset-chip-btn" onclick="applyPreset('courier_us')">
+            <button type="button" id="preset_btn_offline_transshipment" class="preset-chip-btn" onclick="applyPreset('offline_transshipment')">
                 <span class="preset-num-badge">4</span>
-                <span>Express Courier (BLR → JFK)</span>
+                <div class="preset-btn-text">
+                    <span class="preset-btn-main">Offline Transshipment (+4% Lane)</span>
+                    <span class="preset-btn-sub">BOM → EBB (Entebbe) • Multi-Leg</span>
+                </div>
+            </button>
+            <button type="button" id="preset_btn_small_parcel_courier" class="preset-chip-btn" onclick="applyPreset('small_parcel_courier')">
+                <span class="preset-num-badge">5</span>
+                <div class="preset-btn-text">
+                    <span class="preset-btn-main">Small Parcel Courier (AWB Floor)</span>
+                    <span class="preset-btn-sub">BLR → JFK • 4.0 kg Minimum Fee</span>
+                </div>
+            </button>
+            <button type="button" id="preset_btn_dangerous_goods" class="preset-chip-btn" onclick="applyPreset('dangerous_goods')">
+                <span class="preset-num-badge">6</span>
+                <div class="preset-btn-text">
+                    <span class="preset-btn-main">Dangerous Goods (+6% DGR Buffer)</span>
+                    <span class="preset-btn-sub">BOM → AMS • 500 kg Class 9 Hazard</span>
+                </div>
             </button>
         </div>
     </div>
@@ -1674,10 +1728,18 @@
             }
         }
 
-        // Keep hidden gross_wt in sync with airline chargeable weight
-        const gross = ch_wt;
+        // Keep hidden gross_wt in sync with airline chargeable weight unless explicit gross is preserved
         const grossEl = document.getElementById('gross_wt');
-        if (grossEl) grossEl.value = gross;
+        let gross = ch_wt;
+        if (grossEl) {
+            const parsedExisting = parseFloat(grossEl.value);
+            if (keepExplicitGross && !isNaN(parsedExisting) && parsedExisting > 0) {
+                gross = parsedExisting;
+            } else {
+                grossEl.value = ch_wt;
+                gross = ch_wt;
+            }
+        }
 
         const volEl = document.getElementById('vol_wt_display');
         const chEl = document.getElementById('ch_wt_display');
@@ -1714,17 +1776,18 @@
             }
         }
 
-        return { gross_wt: gross, chargeable_wt: ch_wt, density_ratio: 1.0 };
+        const densityRatio = (gross > 0 && ch_wt > 0) ? (ch_wt / gross) : 1.0;
+        return { gross_wt: gross, chargeable_wt: ch_wt, density_ratio: densityRatio };
     }
 
     const PRESET_DATA = {
-        pharma_uk: {
+        pharma_cold_chain: {
             origin: "Indira Gandhi International Airport",
             dest: "Heathrow Apt/London",
             customer_company: "SUN PHARMA LABORATORIES",
-            buy: "176000",
-            gross_wt: "320",
-            dim_l: "100", dim_w: "80", dim_h: "100", dim_pcs: "2",
+            buy: "155000",
+            gross_wt: "450",
+            dim_l: "120", dim_w: "80", dim_h: "95", dim_pcs: "3",
             client: "Shipper / Consignee",
             vertical: "Air Export Forwarding",
             commodity: "Pharmaceuticals",
@@ -1733,43 +1796,59 @@
             revision: "1",
             branch: "Delhi"
         },
-        perishable_uae: {
+        volumetric_high_cube: {
             origin: "Chhatrapati Shivaji Maharaj International Airport",
-            dest: "Dubai",
-            customer_company: "ALLANA SONS PRIVATE LIMITED",
-            buy: "78000",
-            gross_wt: "1200",
-            dim_l: "120", dim_w: "80", dim_h: "90", dim_pcs: "8",
-            client: "Shipper / Consignee",
-            vertical: "Air Perishable",
-            commodity: "Perishable Foodstuff",
-            incoterms: "CFR",
-            frequency: "25",
+            dest: "Frankfurt am Main",
+            customer_company: "RAYMOND APPAREL LIMITED",
+            buy: "115200",
+            gross_wt: "180",
+            dim_l: "120", dim_w: "100", dim_h: "80", dim_pcs: "4",
+            client: "Subagent",
+            vertical: "Air Export Forwarding",
+            commodity: "Garments / Textiles",
+            incoterms: "FOB",
+            frequency: "10",
             revision: "1",
             branch: "Mumbai"
         },
-        heavy_subagent: {
+        heavy_consol: {
             origin: "Chhatrapati Shivaji Maharaj International Airport",
             dest: "Frankfurt am Main",
             customer_company: "UNIVERSAL CLEARING AND FORWARDING",
-            buy: "320000",
-            gross_wt: "2400",
-            dim_l: "150", dim_w: "120", dim_h: "130", dim_pcs: "6",
+            buy: "839325",
+            gross_wt: "7500",
+            chargeable_wt: "7500",
+            mode: "direct",
             client: "Subagent",
             vertical: "Air Export Forwarding",
             commodity: "Engineering & Machinery",
             incoterms: "FOB",
             frequency: "10",
-            revision: "2",
+            revision: "1",
             branch: "Mumbai"
         },
-        courier_us: {
+        offline_transshipment: {
+            origin: "Chhatrapati Shivaji Maharaj International Airport",
+            dest: "Entebbe",
+            customer_company: "AFRICA CARGO LINK",
+            buy: "98000",
+            gross_wt: "350",
+            dim_l: "100", dim_w: "80", dim_h: "75", dim_pcs: "3",
+            client: "Subagent",
+            vertical: "Air Export Forwarding",
+            commodity: "General Cargo",
+            incoterms: "FOB",
+            frequency: "10",
+            revision: "1",
+            branch: "Mumbai"
+        },
+        small_parcel_courier: {
             origin: "Bangalore",
             dest: "John F. Kennedy Apt/New York",
             customer_company: "BLR LOGISTICS OVERSEAS",
-            buy: "45500",
-            gross_wt: "65",
-            dim_l: "60", dim_w: "50", dim_h: "40", dim_pcs: "2",
+            buy: "2400",
+            gross_wt: "4.0",
+            dim_l: "30", dim_w: "25", dim_h: "20", dim_pcs: "1",
             client: "Overseas Agent",
             vertical: "Courier",
             commodity: "Courier",
@@ -1777,8 +1856,28 @@
             frequency: "3",
             revision: "1",
             branch: "Bangalore"
+        },
+        dangerous_goods: {
+            origin: "Chhatrapati Shivaji Maharaj International Airport",
+            dest: "Amsterdam",
+            customer_company: "EXIDE ENERGY SOLUTIONS",
+            buy: "140000",
+            gross_wt: "500",
+            dim_l: "120", dim_w: "80", dim_h: "105", dim_pcs: "3",
+            client: "Shipper / Consignee",
+            vertical: "Air Export Forwarding",
+            commodity: "Dangerous Goods",
+            incoterms: "CIF",
+            frequency: "10",
+            revision: "1",
+            branch: "Mumbai"
         }
     };
+    // Backwards compatibility aliases
+    PRESET_DATA.pharma_uk = PRESET_DATA.pharma_cold_chain;
+    PRESET_DATA.heavy_subagent = PRESET_DATA.heavy_consol;
+    PRESET_DATA.courier_us = PRESET_DATA.small_parcel_courier;
+    PRESET_DATA.perishable_uae = PRESET_DATA.volumetric_high_cube;
 
     const PORT_LABELS = {{ port_labels_json | safe }};
 
@@ -1917,27 +2016,40 @@
         const p = PRESET_DATA[key];
         if (!p) return;
         setDimUnit('cm');
-        setWeightMode('dims');
         setSearchableValue('origin', p.origin);
         setSearchableValue('dest', p.dest);
         const custEl = document.getElementById('customer_company');
         if (custEl) custEl.value = p.customer_company || '';
         document.getElementById('buy').value = p.buy;
-        document.getElementById('gross_wt').value = p.gross_wt;
-        document.getElementById('dim_l').value = p.dim_l;
-        document.getElementById('dim_w').value = p.dim_w;
-        document.getElementById('dim_h').value = p.dim_h;
-        document.getElementById('dim_pcs').value = p.dim_pcs;
+        const grossEl = document.getElementById('gross_wt');
+        if (grossEl) grossEl.value = p.gross_wt;
+
+        if (p.mode === 'direct' || (!p.dim_l && p.chargeable_wt)) {
+            setWeightMode('direct');
+            const dirEl = document.getElementById('direct_ch_wt');
+            if (dirEl) dirEl.value = p.chargeable_wt || p.gross_wt;
+            document.getElementById('dim_l').value = '';
+            document.getElementById('dim_w').value = '';
+            document.getElementById('dim_h').value = '';
+            document.getElementById('dim_pcs').value = '1';
+        } else {
+            setWeightMode('dims');
+            document.getElementById('dim_l').value = p.dim_l || '';
+            document.getElementById('dim_w').value = p.dim_w || '';
+            document.getElementById('dim_h').value = p.dim_h || '';
+            document.getElementById('dim_pcs').value = p.dim_pcs || '1';
+        }
+
         setCustomDropdownValue('client', p.client);
         setCustomDropdownValue('commodity', p.commodity);
         setCustomDropdownValue('frequency', p.frequency);
         setCustomDropdownValue('revision', p.revision ? String(p.revision) : '1');
-        const weights = updateDimensions();
+        const weights = updateDimensions(true);
         const unitEl = document.getElementById('unit_buy');
         if (unitEl && weights.chargeable_wt > 0) {
             unitEl.value = (parseFloat(p.buy) / weights.chargeable_wt).toFixed(2);
         }
-        runInference(false);
+        runInference(true);
     }
 
     function resetFormForNewQuote() {
@@ -2016,7 +2128,7 @@
         if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<svg class="ui-icon spin" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Calculating...'; }
         if (submitBtnTop) { submitBtnTop.disabled = true; }
 
-        const weights = updateDimensions();
+        const weights = updateDimensions(true);
         const unitBuyEl = document.getElementById('unit_buy');
         const buyEl = document.getElementById('buy');
         let unitBuyVal = parseFloat(unitBuyEl?.value);
@@ -2074,6 +2186,7 @@
             unit_buy: (!isNaN(unitBuyVal) && unitBuyVal > 0) ? unitBuyVal : null,
             gross_wt: weights.gross_wt,
             chargeable_wt: weights.chargeable_wt,
+            Cargo_Density_Ratio: weights.density_ratio,
             client: document.getElementById('client')?.value || 'Shipper / Consignee',
             commodity: document.getElementById('commodity')?.value || 'General Cargo',
             frequency: parseInt(document.getElementById('frequency')?.value, 10) || 10,

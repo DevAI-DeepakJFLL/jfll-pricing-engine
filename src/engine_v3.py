@@ -421,10 +421,21 @@ class PricingEngineV3:
         gross_provided = raw_gross_wt is not None and str(raw_gross_wt).strip() != ""
         gross_wt = float(raw_gross_wt) if gross_provided else float("nan")
 
+        # Resolve Cargo Density & Volumetric Expansion Ratio
+        # ML model feature expects Gross/Chargeable in (0, 1]; Commercial guardrail expects Chargeable/Gross (> 1.0)
         if "Cargo_Density_Ratio" in inq and not math.isnan(float(inq["Cargo_Density_Ratio"])):
-            density_ratio = float(inq["Cargo_Density_Ratio"])
+            raw_density = float(inq["Cargo_Density_Ratio"])
+            if raw_density > 1.0:
+                ml_density = min(1.0, 1.0 / raw_density)
+                vol_expansion = raw_density
+            else:
+                ml_density = raw_density
+                vol_expansion = (1.0 / raw_density) if raw_density > 0 else 1.0
         else:
-            density_ratio = (chargeable_wt / gross_wt) if (gross_provided and gross_wt > 0) else float("nan")
+            ml_density = (gross_wt / chargeable_wt) if (gross_provided and chargeable_wt > 0) else float("nan")
+            vol_expansion = (chargeable_wt / gross_wt) if (gross_provided and gross_wt > 0) else 1.0
+
+        density_ratio = vol_expansion
 
         raw_carrier = str(
             inq.get("Quoted Carrier")
@@ -487,7 +498,7 @@ class PricingEngineV3:
             "Total_Buy_INR": buy_cost,
             "Unit_Buy_INR": unit_rate,
             "Chargeable_Weight_Kg": chargeable_wt,
-            "Cargo_Density_Ratio": density_ratio,
+            "Cargo_Density_Ratio": ml_density,
             "Weight_Tier": weight_tier,
             "Commodity_Group": canonical_comm,
             "Regional_Lane": regional_lane,
