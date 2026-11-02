@@ -4,7 +4,7 @@
 ### *Enterprise ML Margin Optimization • Conformal Negotiation Corridors • Hard Commercial Guardrails*
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Tests Passing](https://img.shields.io/badge/Tests-330%20Passing%20(100%25)-2ea44f?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Tests Passing](https://img.shields.io/badge/Tests-341%20Passing%20(100%25)-2ea44f?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
 [![Architecture](https://img.shields.io/badge/Architecture-Quantile%20ML%20%2B%20Conformal-00A699?style=for-the-badge)](src/engine_v3.py)
 [![Latency](https://img.shields.io/badge/Inference%20Latency-%3C15ms-blueviolet?style=for-the-badge)](src/engine_v3.py)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](Dockerfile)
@@ -178,7 +178,7 @@ air_export_pricing_engine/
 │       ├── index.html                        # Pricing engine web UI with authentic styling & clean manual entry
 │       └── history.html                      # Historical quotes & CRM lead management
 │
-├── tests/                                    # 42 test suites (334 automated tests: 330 passing, 4 skipped)
+├── tests/                                    # 43 test suites (341 automated tests, 100% passing)
 │
 ├── scripts/
 │   ├── ingest_and_split_2025.py              # Ingests and splits temporal training/test sets
@@ -215,7 +215,7 @@ All tasks are managed through `./run.sh`:
 # 3. Train Pricing Engine V3 and build conformal corridor tables
 ./run.sh train
 
-# 4. Run full unit and scenario test suite (330 passing, 4 skipped)
+# 4. Run full unit and scenario test suite (341 passing, 100%)
 ./run.sh test
 
 # 5. Run Offline Market & Concept Drift Watchdog
