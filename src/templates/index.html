@@ -1688,7 +1688,10 @@
         updateDimensions();
     }
 
-    function updateDimensions() {
+    let keepExplicitGross = false;
+
+    function updateDimensions(keepExplicitGrossParam = false) {
+        const keepExplicit = Boolean(keepExplicitGrossParam || keepExplicitGross);
         let ch_wt = 0;
         let vol_wt = 0;
 
@@ -1733,7 +1736,7 @@
         let gross = ch_wt;
         if (grossEl) {
             const parsedExisting = parseFloat(grossEl.value);
-            if (keepExplicitGross && !isNaN(parsedExisting) && parsedExisting > 0) {
+            if (keepExplicit && !isNaN(parsedExisting) && parsedExisting > 0) {
                 gross = parsedExisting;
             } else {
                 grossEl.value = ch_wt;

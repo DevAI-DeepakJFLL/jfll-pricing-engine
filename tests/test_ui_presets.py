@@ -189,6 +189,17 @@ class TestUIPresets(unittest.TestCase):
         optimal = data["optimal"]
         self.assertGreaterEqual(optimal["Margin_Percentage"], 11.0)
 
+    def test_frontend_javascript_scope_and_variables(self):
+        """Verify that frontend JS does not have undeclared variables like keepExplicitGross."""
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Verify keepExplicitGross declaration
+        self.assertIn("keepExplicitGross", html)
+        self.assertRegex(html, r"let\s+keepExplicitGross\s*=\s*false", "keepExplicitGross should be declared")
+        self.assertRegex(html, r"function\s+updateDimensions\s*\([^)]*keepExplicitGross", "updateDimensions should accept keepExplicitGross parameter")
+
 
 if __name__ == "__main__":
     unittest.main()
