@@ -15,10 +15,12 @@ from typing import Optional
 try:
     import boto3
     from botocore.exceptions import ClientError
+    from botocore.config import Config
     BOTO3_AVAILABLE = True
 except ImportError:
     BOTO3_AVAILABLE = False
     ClientError = Exception
+    Config = None
 
 logger = logging.getLogger("aws_client")
 
@@ -30,6 +32,7 @@ def get_boto3_client(service_name: str, endpoint_url: Optional[str] = None):
     """
     Constructs a boto3 client pointing to standard AWS endpoints or optional custom URL.
     Uses native AWS IAM roles if explicit credentials are not provided.
+    Enforces tight connection and read timeouts to prevent thread hanging on network disruptions.
     """
     if not BOTO3_AVAILABLE:
         raise RuntimeError("boto3 is not installed. Please install boto3 to use AWS features.")
@@ -42,6 +45,12 @@ def get_boto3_client(service_name: str, endpoint_url: Optional[str] = None):
     client_kwargs = {
         "region_name": region,
     }
+    if Config is not None:
+        client_kwargs["config"] = Config(
+            connect_timeout=3,
+            read_timeout=5,
+            retries={"max_attempts": 1}
+        )
     if endpoint:
         client_kwargs["endpoint_url"] = endpoint
     if access_key and secret_key:
@@ -53,14 +62,19 @@ def get_boto3_client(service_name: str, endpoint_url: Optional[str] = None):
 
 def sync_model_from_s3(
     bucket: str = DEFAULT_BUCKET,
-    s3_key: str = "v3.0/engine_v3_bundle.joblib",
+    s3_key: str = "models/engine_v3_bundle.joblib",
     local_dest: str = "models/engine_v3_bundle.joblib",
-    endpoint_url: Optional[str] = None
+    endpoint_url: Optional[str] = None,
+    force: bool = False
 ) -> bool:
     """
-    Downloads model bundle from S3 if present.
-    Returns True if successfully retrieved, False otherwise.
+    Downloads model bundle from S3 if absent or force=True.
+    Returns True if successfully retrieved or already present, False otherwise.
     """
+    if not force and os.path.exists(local_dest) and os.path.getsize(local_dest) > 0:
+        logger.info(f"Model bundle already exists locally at {local_dest} ({os.path.getsize(local_dest)} bytes). Skipping S3 download.")
+        return True
+
     try:
         s3 = get_boto3_client("s3", endpoint_url=endpoint_url)
         os.makedirs(os.path.dirname(os.path.abspath(local_dest)), exist_ok=True)

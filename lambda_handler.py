@@ -21,8 +21,13 @@ _wsgi_handler = None
 
 try:
     from apig_wsgi import make_lambda_handler
-    from src.app import app
+    from src.app import app, get_engine
     _wsgi_handler = make_lambda_handler(app, binary_support=True)
+    # Pre-warm model in memory during Lambda cold start module initialization
+    try:
+        get_engine()
+    except Exception as warm_err:
+        print(f"Notice: Model engine pre-warm deferred to first request: {warm_err}")
 except BaseException as err:
     import traceback
     _init_err = str(err)

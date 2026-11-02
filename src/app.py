@@ -217,10 +217,10 @@ def get_engine() -> PricingEngineV3:
     if _engine is None:
         with _engine_lock:
             if _engine is None:
-                if os.environ.get("S3_BUCKET_NAME"):
+                bundle_dest = os.path.join(ENGINE_ROOT, "models", "engine_v3_bundle.joblib")
+                if os.environ.get("S3_BUCKET_NAME") and (not os.path.exists(bundle_dest) or os.path.getsize(bundle_dest) == 0):
                     try:
                         from aws_client import sync_model_from_s3
-                        bundle_dest = os.path.join(ENGINE_ROOT, "models", "engine_v3_bundle.joblib")
                         sync_model_from_s3(local_dest=bundle_dest)
                     except Exception as e:
                         logger.warning(f"Could not sync model from S3: {e}")
