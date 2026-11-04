@@ -1,0 +1,248 @@
+[
+  {
+    "case_id": "CASE-01-SMALL-PARCEL",
+    "archetype": "Courier & Small Parcel Expedited (<45kg)",
+    "description": "Low-weight courier cargo requiring minimum documentation and terminal fee floor enforcement.",
+    "input_payload": {
+      "origin": "Indira Gandhi International Airport",
+      "dest": "Dubai",
+      "buy": 4500.0,
+      "unit_buy": 250.0,
+      "chargeable_wt": 18.0,
+      "gross_wt": 18.0,
+      "commodity": "General Cargo",
+      "client": "Direct Shipper",
+      "customer_company": "LOCAL EXPORTS LTD",
+      "frequency": 4,
+      "revision": 1,
+      "strategy": "balanced"
+    },
+    "commercial_baseline_expectations": {
+      "rationale": "High fixed fees (AWB fee min ₹1,500 + Ops fee ₹850) dominate low base buy. High percentage markup required to avoid loss.",
+      "expected_margin_range_pct": [30.0, 36.0],
+      "expected_min_sell_inr": 6000.0,
+      "expected_win_probability_range": [0.55, 0.65],
+      "guardrail_expected": "Cost Floor Clamped (AWB/Ops documentation fees)"
+    },
+    "model_actual_output": {
+      "quoted_sell_price_inr": 6056.10,
+      "rate_per_kg": 336.45,
+      "target_margin_pct": 34.58,
+      "margin_amount_inr": 1556.10,
+      "margin_per_kg": 86.45,
+      "negotiation_corridor": {
+        "min_margin_pct": 34.53,
+        "target_margin_pct": 34.58,
+        "max_margin_pct": 34.63,
+        "spread_pp": 0.10,
+        "min_rate_per_kg": 336.33,
+        "target_rate_per_kg": 336.45,
+        "max_rate_per_kg": 336.58
+      },
+      "strategic_tiers": {
+        "floor": { "margin_pct": 34.53, "rate_per_kg": 336.33, "sell_inr": 6053.85 },
+        "balanced": { "margin_pct": 34.58, "rate_per_kg": 336.45, "sell_inr": 6056.10 },
+        "premium": { "margin_pct": 34.63, "rate_per_kg": 336.58, "sell_inr": 6058.35 }
+      },
+      "win_probability": 0.5911,
+      "pricing_mode": "standard"
+    }
+  },
+  {
+    "case_id": "CASE-02-BULK-HEAVY",
+    "archetype": "Bulk Heavy Freight Consolidation (>1000kg)",
+    "description": "High-tonnage wholesale forwarder RFQ with tight per-kg margins and sublinear fee scaling.",
+    "input_payload": {
+      "origin": "Chhatrapati Shivaji Maharaj International Airport",
+      "dest": "Frankfurt",
+      "buy": 1200000.0,
+      "unit_buy": 160.0,
+      "chargeable_wt": 7500.0,
+      "gross_wt": 7500.0,
+      "commodity": "General Cargo",
+      "client": "Subagent",
+      "customer_company": "GLOBAL CONSOLIDATORS INC",
+      "frequency": 15,
+      "revision": 1,
+      "strategy": "balanced"
+    },
+    "commercial_baseline_expectations": {
+      "rationale": "Large commercial consolidation requires strictly capped per-kg markup (<₹4.50/kg) to remain competitive against airline direct bids.",
+      "expected_margin_range_pct": [2.5, 3.2],
+      "expected_min_sell_inr": 1230000.0,
+      "expected_win_probability_range": [0.50, 0.60],
+      "guardrail_expected": "Commodity / Heavy Consol Cap Protected"
+    },
+    "model_actual_output": {
+      "quoted_sell_price_inr": 1233120.00,
+      "rate_per_kg": 164.42,
+      "target_margin_pct": 2.76,
+      "margin_amount_inr": 33120.00,
+      "margin_per_kg": 4.42,
+      "negotiation_corridor": {
+        "min_margin_pct": 2.70,
+        "target_margin_pct": 2.76,
+        "max_margin_pct": 2.81,
+        "spread_pp": 0.11,
+        "min_rate_per_kg": 164.32,
+        "target_rate_per_kg": 164.42,
+        "max_rate_per_kg": 164.50
+      },
+      "strategic_tiers": {
+        "floor": { "margin_pct": 2.70, "rate_per_kg": 164.32, "sell_inr": 1232400.00 },
+        "balanced": { "margin_pct": 2.76, "rate_per_kg": 164.42, "sell_inr": 1233120.00 },
+        "premium": { "margin_pct": 2.81, "rate_per_kg": 164.50, "sell_inr": 1233720.00 }
+      },
+      "win_probability": 0.5652,
+      "pricing_mode": "standard"
+    }
+  },
+  {
+    "case_id": "CASE-03-PHARMA-COLDCHAIN",
+    "archetype": "Active GDP Pharmaceutical Cold-Chain (Mid-Weight 300-500kg)",
+    "description": "Temperature-controlled clinical supplies requiring refrigerated handling and commodity risk buffers.",
+    "input_payload": {
+      "origin": "Indira Gandhi International Airport",
+      "dest": "Heathrow Apt/London",
+      "buy": 125000.0,
+      "unit_buy": 277.78,
+      "chargeable_wt": 450.0,
+      "gross_wt": 450.0,
+      "commodity": "Perishable Foodstuff",
+      "client": "Shipper / Consignee",
+      "customer_company": "SUN PHARMA LABORATORIES",
+      "frequency": 20,
+      "revision": 1,
+      "strategy": "balanced"
+    },
+    "commercial_baseline_expectations": {
+      "rationale": "High-value cold-chain handling warrants +4.0% to +7.0% margin premium over baseline general freight.",
+      "expected_margin_range_pct": [5.5, 7.5],
+      "expected_min_sell_inr": 132000.0,
+      "expected_win_probability_range": [0.40, 0.52],
+      "guardrail_expected": "Commodity Risk Buffer Applied"
+    },
+    "model_actual_output": {
+      "quoted_sell_price_inr": 133362.50,
+      "rate_per_kg": 296.36,
+      "target_margin_pct": 6.69,
+      "margin_amount_inr": 8362.50,
+      "margin_per_kg": 18.58,
+      "negotiation_corridor": {
+        "min_margin_pct": 5.48,
+        "target_margin_pct": 6.69,
+        "max_margin_pct": 7.90,
+        "spread_pp": 2.42,
+        "min_rate_per_kg": 293.00,
+        "target_rate_per_kg": 296.36,
+        "max_rate_per_kg": 299.72
+      },
+      "strategic_tiers": {
+        "floor": { "margin_pct": 5.18, "rate_per_kg": 292.17, "sell_inr": 131475.00 },
+        "balanced": { "margin_pct": 6.69, "rate_per_kg": 296.36, "sell_inr": 133362.50 },
+        "premium": { "margin_pct": 9.70, "rate_per_kg": 304.72, "sell_inr": 137125.00 }
+      },
+      "win_probability": 0.4562,
+      "pricing_mode": "standard"
+    }
+  },
+  {
+    "case_id": "CASE-04-VOLUMETRIC-HIGHCUBE",
+    "archetype": "Volumetric High-Cube Cargo (High Density Ratio >3.0)",
+    "description": "High cubic space utilization cargo where volumetric weight substantially exceeds gross scale weight.",
+    "input_payload": {
+      "origin": "Chhatrapati Shivaji Maharaj International Airport",
+      "dest": "Frankfurt",
+      "buy": 115200.0,
+      "unit_buy": 180.0,
+      "chargeable_wt": 640.0,
+      "gross_wt": 180.0,
+      "Cargo_Density_Ratio": 3.55,
+      "commodity": "General Cargo",
+      "client": "Direct Shipper",
+      "customer_company": "LIGHTCART LOGISTICS",
+      "frequency": 8,
+      "revision": 1,
+      "strategy": "balanced"
+    },
+    "commercial_baseline_expectations": {
+      "rationale": "Aircraft belly capacity penalty applies when density ratio > 2.0. Requires elevated markup (8.0% - 12.0%) to compensate for lost cubic payload.",
+      "expected_margin_range_pct": [8.5, 11.5],
+      "expected_min_sell_inr": 125000.0,
+      "expected_win_probability_range": [0.30, 0.45],
+      "guardrail_expected": "Volumetric Density Surcharge Buffer"
+    },
+    "model_actual_output": {
+      "quoted_sell_price_inr": 126685.44,
+      "rate_per_kg": 197.95,
+      "target_margin_pct": 9.97,
+      "margin_amount_inr": 11485.44,
+      "margin_per_kg": 17.95,
+      "negotiation_corridor": {
+        "min_margin_pct": 8.77,
+        "target_margin_pct": 9.97,
+        "max_margin_pct": 11.17,
+        "spread_pp": 2.40,
+        "min_rate_per_kg": 195.79,
+        "target_rate_per_kg": 197.95,
+        "max_rate_per_kg": 200.11
+      },
+      "strategic_tiers": {
+        "floor": { "margin_pct": 7.69, "rate_per_kg": 193.84, "sell_inr": 124058.88 },
+        "balanced": { "margin_pct": 9.97, "rate_per_kg": 197.95, "sell_inr": 126685.44 },
+        "premium": { "margin_pct": 12.97, "rate_per_kg": 203.35, "sell_inr": 130141.44 }
+      },
+      "win_probability": 0.3597,
+      "pricing_mode": "standard"
+    }
+  },
+  {
+    "case_id": "CASE-05-KEYACCOUNT-RETENTION",
+    "archetype": "Key Account Retention RFQ (Competitive Lane, Mid-High Weight)",
+    "description": "High-volume repeat corporate enterprise with second-round tender revision demanding competitive discounting.",
+    "input_payload": {
+      "origin": "Chhatrapati Shivaji Maharaj International Airport",
+      "dest": "Heathrow Apt/London",
+      "buy": 160000.0,
+      "unit_buy": 200.0,
+      "chargeable_wt": 800.0,
+      "gross_wt": 800.0,
+      "commodity": "General Cargo",
+      "client": "Direct Shipper",
+      "customer_company": "CIPLA LIMITED",
+      "frequency": 45,
+      "revision": 2,
+      "strategy": "balanced"
+    },
+    "commercial_baseline_expectations": {
+      "rationale": "Key account loyalty tier (>25 quotes/yr) and revision 2 concession ladder demand tight pricing to secure high win rate (>60%).",
+      "expected_margin_range_pct": [3.5, 4.5],
+      "expected_min_sell_inr": 165000.0,
+      "expected_win_probability_range": [0.60, 0.70],
+      "guardrail_expected": "Key Account Loyalty Concession"
+    },
+    "model_actual_output": {
+      "quoted_sell_price_inr": 166496.00,
+      "rate_per_kg": 208.12,
+      "target_margin_pct": 4.06,
+      "margin_amount_inr": 6496.00,
+      "margin_per_kg": 8.12,
+      "negotiation_corridor": {
+        "min_margin_pct": 3.31,
+        "target_margin_pct": 4.06,
+        "max_margin_pct": 4.81,
+        "spread_pp": 1.50,
+        "min_rate_per_kg": 206.62,
+        "target_rate_per_kg": 208.12,
+        "max_rate_per_kg": 209.62
+      },
+      "strategic_tiers": {
+        "floor": { "margin_pct": 2.50, "rate_per_kg": 205.00, "sell_inr": 164000.00 },
+        "balanced": { "margin_pct": 4.06, "rate_per_kg": 208.12, "sell_inr": 166496.00 },
+        "premium": { "margin_pct": 5.94, "rate_per_kg": 211.88, "sell_inr": 169504.00 }
+      },
+      "win_probability": 0.6441,
+      "pricing_mode": "standard"
+    }
+  }
+]
