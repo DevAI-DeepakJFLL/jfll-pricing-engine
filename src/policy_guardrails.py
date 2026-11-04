@@ -15,6 +15,8 @@ try:
         OPS_HANDLING_FEE_AWB_INR,
         MAX_HEAVY_CONSOL_UNIT_MARGIN_INR,
         HEAVY_CONSOL_SCALE_WEIGHT_KG,
+        SMALL_PARCEL_SCALE_WEIGHT_KG,
+        SMALL_PARCEL_MAX_MARGIN_CAP,
         compute_cost_floor_price,
         get_commodity_max_margin,
         get_client_category_max_margin,
@@ -29,6 +31,8 @@ except ImportError:
         OPS_HANDLING_FEE_AWB_INR,
         MAX_HEAVY_CONSOL_UNIT_MARGIN_INR,
         HEAVY_CONSOL_SCALE_WEIGHT_KG,
+        SMALL_PARCEL_SCALE_WEIGHT_KG,
+        SMALL_PARCEL_MAX_MARGIN_CAP,
         compute_cost_floor_price,
         get_commodity_max_margin,
         get_client_category_max_margin,
@@ -125,6 +129,13 @@ def apply_commercial_guardrails(
         cost_floor_margin = round(((cost_floor_price - buy) / buy) * 100.0, 2)
     else:
         cost_floor_margin = 0.0
+
+    # Small parcel courier ceiling scaling (<= 45 kg)
+    # Fixed documentation fees (AWB fee min ₹1,500) require higher margin % tolerance to allow
+    # negotiation corridor and tiers to function above the mandatory cost floor without false conflicts.
+    if wt <= SMALL_PARCEL_SCALE_WEIGHT_KG and buy > 0.0:
+        small_parcel_ceiling = max(effective_cap, min(SMALL_PARCEL_MAX_MARGIN_CAP, cost_floor_margin + 15.0))
+        effective_cap = round(small_parcel_ceiling, 2)
 
     # Volumetric high-cube yield penalty: low-density bulky cargo consumes aircraft cubic capacity
     density_surcharge = 0.0

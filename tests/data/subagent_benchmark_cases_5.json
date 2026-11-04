@@ -19,32 +19,32 @@
     },
     "commercial_baseline_expectations": {
       "rationale": "High fixed fees (AWB fee min ₹1,500 + Ops fee ₹850) dominate low base buy. High percentage markup required to avoid loss.",
-      "expected_margin_range_pct": [30.0, 36.0],
+      "expected_margin_range_pct": [30.0, 45.0],
       "expected_min_sell_inr": 6000.0,
-      "expected_win_probability_range": [0.55, 0.65],
-      "guardrail_expected": "Cost Floor Clamped (AWB/Ops documentation fees)"
+      "expected_win_probability_range": [0.35, 0.65],
+      "guardrail_expected": "Cost Floor Protected (AWB/Ops documentation fees)"
     },
     "model_actual_output": {
-      "quoted_sell_price_inr": 6056.10,
-      "rate_per_kg": 336.45,
-      "target_margin_pct": 34.58,
-      "margin_amount_inr": 1556.10,
-      "margin_per_kg": 86.45,
+      "quoted_sell_price_inr": 6292.80,
+      "rate_per_kg": 349.60,
+      "target_margin_pct": 39.84,
+      "margin_amount_inr": 1792.80,
+      "margin_per_kg": 99.60,
       "negotiation_corridor": {
-        "min_margin_pct": 34.53,
-        "target_margin_pct": 34.58,
-        "max_margin_pct": 34.63,
-        "spread_pp": 0.10,
-        "min_rate_per_kg": 336.33,
-        "target_rate_per_kg": 336.45,
-        "max_rate_per_kg": 336.58
+        "min_margin_pct": 35.84,
+        "target_margin_pct": 39.84,
+        "max_margin_pct": 43.84,
+        "spread_pp": 8.00,
+        "min_rate_per_kg": 339.60,
+        "target_rate_per_kg": 349.60,
+        "max_rate_per_kg": 359.60
       },
       "strategic_tiers": {
         "floor": { "margin_pct": 34.53, "rate_per_kg": 336.33, "sell_inr": 6053.85 },
-        "balanced": { "margin_pct": 34.58, "rate_per_kg": 336.45, "sell_inr": 6056.10 },
-        "premium": { "margin_pct": 34.63, "rate_per_kg": 336.58, "sell_inr": 6058.35 }
+        "balanced": { "margin_pct": 39.84, "rate_per_kg": 349.60, "sell_inr": 6292.80 },
+        "premium": { "margin_pct": 47.34, "rate_per_kg": 368.35, "sell_inr": 6630.30 }
       },
-      "win_probability": 0.5911,
+      "win_probability": 0.3964,
       "pricing_mode": "standard"
     }
   },

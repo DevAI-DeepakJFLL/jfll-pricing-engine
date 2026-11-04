@@ -35,6 +35,8 @@ MIN_MARGIN_PER_KG_INR: float = 3.0       # Minimum unit operational contribution
 OPS_HANDLING_FEE_AWB_INR: float = 850.0  # Baseline origin handling & terminal documentation fee
 MAX_HEAVY_CONSOL_UNIT_MARGIN_INR: float = 4.50  # Unit margin ceiling for >= 5000kg bulk consolidations
 HEAVY_CONSOL_SCALE_WEIGHT_KG: float = 5000.0    # Bulk consolidation scale threshold
+SMALL_PARCEL_SCALE_WEIGHT_KG: float = 45.0      # Small parcel & courier tier threshold
+SMALL_PARCEL_MAX_MARGIN_CAP: float = 55.0       # Maximum margin ceiling for <= 45kg to absorb fixed AWB floor
 
 # ------------------------------------------------------------------------------
 # COMMODITY RISK BUFFERS TABLE (P-7, F-10, Section 10.1)

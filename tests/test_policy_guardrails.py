@@ -347,6 +347,28 @@ class TestPolicyGuardrails(unittest.TestCase):
         self.assertTrue(res_heavy.is_cap_clamped)
         self.assertEqual(res_heavy.limiting_factor, "heavy_consol_unit_cap")
 
+    def test_small_parcel_courier_ceiling_scaling(self):
+        """
+        Requirement: <= 45 kg courier parcel scaling prevents false 'cost floor above cap' conflicts
+        when fixed documentation fees (₹1,500 AWB fee) require high percentage margins on low base buy.
+        """
+        res_parcel = apply_commercial_guardrails(
+            raw_margin_pct=42.0,
+            buy_cost=4500.0,
+            chargeable_wt=18.0,
+            commodity="General Cargo",
+            client_cat="Direct Shipper",
+        )
+        # Cost floor margin = (6054 - 4500)/4500 = 34.53%
+        # Static cap was 30.0%, but scaled courier ceiling expands to min(55.0, 34.53 + 15.0) = 49.53%
+        self.assertEqual(res_parcel.cost_floor_margin_pct, 34.53)
+        self.assertEqual(res_parcel.effective_cap_pct, 49.53)
+        self.assertNotIn("cost floor above cap", res_parcel.approval_required)
+        self.assertFalse(res_parcel.is_floor_clamped)
+        self.assertFalse(res_parcel.is_cap_clamped)
+        self.assertEqual(res_parcel.final_margin_pct, 42.0)
+        self.assertEqual(res_parcel.limiting_factor, "none")
+
 
 
 
