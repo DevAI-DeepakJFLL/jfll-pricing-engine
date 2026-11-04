@@ -34,7 +34,11 @@ if _BASE_DIR not in sys.path:
     sys.path.insert(0, _BASE_DIR)
 
 try:
-    from constants import MODEL_VERSION
+    from constants import (
+        MODEL_VERSION,
+        MIN_MARGIN_PER_AWB_INR,
+        OPS_HANDLING_FEE_AWB_INR,
+    )
     from quantile_model import MarginQuantileModel
     from conformal_corridors import ConformalCorridorCalibrator
     from policy_guardrails import apply_commercial_guardrails
@@ -48,7 +52,11 @@ try:
     from win_model import WinModel
     from backtest import temporal_split, measure_corridor_coverage
 except ImportError:
-    from src.constants import MODEL_VERSION
+    from src.constants import (
+        MODEL_VERSION,
+        MIN_MARGIN_PER_AWB_INR,
+        OPS_HANDLING_FEE_AWB_INR,
+    )
     from src.quantile_model import MarginQuantileModel
     from src.conformal_corridors import ConformalCorridorCalibrator
     from src.policy_guardrails import apply_commercial_guardrails
@@ -1001,6 +1009,20 @@ class PricingEngineV3:
         else:
             signals["competitive"] = {"weight": 0.10, "s": 0.0, "why": "no competitor data"}
 
+        floor_breakdown = {
+            "airline_buy_cost_inr": buy_cost,
+            "awb_documentation_fee_inr": (
+                MIN_MARGIN_PER_AWB_INR if chargeable_wt <= 45.0
+                else round(min(MIN_MARGIN_PER_AWB_INR, max(350.0, 0.015 * buy_cost)), 2)
+            ),
+            "terminal_handling_fee_inr": (
+                OPS_HANDLING_FEE_AWB_INR if chargeable_wt <= 45.0
+                else round(min(OPS_HANDLING_FEE_AWB_INR, max(200.0, 0.010 * buy_cost)), 2)
+            ),
+            "cost_floor_price_inr": guard_bal.cost_floor_price_inr,
+            "cost_floor_margin_pct": guard_bal.cost_floor_margin_pct,
+        }
+
         # 12. Optimal Quote Card Assembly
         optimal_card = dict(strategic_cards[chosen_strategy])
         optimal_card.update({
@@ -1014,6 +1036,7 @@ class PricingEngineV3:
             "strategic_recommendations": strategic_cards,
             "negotiation_corridor": corridor_dict,
             "Cost_Floor_Price_INR": guard_bal.cost_floor_price_inr,
+            "operational_floor_breakdown": floor_breakdown,
             "Cohort_Band_Per_Kg": {
                 "P10": round(raw_p10, 2),
                 "P50": round(raw_p50, 2),
@@ -1031,6 +1054,7 @@ class PricingEngineV3:
             "status": "success",
             "model_version": MODEL_VERSION,
             "optimal": optimal_card,
+            "operational_floor_breakdown": floor_breakdown,
             "carrier": raw_carrier,
             "customer_company": norm_cust,
             "sales_person": raw_sales_person,

@@ -508,24 +508,51 @@ class CustomerPITRegistry:
         margin_col = schema["margin"]
         sell_col = schema["sell"]
 
-        date_vals = df[date_src].values
+        date_vals = pd.to_datetime(df[date_src]).values
         cust_vals = df[cust_key].values
         lane_vals = df[lane_key].values if lane_key and lane_key in df.columns else [None] * len(df)
         won_vals = df[won_col].values if won_col and won_col in df.columns else [0] * len(df)
         margin_vals = df[margin_col].values if margin_col and margin_col in df.columns else [np.nan] * len(df)
         sell_vals = df[sell_col].values if sell_col and sell_col in df.columns else [0.0] * len(df)
 
+        updated_cust_keys = set()
+        updated_lane_keys = set()
+
         for qd, cid, lval, wval, mval, sval in zip(
             date_vals, cust_vals, lane_vals, won_vals, margin_vals, sell_vals
         ):
-            self.update(
-                quote_date=qd,
-                customer_id=cid,
-                is_won=wval,
-                margin=mval,
-                sell_inr=sval,
-                regional_lane=lval,
-            )
+            dt = pd.to_datetime(qd)
+            won_int = 1 if wval in (1, "1", True, "Won", "won") else 0
+            margin_val = float(mval) if mval is not None and not pd.isna(mval) else np.nan
+            sell_val = float(sval) if sval is not None and not pd.isna(sval) else 0.0
+            cust_entry = (dt, won_int, margin_val, sell_val)
+
+            keys_to_update = {str(cid)}
+            try:
+                c_norm = normalize_customer_name(str(cid))
+                c_id = get_canonical_customer_id(str(cid))
+                if c_norm:
+                    keys_to_update.add(c_norm)
+                if c_id:
+                    keys_to_update.add(c_id)
+            except Exception:
+                pass
+
+            for k in keys_to_update:
+                self._customers[k].append(cust_entry)
+                updated_cust_keys.add(k)
+
+            if won_int == 1 and not np.isnan(margin_val) and lval:
+                lane_str = str(lval)
+                self._lanes[lane_str].append((dt, margin_val))
+                updated_lane_keys.add(lane_str)
+
+        # O(N log N) in-place Timsort once per customer and lane (converting O(N^2) inserts to O(N log N))
+        for k in updated_cust_keys:
+            self._customers[k].sort(key=lambda entry: entry[0])
+        for k in updated_lane_keys:
+            self._lanes[k].sort(key=lambda entry: entry[0])
+
         return self
 
     @classmethod
